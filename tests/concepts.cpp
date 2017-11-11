@@ -48,6 +48,10 @@ void print_constrained(const T& f)
 {
 	std::cout << "float: " << f << std::endl;
 }
+
+
+// only 'bool' type allowed
+//template<typename T> concept int c_num = 12;
 // ----------------------------------------------------------------------------
 
 
