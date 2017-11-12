@@ -13,8 +13,13 @@
 #include <type_traits>
 #include <array>
 #include <any>
+#include <algorithm>
 #include <functional>
 #include <tuple>
+#include <utility>
+#include <experimental/algorithm>
+#include <experimental/functional>
+#include <experimental/string>
 #include <boost/type_index.hpp>
 namespace ty = boost::typeindex;
 
@@ -49,6 +54,24 @@ void modify(auto& a)
 		++a;
 	else
 		--a;
+}
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
+// index_sequences
+template<std::size_t ...seq>
+auto mk_tup(const auto& iter, std::index_sequence<seq...>)
+{
+	return std::make_tuple(*(iter + seq)...);
+}
+
+template<std::size_t ...seq>
+void pr_tup(const auto& tup, std::index_sequence<seq...>)
+{
+	using t_tup = std::decay_t<decltype(tup)>;
+	std::apply(::print<std::tuple_element_t<seq, t_tup>...>, tup);
 }
 // ----------------------------------------------------------------------------
 
@@ -144,9 +167,39 @@ int main()
 		};
 		A a{std::make_from_tuple<A>(tup)};
 		print(a.i, " ", a.d);
+
+
+		int arr[] = { 1, 2, 3, 4, 5};
+		auto seq = std::make_index_sequence<3>();
+		auto tupfromarr = mk_tup(arr, seq);
+		std::cout << ty::type_id_with_cvr<decltype(tupfromarr)>().pretty_name() << std::endl;
+		//std::apply(::print<int,int,int>, tupfromarr);
+		pr_tup(tupfromarr, seq);
 	}
 	// --------------------------------------------------------------------
 
+
+
+	// --------------------------------------------------------------------
+	// misc
+	{
+		std::string str("TEST123ABCDEF");
+		std::string str2("123");
+
+		// search
+		auto searcher = std::experimental::make_default_searcher(str2.begin(), str2.end());
+		auto iter = std::experimental::search(str.begin(), str.end(), searcher);
+		std::cout << "pos: " << iter-str.begin() << std::endl;
+
+		// erase
+		std::experimental::erase(str, 'T');
+		std::cout << str << std::endl;
+
+		// erase_if
+		std::experimental::erase_if(str, [](char c)->bool { return c == 'E'; });
+		std::cout << str << std::endl;
+	}
+	// --------------------------------------------------------------------
 
 	return 0;
 }

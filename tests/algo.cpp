@@ -1,5 +1,5 @@
 /**
- * path/file operations
+ * algos
  * @author Tobias Weber
  * @date 11-nov-17
  *
@@ -11,6 +11,7 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <experimental/iterator>
 #include <random>
 
 
@@ -69,7 +70,8 @@ int main()
 	// --------------------------------------------------------------------
 	// sample
 	std::mt19937 rndeng(123);
-	std::sample(v.begin(), v.end(), std::ostream_iterator<T>(std::cout, " "), 3, rndeng);
+	auto joiner = std::experimental::make_ostream_joiner(std::cout, ", ");
+	std::sample(v.begin(), v.end(), joiner, 3, rndeng);
 	std::cout << std::endl;
 	// --------------------------------------------------------------------
 
