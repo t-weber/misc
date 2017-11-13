@@ -17,6 +17,7 @@
 #include <functional>
 #include <tuple>
 #include <utility>
+#include <unordered_map>
 #include <experimental/algorithm>
 #include <experimental/functional>
 #include <experimental/string>
@@ -89,18 +90,6 @@ int main()
 
 
 	// --------------------------------------------------------------------
-	// [] = ...
-	{
-		auto [i, j, k] = arr();
-		print(i, " ", j, " ", k);
-		auto& [l, m, n] = arr2();
-		l = 10;
-		print(l, " ", m, " ", n);
-	}
-	// --------------------------------------------------------------------
-
-
-	// --------------------------------------------------------------------
 	// new if statement
 	if(std::ifstream ifstr("./cpp17.cpp"); ifstr.is_open())
 	{
@@ -113,6 +102,39 @@ int main()
 		std::cout << "File could not be opened." << std::endl;
 	}
 	// --------------------------------------------------------------------
+
+
+	// --------------------------------------------------------------------
+	// [] = ...
+	{
+		auto [i, j, k] = arr();
+		print(i, " ", j, " ", k);
+		auto& [l, m, n] = arr2();
+		l = 10;
+		print(l, " ", m, " ", n);
+
+		std::unordered_map<std::string, int> map{{{"Test"}, 123}};
+		if(auto [iter, bOk] = map.insert({"newtest", 456}); bOk)
+			std::cout << "OK: " << iter->first << ", " << iter->second << std::endl;
+		else
+			std::cout << "failed" << std::endl;
+		if(auto [iter, bOk] = map.insert({"Test", 456}); bOk)
+			std::cout << "OK: " << iter->first << ", " << iter->second << std::endl;
+		else
+			std::cout << "failed" << std::endl;
+
+		if(auto iter = map.find("Test"); iter != map.end())
+			std::cout << "OK: " << iter->first << ", " << iter->second << std::endl;
+		else
+			std::cout << "failed" << std::endl;
+
+		if(auto node = map.extract("Test"); !node.empty())
+			std::cout << "node: " << node.key() << ", " << node.mapped() << std::endl;
+		if(auto node = map.extract("Test"); !node.empty())
+			std::cout << "node: " << node.key() << ", " << node.mapped() << std::endl;
+	}
+	// --------------------------------------------------------------------
+
 
 
 	// --------------------------------------------------------------------
