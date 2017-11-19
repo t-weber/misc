@@ -8,7 +8,7 @@
  *  * https://github.com/boostorg/property_tree/blob/develop/examples/debug_settings.cpp
  *  * https://github.com/boostorg/property_tree/blob/develop/test/test_property_tree.hpp
  *
- * gcc -o ptree ptree.cpp -std=c++17 -lstdc++
+ * gcc -o ptree ptree.cpp -std=c++17 -lstdc++ -lboost_iostreams
  */
 
 #include <iostream>
@@ -20,6 +20,12 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 namespace ptree = boost::property_tree;
+
+#include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/device/file.hpp>
+#include <boost/iostreams/filter/bzip2.hpp>
+namespace ios = boost::iostreams;
 
 
 // ----------------------------------------------------------------------------
@@ -138,6 +144,38 @@ int main()
 		auto attrs = prop.get_child("test.<xmlattr>");
 		std::cout << attrs.size() << " attributes" << std::endl;
 		std::cout << "a = " << prop.get<std::string>("test.<xmlattr>.a") << std::endl;
+	}
+
+
+	// write to a filtering ostream
+	{
+		ptree::ptree prop;
+
+		// put values
+		prop.put<int>("root.test", 123);
+		prop.put<double>("root.test2", 456.789);
+		prop.put<std::string>("root.test3", "123456");
+
+		ios::stream<ios::file_sink> file("tst.xml.bz2");
+		ios::filtering_ostream fostr;
+		fostr.push(ios::bzip2_compressor());
+		fostr.push(file);
+		ptree::write_xml(fostr, prop, ptree::xml_writer_make_settings('\t', 1, std::string("utf-8")));
+	}
+
+
+	// read from a filtering istream
+	{
+		ios::stream<ios::file_source> file("tst.xml.bz2");
+
+		ios::filtering_istream istr;
+		istr.push(ios::bzip2_decompressor());
+		istr.push(file);
+
+		ptree::ptree prop;
+		ptree::read_xml(istr, prop);
+
+		std::cout << prop.get<double>("root.test2") << std::endl;
 	}
 
 	return 0;
