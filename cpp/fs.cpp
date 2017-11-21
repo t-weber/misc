@@ -9,11 +9,16 @@
 
 #include <iostream>
 
-#include <experimental/filesystem>
-//#include <boost/filesystem.hpp>
-
-namespace fs = std::experimental::filesystem;
-//namespace fs = boost::filesystem;
+#if __has_include(<filesystem>)
+	#include <filesystem>
+	namespace fs = std::filesystem;
+#elif __has_include(<experimental/filesystem>)
+	#include <experimental/filesystem>
+	namespace fs = std::experimental::filesystem;
+#else
+	#include <boost/filesystem.hpp>
+	namespace fs = boost::filesystem;
+#endif
 
 
 void iterate_dir(const fs::path& path)

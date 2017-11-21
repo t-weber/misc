@@ -35,7 +35,7 @@ void print(const auto& a, const auto&... rest)
 // ----------------------------------------------------------------------------
 // constrained functions
 
-template<typename T> concept bool c_onlyint = std::is_integral<T>::value;
+template<typename T> concept bool c_onlyint = std::is_integral_v<T>;
 
 void print_constrained(const c_onlyint& i)
 {
@@ -43,7 +43,7 @@ void print_constrained(const c_onlyint& i)
 }
 
 // alternate form
-template<class T> requires std::is_floating_point<T>::value
+template<class T> requires std::is_floating_point_v<T>
 void print_constrained(const T& f)
 {
 	std::cout << "float: " << f << std::endl;
@@ -89,7 +89,27 @@ template<has_value_type T> void print_value_type()
 
 auto addall(const auto&& ...a)
 {
-	return (0 + ... + a);
+	return (/*0 +*/ ... + a);
+}
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
+// old-style emulation of concepts using std::enable_if
+
+// constrained to int types
+template<class T, std::enable_if_t<std::is_integral_v<T>, int> _dummy=0>
+void emulate_concepts(T t)
+{
+	std::cout << "integral type: " << t << std::endl;
+}
+
+//constrained to non-int types
+template<class T, std::enable_if_t<!std::is_integral_v<T>, int> _dummy=0>
+void emulate_concepts(T t)
+{
+	std::cout << "non-integral type: " << t << std::endl;
 }
 // ----------------------------------------------------------------------------
 
@@ -120,6 +140,9 @@ int main()
 	// ----------------------------------------------------------------------------
 
 	std::cout << "add: " << addall(1,2,3,4) << std::endl;
+
+	emulate_concepts(1);
+	emulate_concepts(1.5);
 
 	return 0;
 }
