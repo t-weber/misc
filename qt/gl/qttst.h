@@ -9,14 +9,20 @@
 
 // ----------------------------------------------------------------------------
 // GL versions
-//#include <QOpenGLFunctions>
-//using qgl_funcs = QOpenGLFunctions;
+/*#include <QOpenGLFunctions>
+using qgl_funcs = QOpenGLFunctions;
+#define _GL_MAJ_VER -1
+#define _GL_MIN_VER -1*/
 
 #include <QOpenGLFunctions_3_3_Core>
 using qgl_funcs = QOpenGLFunctions_3_3_Core;
+#define _GL_MAJ_VER 3
+#define _GL_MIN_VER 3
 
-//#include <QOpenGLFunctions_4_5_Core>
-//using qgl_funcs = QOpenGLFunctions_4_5_Core;
+/*#include <QOpenGLFunctions_4_5_Core>
+using qgl_funcs = QOpenGLFunctions_4_5_Core;
+#define _GL_MAJ_VER 4
+#define _GL_MIN_VER 5*/
 // ----------------------------------------------------------------------------
 
 #include <QDialog>
@@ -42,9 +48,10 @@ private:
 	std::shared_ptr<QOpenGLShaderProgram> m_pShaders;
 	std::shared_ptr<QOpenGLBuffer> m_pvertexbuf;
 
-	int m_attrVertex = 0;
-	int m_attrVertexColor = 0;
-	int m_uniMatrixCam = 0;
+	GLuint m_vertexarr = 0;
+	GLint m_attrVertex = -1;
+	GLint m_attrVertexColor = -1;
+	GLint m_uniMatrixCam = -1;
 };
 
 

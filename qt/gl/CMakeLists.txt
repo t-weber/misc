@@ -10,6 +10,7 @@ find_package(Boost REQUIRED)
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Gui REQUIRED)
 find_package(Qt5Widgets REQUIRED)
+find_package(Qt5OpenGL REQUIRED)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -23,4 +24,4 @@ add_executable(qttst qttst.cpp qttst.h)
 
 target_link_libraries(qttst
 	${Boost_LIBRARIES}
-	Qt5::Core Qt5::Widgets Qt5::Gui)
+	Qt5::Core Qt5::Widgets Qt5::Gui Qt5::OpenGL)
