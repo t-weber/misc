@@ -5,6 +5,7 @@
  *
  * References:
  *  * http://www.boost.org/doc/libs/1_65_1/libs/geometry/doc/html/index.html
+ *  * http://www.boost.org/doc/libs/1_65_1/libs/geometry/doc/html/geometry/spatial_indexes/rtree_examples.html
  *  * https://github.com/boostorg/geometry/tree/develop/example
  *
  * gcc -o geo geo.cpp -std=c++17 -lstdc++ -lm
@@ -13,20 +14,26 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <tuple>
 
+#include <boost/function_output_iterator.hpp>
 #include <boost/geometry.hpp>
 #include <boost/geometry/strategies/transform.hpp>
+#include <boost/geometry/index/rtree.hpp>
 namespace geo = boost::geometry;
-namespace trafo = boost::geometry::strategy::transform;
+namespace trafo = geo::strategy::transform;
+namespace geoidx = geo::index;
 
 
 using t_real = double;
 using t_vertex = geo::model::point<t_real, 2, geo::cs::cartesian>;
+constexpr std::size_t geo_iDim = geo::traits::dimension<t_vertex>::value;
 using t_lines = geo::model::linestring<t_vertex>;
 using t_poly = geo::model::polygon<t_vertex>;
 using t_svg = geo::svg_mapper<t_vertex>;
-constexpr std::size_t geo_iDim = geo::traits::dimension<t_vertex>::value;
 using t_trafo = trafo::matrix_transformer<t_real, geo_iDim, geo_iDim>;
+
+using t_rtree = geoidx::rtree<std::tuple<t_vertex, std::size_t, void*>, geoidx::dynamic_rstar>;
 
 
 int main()
@@ -100,6 +107,29 @@ int main()
 	svg1.map(pt2, "stroke:#000000; stroke-width:1px; fill:#000000;", 1.);
 	svg1.map(pt3, "stroke:#000000; stroke-width:1px; fill:#000000;", 1.);
 	svg1.map(ptCent, "stroke:#ff0000; stroke-width:1px; fill:#ff0000;", 1.);
+
+
+	// spatial indices
+	t_rtree rt1(typename t_rtree::parameters_type(8));
+	rt1.insert(std::make_tuple(pt1, 1, nullptr));
+	rt1.insert(std::make_tuple(pt2, 2, nullptr));
+	rt1.insert(std::make_tuple(pt3, 3, nullptr));
+
+	// query nearest 2 points
+	std::vector<typename t_rtree::value_type> vecNearest;
+	rt1.query(geoidx::nearest(t_vertex(1., 3.), 2), std::back_inserter(vecNearest));
+	std::cout << "nearest point indices: ";
+	for(const auto& ptNearest : vecNearest)
+		std::cout << std::get<1>(ptNearest) << " ";
+	std::cout << "\n";
+
+	// query nearest point, calling a lambda function
+	rt1.query(geoidx::nearest(t_vertex(1., 3.), 1),
+		boost::make_function_output_iterator([](const auto& tup)
+		{
+			std::cout << "nearest index: " << std::get<1>(tup) << "\n";
+		}));
+
 
 	return 0;
 }
