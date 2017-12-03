@@ -2,6 +2,7 @@
  * property tree code snippets
  * @author Tobias Weber
  * @date 18-nov-17
+ * @license: see 'LICENSE' file
  *
  * References:
  *  * http://www.boost.org/doc/libs/1_65_1/doc/html/property_tree/reference.html

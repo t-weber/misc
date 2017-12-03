@@ -2,6 +2,7 @@
  * path/file operations
  * @author Tobias Weber
  * @date 11-nov-17
+ * @license: see 'LICENSE' file
  *
  * gcc -o fs fs.cpp -std=c++14 -lstdc++ -lstdc++fs
  * gcc -o fs fs.cpp -std=c++14 -lstdc++ -lboost_filesystem -lboost_system

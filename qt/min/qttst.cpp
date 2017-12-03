@@ -2,6 +2,7 @@
  * minimal qt example
  * @author Tobias Weber
  * @date Nov-2017
+ * @license: see 'LICENSE' file
  */
 
 #include "qttst.h"

@@ -3,6 +3,7 @@
  * (WARNING: not yet working correctly!)
  * @author Tobias Weber
  * @date Nov-2017
+ * @license: see 'LICENSE' file
  *
  * References:
  *  * http://doc.qt.io/qt-5/qopenglwidget.html#details

@@ -2,6 +2,7 @@
  * algos
  * @author Tobias Weber
  * @date 11-nov-17
+ * @license: see 'LICENSE' file
  *
  * gcc -o algo algo.cpp -std=c++17 -lstdc++ -lstdc++fs
  */

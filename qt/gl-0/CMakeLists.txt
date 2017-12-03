@@ -1,6 +1,7 @@
 #
 # @author Tobias Weber
 # @date nov-2017
+# @license: see 'LICENSE' file
 #
 
 project(qtglwin)

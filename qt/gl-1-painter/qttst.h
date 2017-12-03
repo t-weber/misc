@@ -2,6 +2,7 @@
  * minimal qt gl example
  * @author Tobias Weber
  * @date Nov-2017
+ * @license: see 'LICENSE' file
  */
 
 #ifndef __QTTST_H__

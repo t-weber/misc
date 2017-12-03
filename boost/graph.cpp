@@ -2,6 +2,7 @@
  * graph tests
  * @author Tobias Weber
  * @date 03-dec-17
+ * @license: see 'LICENSE' file
  *
  * References:
  *  * https://github.com/boostorg/graph/tree/develop/example

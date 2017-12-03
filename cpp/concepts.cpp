@@ -2,6 +2,7 @@
  * concepts test
  * @author Tobias Weber
  * @date 11-nov-17
+ * @license: see 'LICENSE' file
  *
  * gcc -o concepts concepts.cpp -std=c++17 -fconcepts -lstdc++
  */
