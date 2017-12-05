@@ -27,27 +27,33 @@ namespace geoidx = geo::index;
 
 
 using t_real = double;
-using t_vertex = geo::model::point<t_real, 2, geo::cs::cartesian>;
-constexpr std::size_t geo_iDim = geo::traits::dimension<t_vertex>::value;
-using t_lines = geo::model::linestring<t_vertex>;
-using t_poly = geo::model::polygon<t_vertex>;
-using t_svg = geo::svg_mapper<t_vertex>;
-using t_trafo = trafo::matrix_transformer<t_real, geo_iDim, geo_iDim>;
 
-using t_rtree = geoidx::rtree<std::tuple<t_vertex, std::size_t, void*>, geoidx::dynamic_rstar>;
+template<class T = t_real>
+using t_vertex = geo::model::point<T, 2, geo::cs::cartesian>;
+
+template<class T = t_real>
+constexpr std::size_t g_iDim = geo::traits::dimension<t_vertex<T>>::value;
+
+template<class T = t_real> using t_lines = geo::model::linestring<t_vertex<T>>;
+template<class T = t_real> using t_poly = geo::model::polygon<t_vertex<T>>;
+template<class T = t_real> using t_svg = geo::svg_mapper<t_vertex<T>>;
+template<class T = t_real> using t_trafo = trafo::matrix_transformer<T, g_iDim<T>, g_iDim<T>>;
+
+template<class T = t_real>
+using t_rtree = geoidx::rtree<std::tuple<t_vertex<T>, std::size_t, void*>, geoidx::dynamic_rstar>;
 
 
 int main()
 {
 	// points
-	t_vertex pt1(1., 2.);
-	t_vertex pt2(3., 9.);
-	t_vertex pt3(5., 1.);
+	t_vertex<t_real> pt1(1., 2.);
+	t_vertex<t_real> pt2(3., 9.);
+	t_vertex<t_real> pt3(5., 1.);
 	std::cout << geo::distance(pt1, pt2) << "\n";
 
 
 	// lines
-	t_lines l1;
+	t_lines<t_real> l1;
 	l1.push_back(pt1);
 	l1.push_back(pt2);
 	l1.push_back(pt3);
@@ -56,32 +62,32 @@ int main()
 
 
 	// polys
-	t_poly poly1;
+	t_poly<t_real> poly1;
 	geo::convex_hull(l1, poly1);
 	geo::correct(poly1);
-	t_vertex ptCent;
+	t_vertex<t_real> ptCent;
 	geo::centroid(poly1, ptCent);
 	std::cout << geo::area(poly1) << "\n";
 
 
 	// intersections
-	t_lines l2;
-	l2.push_back(t_vertex(0., 0.));
-	l2.push_back(t_vertex(10., 10.));
-	std::vector<t_vertex> vecPts;
+	t_lines<t_real> l2;
+	l2.push_back(t_vertex<t_real>(0., 0.));
+	l2.push_back(t_vertex<t_real>(10., 10.));
+	std::vector<t_vertex<t_real>> vecPts;
 	geo::intersection(poly1, l2, vecPts);
 
 
 	// trafos
-	t_lines l3;
+	t_lines<t_real> l3;
 	// matrix in homogeneous coordinates
-	t_trafo trafo1(1.,0.,2., 0.,1.,0., 0.,0.,0.);
+	t_trafo<t_real> trafo1(1.,0.,2., 0.,1.,0., 0.,0.,0.);
 	geo::transform(l2, l3, trafo1);
 
 
 	// svg
 	std::ofstream ofstr("tst.svg");
-	t_svg svg1(ofstr, 100, 100, "width=\"200px\" height=\"200px\"");
+	t_svg<t_real> svg1(ofstr, 100, 100, "width=\"200px\" height=\"200px\"");
 
 	svg1.add(poly1);
 	svg1.map(poly1, "stroke:#000000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
@@ -111,21 +117,21 @@ int main()
 
 
 	// spatial indices
-	t_rtree rt1(typename t_rtree::parameters_type(8));
+	t_rtree<t_real> rt1(typename t_rtree<t_real>::parameters_type(8));
 	rt1.insert(std::make_tuple(pt1, 1, nullptr));
 	rt1.insert(std::make_tuple(pt2, 2, nullptr));
 	rt1.insert(std::make_tuple(pt3, 3, nullptr));
 
 	// query nearest 2 points
-	std::vector<typename t_rtree::value_type> vecNearest;
-	rt1.query(geoidx::nearest(t_vertex(1., 3.), 2), std::back_inserter(vecNearest));
+	std::vector<typename t_rtree<t_real>::value_type> vecNearest;
+	rt1.query(geoidx::nearest(t_vertex<t_real>(1., 3.), 2), std::back_inserter(vecNearest));
 	std::cout << "nearest point indices: ";
 	for(const auto& ptNearest : vecNearest)
 		std::cout << std::get<1>(ptNearest) << " ";
 	std::cout << "\n";
 
 	// query nearest point, calling a lambda function
-	rt1.query(geoidx::nearest(t_vertex(1., 3.), 1),
+	rt1.query(geoidx::nearest(t_vertex<t_real>(1., 3.), 1),
 		boost::make_function_output_iterator([](const auto& tup)
 		{
 			std::cout << "nearest index: " << std::get<1>(tup) << "\n";
