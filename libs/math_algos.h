@@ -15,7 +15,6 @@
 // ----------------------------------------------------------------------------
 // concepts
 // ----------------------------------------------------------------------------
-
 /**
  * requirements for a vector container
  */
@@ -57,10 +56,14 @@ concept bool is_mat = requires(const T& a)
 	a*a(0,0);
 	a/a(0,0);					// operator/
 };
-
 // ----------------------------------------------------------------------------
 
 
+
+
+// ----------------------------------------------------------------------------
+// n-dim algos
+// ----------------------------------------------------------------------------
 /**
  * unit matrix
  */
@@ -180,6 +183,26 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
+ * project vector vec onto another vector vecProj
+ */
+template<class t_vec>
+t_vec project(const t_vec& vec, const t_vec& vecProj, bool bIsNormalised=1)
+requires is_vec<t_vec>
+{
+	if(bIsNormalised)
+	{
+		return inner_prod<t_vec>(vec, vecProj) * vecProj;
+	}
+	else
+	{
+		const auto len = norm<t_vec>(vecProj);
+		t_vec _vecProj = vecProj / len;
+		return inner_prod<t_vec>(vec, _vecProj) * _vecProj;
+	}
+}
+
+
+/**
  * matrix to project onto plane perpendicular to vector: P = 1-|v><v|
  * from: 1 = sum_i |v_i><v_i| = |x><x| + |y><y| + |z><z|
  */
@@ -191,6 +214,61 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	return unity<t_mat>(iSize) -
 		projector<t_mat, t_vec>(vec, bIsNormalised);
 }
+
+
+/**
+ * project vector vec onto plane perpendicular to vector vecNorm
+ */
+template<class t_vec>
+t_vec ortho_project(const t_vec& vec, const t_vec& vecNorm, bool bIsNormalised=1)
+requires is_vec<t_vec>
+{
+	const std::size_t iSize = vec.size();
+	return vec - project<t_vec>(vec, vecNorm, bIsNormalised);
+}
+
+
+/**
+ * find orthonormal substitute base for vector space (Gram-Schmidt algo)
+ * get orthogonal projections: |i'> = (1 - sum_{j<i} |j><j|) |i>
+ */
+template<template<class...> class t_cont, class t_vec>
+t_cont<t_vec> orthonorm_sys(const t_cont<t_vec>& sys)
+requires is_vec<t_vec>
+{
+	const std::size_t N = sys.size();
+	t_cont<t_vec> newsys;
+
+	for(std::size_t i=0; i<N; ++i)
+	{
+		t_vec vecOrthoProj = sys[i];
+
+		// subtract projections to other base vectors
+		for(std::size_t j=0; j<newsys.size(); ++j)
+			vecOrthoProj -= project<t_vec>(sys[i], newsys[j], true);
+
+		// normalise
+		vecOrthoProj /= norm<t_vec>(vecOrthoProj);
+		newsys.push_back(vecOrthoProj);
+	}
+
+	return newsys;
+}
+
+
+// ----------------------------------------------------------------------------
+
+
+
+
+
+// ----------------------------------------------------------------------------
+// 3-dim algos
+// ----------------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------
+
 
 
 #endif

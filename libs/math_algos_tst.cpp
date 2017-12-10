@@ -45,7 +45,7 @@ int main()
 
 		t_vec vec1(3), vec2(3);
 		vec1[0] = 1; vec1[1] = 2; vec1[2] = 3;
-		vec2[0] = 5; vec2[1] = 6; vec2[2] = 7;
+		vec2[0] = 7; vec2[1] = 8; vec2[2] = 9;
 
 		t_real d = inner_prod<t_vec>(vec1, vec2);
 		t_mat mat = outer_prod<t_mat, t_vec>(vec1, vec2);
@@ -53,10 +53,20 @@ int main()
 		std::cout << mat << "\n";
 
 		t_vec vec3 = zero<t_vec>(3);
+		vec3[1] = 1;
+		vec3[2] = 1;
 		t_mat mat3 = zero<t_mat>(3,3);
 
 		t_mat matProj = ortho_projector<t_mat, t_vec>(vec1, 0);
 		std::cout << matProj << "\n";
+
+
+		auto newsys = orthonorm_sys<std::vector, t_vec>({vec1, vec2, vec3});
+		for(const auto& vec : newsys)
+			std::cout << vec << ", length: " << norm<t_vec>(vec) << "\n";
+		std::cout << "v0 * v1 = " << inner_prod<t_vec>(newsys[0], newsys[1]) << "\n";
+		std::cout << "v0 * v2 = " << inner_prod<t_vec>(newsys[0], newsys[2]) << "\n";
+		std::cout << "v1 * v2 = " << inner_prod<t_vec>(newsys[1], newsys[2]) << "\n";
 	}
 
 	return 0;
