@@ -16,10 +16,10 @@
 // concepts
 // ----------------------------------------------------------------------------
 /**
- * requirements for a vector container
+ * requirements for a basic vector container like std::vector
  */
 template<class T>
-concept bool is_vec = requires(const T& a)
+concept bool is_basic_vec = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 
@@ -27,13 +27,21 @@ concept bool is_vec = requires(const T& a)
 	a.operator[](1);			// must have an operator[]
 
 	a.size();					// must have a size() member function
-
-	//a+a;						// operator+
-	//a-a;						// operator-
-	//a[0]*a;					// operator*
-	//a*a[0];
-	//a/a[0];					// operator/
 };
+
+
+/**
+ * requirements for a vector container
+ */
+template<class T>
+concept bool is_vec = requires(const T& a)
+{
+	a+a;						// operator+
+	a-a;						// operator-
+	a[0]*a;						// operator*
+	a*a[0];
+	a/a[0];						// operator/
+} && is_basic_vec<T>;
 
 
 /**
@@ -81,7 +89,6 @@ requires is_mat<t_mat>
 }
 
 
-
 /**
  * zero matrix
  */
@@ -104,7 +111,7 @@ requires is_mat<t_mat>
  */
 template<class t_vec>
 t_vec zero(std::size_t N)
-requires is_vec<t_vec>
+requires is_basic_vec<t_vec>
 {
 	t_vec vec(N);
 
@@ -121,7 +128,7 @@ requires is_vec<t_vec>
  */
 template<class t_vec>
 typename t_vec::value_type inner_prod(const t_vec& vec1, const t_vec& vec2)
-requires is_vec<t_vec>
+requires is_basic_vec<t_vec>
 {
 	typename t_vec::value_type val(0);
 
@@ -137,7 +144,7 @@ requires is_vec<t_vec>
  */
 template<class t_vec>
 typename t_vec::value_type norm(const t_vec& vec)
-requires is_vec<t_vec>
+requires is_basic_vec<t_vec>
 {
 	return std::sqrt(inner_prod<t_vec>(vec, vec));
 }
@@ -148,7 +155,7 @@ requires is_vec<t_vec>
  */
 template<class t_mat, class t_vec>
 t_mat outer_prod(const t_vec& vec1, const t_vec& vec2)
-requires is_vec<t_vec> && is_mat<t_mat>
+requires is_basic_vec<t_vec> && is_mat<t_mat>
 {
 	const std::size_t N1 = vec1.size();
 	const std::size_t N2 = vec2.size();
@@ -266,6 +273,44 @@ requires is_vec<t_vec>
 // 3-dim algos
 // ----------------------------------------------------------------------------
 
+/**
+ * cross product matrix
+ */
+template<class t_mat, class t_vec>
+t_mat skewsymmetric(const t_vec& vec)
+requires is_basic_vec<t_vec> && is_mat<t_mat>
+{
+	t_mat mat(3,3);
+
+	mat(0,0) = 0; 		mat(0,1) = -vec[2]; 	mat(0,2) = vec[1];
+	mat(1,0) = vec[2]; 	mat(1,1) = 0; 			mat(1,2) = -vec[0];
+	mat(2,0) = -vec[1]; mat(2,1) = vec[0]; 		mat(2,2) = 0;
+
+	return mat;
+}
+
+
+/**
+ * matrix to rotate around an axis
+ */
+template<class t_mat, class t_vec>
+t_mat rotation(const t_vec& axis, const typename t_vec::value_type angle, bool bIsNormalised=1)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	// project along rotation axis
+	t_mat matProj1 = projector<t_mat, t_vec>(axis, bIsNormalised);
+
+	// project along axis 2 in plane perpendiculat to rotation axis
+	t_mat matProj2 = ortho_projector<t_mat, t_vec>(axis, bIsNormalised) * std::cos(angle);
+
+	// project along axis 3 in plane perpendiculat to rotation axis and axis 2
+	typename t_vec::value_type len = 1;
+	if(!bIsNormalised)
+		len = norm<t_vec>(axis);
+	t_mat matProj3 = skewsymmetric<t_mat, t_vec>(axis/len) * std::sin(angle);
+
+	return matProj1 + matProj2 + matProj3;
+}
 
 // ----------------------------------------------------------------------------
 
