@@ -10,13 +10,17 @@
 #include "math_algos.h"
 
 #include <vector>
+#include <array>
 
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/io.hpp>
 namespace ublas = boost::numeric::ublas;
 
-//#include <QtCore/QVector>
+#include <boost/type_index.hpp>
+namespace ty = boost::typeindex;
+
+#include <QtCore/QVector>
 //#include <QtGui/QGenericMatrix>
 
 
@@ -25,10 +29,51 @@ using t_real = double;
 
 int main()
 {
-	// using STL containers
+	// using dynamic STL containers
 	{
 		using t_vec = std::vector<t_real>;
 		using t_mat = ublas::matrix<t_real>;
+		std::cout << "Using " << ty::type_id_with_cvr<t_vec>().pretty_name() << "\n";
+
+		t_vec vec1{{1, 2, 3}};
+		t_vec vec2{{7, 8, 9}};
+
+		t_real d = inner_prod<t_vec>(vec1, vec2);
+		std::cout << d << "\n";
+
+		t_vec vec3 = zero<t_vec>(3);
+		t_mat mat1 = outer_prod<t_mat, t_vec>(vec1, vec2);
+		std::cout << mat1 << "\n";
+	}
+
+	std::cout << "\n";
+
+
+	// using static STL containers
+	{
+		using t_vec = std::array<t_real, 3>;
+		using t_mat = ublas::matrix<t_real>;
+		std::cout << "Using " << ty::type_id_with_cvr<t_vec>().pretty_name() << "\n";
+
+		t_vec vec1{{1, 2, 3}};
+		t_vec vec2{{7, 8, 9}};
+
+		t_real d = inner_prod<t_vec>(vec1, vec2);
+		std::cout << d << "\n";
+
+		t_vec vec3 = zero<t_vec>(3);
+		t_mat mat1 = outer_prod<t_mat, t_vec>(vec1, vec2);
+		std::cout << mat1 << "\n";
+	}
+
+	std::cout << "\n";
+
+
+	// using Qt classes
+	{
+		using t_vec = QVector<t_real>;
+		using t_mat = ublas::matrix<t_real>;
+		std::cout << "Using " << ty::type_id_with_cvr<t_vec>().pretty_name() << "\n";
 
 		t_vec vec1{{1, 2, 3}};
 		t_vec vec2{{7, 8, 9}};
@@ -48,6 +93,7 @@ int main()
 	{
 		using t_vec = ublas::vector<t_real>;
 		using t_mat = ublas::matrix<t_real>;
+		std::cout << "Using " << ty::type_id_with_cvr<t_vec>().pretty_name() << "\n";
 
 		t_vec vec1(3), vec2(3);
 		vec1[0] = 1; vec1[1] = 2; vec1[2] = 3;

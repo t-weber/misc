@@ -23,12 +23,18 @@ concept bool is_basic_vec = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 
-	T(3);						// constructor
-	a.operator[](1);			// must have an operator[]
-
 	a.size();					// must have a size() member function
+	a.operator[](1);			// must have an operator[]
 };
 
+/**
+ * requirements of a vector type with a dynamic size
+ */
+template<class T>
+concept bool is_dyn_vec = requires(const T& a)
+{
+	T(3);						// constructor
+};
 
 /**
  * requirements for a vector container
@@ -45,6 +51,15 @@ concept bool is_vec = requires(const T& a)
 
 
 /**
+ * requirements of a matrix type with a dynamic size
+ */
+template<class T>
+concept bool is_dyn_mat = requires(const T& a)
+{
+	T(3,3);						// constructor
+};
+
+/**
  * requirements for a matrix container
  */
 template<class T>
@@ -52,11 +67,9 @@ concept bool is_mat = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 
-	T(3,3);						// constructor
-	a.operator()(1,1);			// must have an operator()
-
 	a.size1();					// must have a size1() member function
 	a.size2();					// must have a size2() member function
+	a.operator()(1,1);			// must have an operator()
 
 	a+a;						// operator+
 	a-a;						// operator-
@@ -79,7 +92,9 @@ template<class t_mat>
 t_mat unity(std::size_t N)
 requires is_mat<t_mat>
 {
-	t_mat mat(N,N);
+	t_mat mat;
+	if constexpr(is_dyn_mat<t_mat>)
+		mat = t_mat(N,N);
 
 	for(std::size_t i=0; i<N; ++i)
 		for(std::size_t j=0; j<N; ++j)
@@ -96,7 +111,9 @@ template<class t_mat>
 t_mat zero(std::size_t N1, std::size_t N2)
 requires is_mat<t_mat>
 {
-	t_mat mat(N1, N2);
+	t_mat mat;
+	if constexpr(is_dyn_mat<t_mat>)
+		mat = t_mat(N1, N2);
 
 	for(std::size_t i=0; i<N1; ++i)
 		for(std::size_t j=0; j<N2; ++j)
@@ -113,7 +130,9 @@ template<class t_vec>
 t_vec zero(std::size_t N)
 requires is_basic_vec<t_vec>
 {
-	t_vec vec(N);
+	t_vec vec;
+	if constexpr(is_dyn_vec<t_vec>)
+		vec = t_vec(N);
 
 	for(std::size_t i=0; i<N; ++i)
 		vec[i] = 0;
@@ -159,7 +178,10 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 {
 	const std::size_t N1 = vec1.size();
 	const std::size_t N2 = vec2.size();
-	t_mat mat(N1, N2);
+
+	t_mat mat;
+	if constexpr(is_dyn_mat<t_mat>)
+		mat = t_mat(N1, N2);
 
 	for(std::size_t n1=0; n1<N1; ++n1)
 		for(std::size_t n2=0; n2<N2; ++n2)
@@ -280,7 +302,9 @@ template<class t_mat, class t_vec>
 t_mat skewsymmetric(const t_vec& vec)
 requires is_basic_vec<t_vec> && is_mat<t_mat>
 {
-	t_mat mat(3,3);
+	t_mat mat;
+	if constexpr(is_dyn_mat<t_mat>)
+		mat = t_mat(3,3);
 
 	mat(0,0) = 0; 		mat(0,1) = -vec[2]; 	mat(0,2) = vec[1];
 	mat(1,0) = vec[2]; 	mat(1,1) = 0; 			mat(1,2) = -vec[0];
