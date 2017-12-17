@@ -81,6 +81,48 @@ concept bool is_mat = requires(const T& a)
 
 
 
+// ----------------------------------------------------------------------------
+// adapters
+// ----------------------------------------------------------------------------
+template<typename size_t, size_t N, typename T, template<size_t, size_t, class...> class t_mat_base>
+class qvec_adapter : public t_mat_base<1, N, T>
+{
+public:
+	// types
+	using base_type = t_mat_base<1, N, T>;
+	using size_type = size_t;
+	using value_type = T;
+
+	// constructors
+	using base_type::base_type;
+	qvec_adapter(const base_type& vec) : base_type{vec} {}
+
+	size_t size() const { return N; }
+
+	T& operator[](size_t i) { return base_type::operator()(i,0); }
+	const T& operator[](size_t i) const { return base_type::operator()(i,0); }
+};
+
+
+template<typename size_t, size_t ROWS, size_t COLS, typename T, template<size_t, size_t, class...> class t_mat_base>
+class qmat_adapter : public t_mat_base<COLS, ROWS, T>
+{
+public:
+	// types
+	using base_type = t_mat_base<COLS, ROWS, T>;
+	using size_type = size_t;
+	using value_type = T;
+
+	// constructors
+	using base_type::base_type;
+	qmat_adapter(const base_type& mat) : base_type{mat} {}
+
+	size_t size1() const { return COLS; }
+	size_t size2() const { return ROWS; }
+};
+// ----------------------------------------------------------------------------
+
+
 
 // ----------------------------------------------------------------------------
 // n-dim algos
