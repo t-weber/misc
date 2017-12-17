@@ -5,7 +5,7 @@
  * @license: see 'LICENSE' file
  *
  * enabled concepts:
- * g++ -D__USE_CONCEPTS__ -o concepts2 concepts2.cpp -std=c++17 -fconcepts
+ * g++ -o concepts2 concepts2.cpp -std=c++17 -fconcepts
  *
  * disabled concepts:
  * g++ -o concepts2 concepts2.cpp -std=c++17
@@ -19,7 +19,7 @@
 namespace ublas = boost::numeric::ublas;
 
 
-#ifdef __USE_CONCEPTS__
+#ifdef __cpp_concepts
 // requirements of a vector type
 template<class T>
 concept bool is_vec = requires(const T& a)
@@ -43,7 +43,7 @@ concept bool is_vec2 = requires(const T& a)
 // a function on the vector type
 template<class t_vec>
 t_vec vector_func(const t_vec& vec1, const t_vec& vec2)
-#ifdef __USE_CONCEPTS__
+#ifdef __cpp_concepts
 	requires is_vec<t_vec> && is_vec2<t_vec>
 #endif
 {
@@ -56,7 +56,7 @@ t_vec vector_func(const t_vec& vec1, const t_vec& vec2)
 }
 
 
-#ifdef __USE_CONCEPTS__
+#ifdef __cpp_concepts
 // alternate formulation
 template<is_vec t_vec>
 void vector_func2(const t_vec& vec1, const t_vec& vec2)
