@@ -13,14 +13,26 @@
 #include <vector>
 
 
-// requirements of a vector type
+// requirements of a vector type (as concept variable)
 template<class T>
 concept bool is_vec = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
-	a.operator[](1);			// must have operator[]
-	a.size();					// must have a size() member function
+	a.operator[](1);		// must have operator[]
+	{ a.size() } -> std::size_t;	// must have a size() member function
 };
+
+// requirements of a vector type (as concept function)
+template<class T>
+concept bool is_vec_func()
+{
+	return requires(const T& a)
+	{
+		typename T::value_type;				// must have a value_type
+		{ a.operator[](1) } -> typename T::value_type;	// must have operator[]
+		{ a.size() } -> std::size_t;			// must have a size() member function
+	};
+}
 
 
 // requirements of a vector type with a dynamic size
@@ -35,7 +47,8 @@ concept bool is_dyn_vec = requires(const T& a)
 // a function on the vector type
 template<class t_vec>
 t_vec vector_func(const t_vec& vec1, const t_vec& vec2)
-	requires is_vec<t_vec>
+	requires is_vec<t_vec>			// using variable concept
+	//requires is_vec_func<t_vec>()		// using function concept
 {
 	t_vec vec;
 	if constexpr(is_dyn_vec<t_vec>)
@@ -55,6 +68,7 @@ t_vec vector_func(const t_vec& vec1, const t_vec& vec2)
 }
 
 
+template<class T> concept bool has_size = requires(const T& t) { t.size(); };
 
 int main()
 {
@@ -72,6 +86,21 @@ int main()
 	vec4[0] = 9.; vec4[1] = 8.; vec4[2] = 7.;
 	std::vector<double> vecR2 = vector_func(vec3, vec4);
 	std::cout << vecR2[0] << ", " << vecR2[1] << ", " << vecR2[2] << "\n";
+
+
+	// checking if a member is available
+	auto lam = [](const auto& vec) -> void
+	{
+		//concept bool has_size = requires(const auto& t) { t.size(); };
+
+		if constexpr(has_size<decltype(vec)>)
+			std::cout << "Type " << typeid(vec).name() << " has a size() member.\n";
+		else
+			std::cout << "Type " << typeid(vec).name() << " has NO size() member.\n";
+	};
+
+	lam(vec1);
+	lam(5);
 
 
 	return 0;
