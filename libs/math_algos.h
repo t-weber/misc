@@ -288,7 +288,23 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
- * project vector vec onto plane perpendicular to vector vecNorm
+ * matrix to mirror on plane perpendicular to vector: P = 1 - 2*|v><v|
+ * subtracts twice its projection onto the plane normal from the vector
+ */
+template<class t_mat, class t_vec>
+t_mat ortho_mirror_op(const t_vec& vec, bool bIsNormalised=1)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	using T = typename t_vec::value_type;
+	const std::size_t iSize = vec.size();
+
+	return unity<t_mat>(iSize) -
+		T(2)*projector<t_mat, t_vec>(vec, bIsNormalised);
+}
+
+
+/**
+ * project vector vec onto plane through the origin and perpendicular to vector vecNorm
  */
 template<class t_vec>
 t_vec ortho_project(const t_vec& vec, const t_vec& vecNorm, bool bIsNormalised=1)
@@ -296,6 +312,38 @@ requires is_vec<t_vec>
 {
 	const std::size_t iSize = vec.size();
 	return vec - project<t_vec>(vec, vecNorm, bIsNormalised);
+}
+
+
+/**
+ * project vector vec onto plane perpendicular to vector vecNorm with distance d
+ * vecNorm has to be normalised and plane in Hessian form: x*vecNorm = d
+ */
+template<class t_vec>
+t_vec ortho_project_plane(const t_vec& vec,
+	const t_vec& vecNorm, typename t_vec::value_type d)
+requires is_vec<t_vec>
+{
+	// project onto plane through origin
+	t_vec vecProj0 = ortho_project<t_vec>(vec, vecNorm, 1);
+	// add distance of plane to origin
+	return vecProj0 + d*vecNorm;
+}
+
+
+/**
+ * mirror a vector on a plane perpendicular to vector vecNorm with distance d
+ * vecNorm has to be normalised and plane in Hessian form: x*vecNorm = d
+ */
+template<class t_vec>
+t_vec ortho_mirror_plane(const t_vec& vec,
+	const t_vec& vecNorm, typename t_vec::value_type d)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	t_vec vecProj = ortho_project_plane<t_vec>(vec, vecNorm, d);
+	return vec - T(2)*(vec - vecProj);
 }
 
 

@@ -106,6 +106,14 @@ int main()
 		std::cout << matRot(0,0) << " " << matRot(0,1) << " " << matRot(0,2) << "\n";
 		std::cout << matRot(1,0) << " " << matRot(1,1) << " " << matRot(1,2) << "\n";
 		std::cout << matRot(2,0) << " " << matRot(2,1) << " " << matRot(2,2) << "\n";
+
+
+		t_vec vecNorm; vecNorm[0] = 0; vecNorm[1] = 1; vecNorm[2] = 0;
+		t_real d = 5.;
+		t_vec vecPlane = ortho_project_plane<t_vec>(vec1, vecNorm, d);
+		std::cout << vecPlane[0] << " "  << vecPlane[1]  << " " << vecPlane[2] << "\n";
+		vecPlane = ortho_mirror_plane<t_vec>(vec1, vecNorm, d);
+		std::cout << vecPlane[0] << " "  << vecPlane[1]  << " " << vecPlane[2] << "\n";
 	}
 
 	std::cout << "\n";
@@ -144,6 +152,12 @@ int main()
 
 
 		std::cout << rotation<t_mat, t_vec>(vec3, 0.1, 0) << "\n";
+
+
+		t_vec vecNorm(3); vecNorm[0] = 0; vecNorm[1] = 1; vecNorm[2] = 0;
+		t_real d = 5.;
+		std::cout << ortho_project_plane<t_vec>(vec1, vecNorm, d) << "\n";
+		std::cout << ortho_mirror_plane<t_vec>(vec1, vecNorm, d) << "\n";
 	}
 
 	return 0;
