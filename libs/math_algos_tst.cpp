@@ -93,6 +93,11 @@ int main()
 		std::cout << matProj(1,0) << " " << matProj(1,1) << " " << matProj(1,2) << "\n";
 		std::cout << matProj(2,0) << " " << matProj(2,1) << " " << matProj(2,2) << "\n";
 
+		mat3(0,0) = 1; mat3(0,1) = 2; mat3(0,2) = 3;
+		mat3(1,0) = 1; mat3(1,1) = 2; mat3(1,2) = 2;
+		mat3(2,0) = 3; mat3(2,1) = 2; mat3(2,2) = 1;
+		std::cout << "det = " << det<t_mat>(mat3) << "\n";
+
 
 		auto newsys = orthonorm_sys<std::vector, t_vec>({vec1, vec2, vec3});
 		for(const auto& vec : newsys)
@@ -133,6 +138,9 @@ int main()
 		std::cout << inner_prod<t_vec>(vec1, vec2) << "\n";
 		t_mat mat = outer_prod<t_mat, t_vec>(vec1, vec2);
 		std::cout << mat << "\n";
+		std::cout << mat(0,0) << " " << mat(0,1) << " " << mat(0,2) << "\n";
+		std::cout << mat(1,0) << " " << mat(1,1) << " " << mat(1,2) << "\n";
+		std::cout << mat(2,0) << " " << mat(2,1) << " " << mat(2,2) << "\n";
 
 		t_vec vec3 = zero<t_vec>(3);
 		vec3[1] = 1;
@@ -141,6 +149,11 @@ int main()
 
 		t_mat matProj = ortho_projector<t_mat, t_vec>(vec1, 0);
 		std::cout << matProj << "\n";
+
+		mat3(0,0) = 1; mat3(0,1) = 2; mat3(0,2) = 3;
+		mat3(1,0) = 1; mat3(1,1) = 2; mat3(1,2) = 2;
+		mat3(2,0) = 3; mat3(2,1) = 2; mat3(2,2) = 1;
+		std::cout << "det = " << det<t_mat>(mat3) << "\n";
 
 
 		auto newsys = orthonorm_sys<std::vector, t_vec>({vec1, vec2, vec3});

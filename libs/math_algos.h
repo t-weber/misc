@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <cmath>
+#include <vector>
 
 
 // ----------------------------------------------------------------------------
@@ -117,8 +118,8 @@ public:
 	using base_type::base_type;
 	qmat_adapter(const base_type& mat) : base_type{mat} {}
 
-	size_t size1() const { return COLS; }
-	size_t size2() const { return ROWS; }
+	size_t size1() const { return ROWS; }
+	size_t size2() const { return COLS; }
 };
 // ----------------------------------------------------------------------------
 
@@ -375,6 +376,104 @@ requires is_vec<t_vec>
 }
 
 
+
+/**
+ * linearise a matrix to a vector container
+ */
+template<class t_mat, template<class...> class t_cont>
+t_cont<typename t_mat::value_type> flatten(const t_mat& mat)
+requires is_mat<t_mat> && is_basic_vec<t_cont<typename t_mat::value_type>>
+{
+	using T = typename t_mat::value_type;
+	t_cont<T> vec;
+
+	for(std::size_t iRow=0; iRow<mat.size1(); ++iRow)
+		for(std::size_t iCol=0; iCol<mat.size2(); ++iCol)
+			vec.push_back(mat(iRow, iCol));
+
+	return vec;
+}
+
+
+/**
+ * submatrix removing a column/row from a matrix stored in a vector container
+ */
+template<class t_vec>
+t_vec flat_submat(const t_vec& mat,
+	std::size_t iNumRows, std::size_t iNumCols,
+	std::size_t iRemRow, std::size_t iRemCol)
+requires is_basic_vec<t_vec>
+{
+	t_vec vec;
+
+	for(std::size_t iRow=0; iRow<iNumRows; ++iRow)
+	{
+		if(iRow == iRemRow)
+			continue;
+
+		for(std::size_t iCol=0; iCol<iNumCols; ++iCol)
+		{
+			if(iCol == iRemCol)
+				continue;
+			vec.push_back(mat[iRow*iNumCols + iCol]);
+		}
+	}
+
+	return vec;
+}
+
+
+/**
+ * determinant from a square matrix stored in a vector container
+ */
+template<class t_vec>
+typename t_vec::value_type flat_det(const t_vec& mat, std::size_t iN)
+requires is_basic_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	// special cases
+	if(iN == 0)
+		return 0;
+	else if(iN == 1)
+		return mat[0];
+	else if(iN == 2)
+		return mat[0]*mat[3] - mat[1]*mat[2];
+
+	// recursively expand determiant along a row
+	T fullDet = T(0);
+	bool bSign = 1;
+	std::size_t iRow = 0;
+
+	for(std::size_t iCol=0; iCol<iN; ++iCol)
+	{
+		t_vec subMat = flat_submat<t_vec>(mat, iN, iN, iRow, iCol);
+		T subDet = flat_det<t_vec>(subMat, iN-1);
+		if(!bSign) subDet = -subDet;
+
+		fullDet += mat[iRow*iN + iCol] * subDet;
+		bSign = !bSign;
+	}
+
+	return fullDet;
+}
+
+
+/**
+ * determinant
+ */
+template<class t_mat>
+typename t_mat::value_type det(const t_mat& mat)
+requires is_mat<t_mat>
+{
+	using T = typename t_mat::value_type;
+
+	if(mat.size1() != mat.size2())
+		return 0;
+
+	std::vector<T> matFlat = flatten<t_mat, std::vector>(mat);
+	return flat_det<std::vector<T>>(matFlat, mat.size1());
+}
 // ----------------------------------------------------------------------------
 
 
@@ -426,8 +525,8 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	return matProj1 + matProj2 + matProj3;
 }
 
-// ----------------------------------------------------------------------------
 
+// ----------------------------------------------------------------------------
 
 
 #endif
