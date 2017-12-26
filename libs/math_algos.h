@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cmath>
 #include <vector>
+#include <iterator>
 
 
 // ----------------------------------------------------------------------------
@@ -98,7 +99,7 @@ public:
 	using base_type::base_type;
 	qvec_adapter(const base_type& vec) : base_type{vec} {}
 
-	size_t size() const { return N; }
+	constexpr size_t size() const { return N; }
 
 	T& operator[](size_t i) { return base_type::operator()(i,0); }
 	const T& operator[](size_t i) const { return base_type::operator()(i,0); }
@@ -184,6 +185,61 @@ requires is_basic_vec<t_vec>
 }
 
 
+/**
+ * create vector from initializer_list
+ */
+template<class t_vec>
+t_vec create(const std::initializer_list<typename t_vec::value_type>& lst)
+requires is_basic_vec<t_vec>
+{
+	t_vec vec;
+	if constexpr(is_dyn_vec<t_vec>)
+		vec = t_vec(lst.size());
+
+	const std::size_t iMax = std::min(lst.size(), std::size_t(vec.size()));
+	auto iterLst = lst.begin();
+	for(std::size_t i=0; i<iMax; ++i)
+	{
+		vec[i] = *iterLst;
+		std::advance(iterLst, 1);
+	}
+
+	return vec;
+}
+
+
+/**
+ * create matrix from initializer_list
+ * in columns[rows] order
+ */
+template<class t_mat>
+t_mat create(const std::initializer_list<std::initializer_list<typename t_mat::value_type>>& lst)
+requires is_mat<t_mat>
+{
+	const std::size_t iCols = lst.size();
+	const std::size_t iRows = lst.begin()->size();
+
+	t_mat mat;
+	if constexpr(is_dyn_mat<t_mat>)
+		mat = t_mat(iRows, iCols);
+
+	auto iterCol = lst.begin();
+	for(std::size_t iCol=0; iCol<iCols; ++iCol)
+	{
+		auto iterRow = iterCol->begin();
+		for(std::size_t iRow=0; iRow<iRows; ++iRow)
+		{
+			mat(iRow, iCol) = *iterRow;
+			std::advance(iterRow, 1);
+		}
+
+		std::advance(iterCol, 1);
+	}
+
+	return mat;
+}
+
+
 
 /**
  * inner product
@@ -236,6 +292,7 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 
 /**
  * matrix to project onto vector: P = |v><v|
+ * from: |x'> = <v|x> * |v> = |v><v|x> = |v><v| * |x>
  */
 template<class t_mat, class t_vec>
 t_mat projector(const t_vec& vec, bool bIsNormalised=1)
@@ -271,6 +328,21 @@ requires is_vec<t_vec>
 		t_vec _vecProj = vecProj / len;
 		return inner_prod<t_vec>(vec, _vecProj) * _vecProj;
 	}
+}
+
+
+/**
+ * project vector vec onto the line lineOrigin + lam*lineDir
+ * shift line to go through origin, calculate projection and shift back
+ */
+template<class t_vec>
+t_vec project_line(const t_vec& vec,
+	const t_vec& lineOrigin, const t_vec& lineDir, bool bIsNormalised=1)
+requires is_vec<t_vec>
+{
+	t_vec ptShifted = vec - lineOrigin;
+	t_vec ptProj = project<t_vec>(ptShifted, lineDir, bIsNormalised);
+	return lineOrigin + ptProj;
 }
 
 

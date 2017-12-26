@@ -107,21 +107,36 @@ int main()
 		std::cout << "v1 * v2 = " << inner_prod<t_vec>(newsys[1], newsys[2]) << "\n";
 
 
+		std::cout << "\nrotation\n";
 		auto matRot = rotation<t_mat, t_vec>(vec3, 0.1, 0);
 		std::cout << matRot(0,0) << " " << matRot(0,1) << " " << matRot(0,2) << "\n";
 		std::cout << matRot(1,0) << " " << matRot(1,1) << " " << matRot(1,2) << "\n";
 		std::cout << matRot(2,0) << " " << matRot(2,1) << " " << matRot(2,2) << "\n";
 
 
+		std::cout << "\nproject_plane\n";
 		t_vec vecNorm; vecNorm[0] = 0; vecNorm[1] = 1; vecNorm[2] = 0;
 		t_real d = 5.;
 		t_vec vecPlane = ortho_project_plane<t_vec>(vec1, vecNorm, d);
 		std::cout << vecPlane[0] << " "  << vecPlane[1]  << " " << vecPlane[2] << "\n";
 		vecPlane = ortho_mirror_plane<t_vec>(vec1, vecNorm, d);
 		std::cout << vecPlane[0] << " "  << vecPlane[1]  << " " << vecPlane[2] << "\n";
+
+		std::cout << "\nproject_line\n";
+		t_vec lineOrigin = create<t_vec>({10., 20., 30.});
+		t_vec lineDir = create<t_vec>({0., 1., 0.});
+		t_vec vecPos = create<t_vec>({1., 2., 3.});
+		t_vec vecLineProj = project_line<t_vec>(vecPos, lineOrigin, lineDir, 0);
+		std::cout << vecLineProj[0] << " "  << vecLineProj[1]  << " " << vecLineProj[2] << "\n";
+
+
+		std::cout << "\ncreate\n";
+		t_mat matCreated = create<t_mat>({{1,2}, {3,4}});
+		std::cout << matCreated(0,0) << " " << matCreated(0,1) << "\n";
+		std::cout << matCreated(1,0) << " " << matCreated(1,1) << "\n";
 	}
 
-	std::cout << "\n";
+	std::cout << "\n\n";
 
 
 	// using ublas classes
@@ -164,13 +179,26 @@ int main()
 		std::cout << "v1 * v2 = " << inner_prod<t_vec>(newsys[1], newsys[2]) << "\n";
 
 
+		std::cout << "\nrotation\n";
 		std::cout << rotation<t_mat, t_vec>(vec3, 0.1, 0) << "\n";
 
 
+		std::cout << "\nproject_plane\n";
 		t_vec vecNorm(3); vecNorm[0] = 0; vecNorm[1] = 1; vecNorm[2] = 0;
 		t_real d = 5.;
 		std::cout << ortho_project_plane<t_vec>(vec1, vecNorm, d) << "\n";
 		std::cout << ortho_mirror_plane<t_vec>(vec1, vecNorm, d) << "\n";
+
+
+		std::cout << "\nproject_line\n";
+		t_vec lineOrigin = create<t_vec>({10., 20., 30.});
+		t_vec lineDir = create<t_vec>({0., 1., 0.});
+		t_vec vecPos = create<t_vec>({1., 2., 3.});
+		std::cout << project_line<t_vec>(vecPos, lineOrigin, lineDir, 0) << "\n";
+
+
+		std::cout << "\ncreate\n";
+		std::cout << create<t_mat>({{1,2}, {3,4}}) << "\n";
 	}
 
 	return 0;
