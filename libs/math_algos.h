@@ -12,11 +12,19 @@
 #include <cmath>
 #include <vector>
 #include <iterator>
+#include <limits>
 
 
 // ----------------------------------------------------------------------------
 // concepts
 // ----------------------------------------------------------------------------
+/**
+ * requirements for a scalar type
+ */
+template<class T>
+concept bool is_scalar = 
+	std::is_floating_point_v<T> || std::is_integral_v<T>;
+
 /**
  * requirements for a basic vector container like std::vector
  */
@@ -129,6 +137,65 @@ public:
 // ----------------------------------------------------------------------------
 // n-dim algos
 // ----------------------------------------------------------------------------
+
+/**
+ * are two scalars equal within an epsilon range?
+ */
+template<class T>
+bool equals(T t1, T t2, T eps = std::numeric_limits<T>::epsilon())
+requires is_scalar<T>
+{
+	return std::abs(t1 - t2) <= eps;
+}
+
+/**
+ * are two vectors equal within an epsilon range?
+ */
+template<class t_vec>
+bool equals(const t_vec& vec1, const t_vec& vec2,
+	typename t_vec::value_type eps = std::numeric_limits<typename t_vec::value_type>::epsilon())
+requires is_basic_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	if(vec1.size() != vec2.size())
+		return false;
+
+	for(std::size_t i=0; i<vec1.size(); ++i)
+	{
+		if(!equals<T>(vec1[i], vec2[i], eps))
+			return false;
+	}
+
+	return true;
+}
+
+/**
+ * are two matrices equal within an epsilon range?
+ */
+template<class t_mat>
+bool equals(const t_mat& mat1, const t_mat& mat2,
+	typename t_mat::value_type eps = std::numeric_limits<typename t_mat::value_type>::epsilon())
+requires is_mat<t_mat>
+{
+	using T = typename t_mat::value_type;
+
+	if(mat1.size1() != mat2.size1() || mat1.size2() != mat2.size2())
+		return false;
+
+	for(std::size_t i=0; i<mat1.size1(); ++i)
+	{
+		for(std::size_t j=0; j<mat1.size2(); ++j)
+		{
+			if(!equals<T>(mat1(i,j), mat2(i,j), eps))
+				return false;
+		}
+	}
+
+	return true;
+}
+
+
 /**
  * unit matrix
  */

@@ -134,6 +134,13 @@ int main()
 		t_mat matCreated = create<t_mat>({{1,2}, {3,4}});
 		std::cout << matCreated(0,0) << " " << matCreated(0,1) << "\n";
 		std::cout << matCreated(1,0) << " " << matCreated(1,1) << "\n";
+
+
+		std::cout << "\nequals\n";
+		std::cout << std::boolalpha << equals<t_vec>(create<t_vec>({1,2,3}), create<t_vec>({1,2,3})) << "\n";
+		std::cout << std::boolalpha << equals<t_vec>(create<t_vec>({1,2,3.1}), create<t_vec>({1,2,3})) << "\n";
+		std::cout << std::boolalpha << equals<t_mat>(create<t_mat>({{1,2}, {3,4}}), create<t_mat>({{1,2}, {3,4}})) << "\n";
+		std::cout << std::boolalpha << equals<t_mat>(create<t_mat>({{1,2}, {3.1,4}}), create<t_mat>({{1,2}, {3,4}})) << "\n";
 	}
 
 	std::cout << "\n\n";
@@ -199,6 +206,13 @@ int main()
 
 		std::cout << "\ncreate\n";
 		std::cout << create<t_mat>({{1,2}, {3,4}}) << "\n";
+
+
+		std::cout << "\nequals\n";
+		std::cout << std::boolalpha << equals<t_vec>(create<t_vec>({1,2,3}), create<t_vec>({1,2,3})) << "\n";
+		std::cout << std::boolalpha << equals<t_vec>(create<t_vec>({1,2,3.1}), create<t_vec>({1,2,3})) << "\n";
+		std::cout << std::boolalpha << equals<t_mat>(create<t_mat>({{1,2}, {3,4}}), create<t_mat>({{1,2}, {3,4}})) << "\n";
+		std::cout << std::boolalpha << equals<t_mat>(create<t_mat>({{1,2}, {3.1,4}}), create<t_mat>({{1,2}, {3,4}})) << "\n";
 	}
 
 	return 0;
