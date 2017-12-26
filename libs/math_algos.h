@@ -624,6 +624,29 @@ requires is_mat<t_mat>
 // ----------------------------------------------------------------------------
 
 /**
+ * cross product
+ */
+template<class t_vec>
+t_vec cross_prod(const t_vec& vec1, const t_vec& vec2)
+requires is_basic_vec<t_vec>
+{
+	t_vec vec;
+
+	// only valid for 3-vectors
+	if(vec1.size() != 3 || vec2.size() != 3)
+		return vec;
+
+	if constexpr(is_dyn_vec<t_vec>)
+		vec = t_vec(3);
+
+	for(int i=0; i<3; ++i)
+		vec[i] = vec1[(i+1)%3]*vec2[(i+2)%3] - vec1[(i+2)%3]*vec2[(i+1)%3];
+
+	return vec;
+}
+
+
+/**
  * cross product matrix
  */
 template<class t_mat, class t_vec>
@@ -649,17 +672,33 @@ template<class t_mat, class t_vec>
 t_mat rotation(const t_vec& axis, const typename t_vec::value_type angle, bool bIsNormalised=1)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
+	using t_real = typename t_vec::value_type;
+
+	const t_real c = std::cos(angle);
+	const t_real s = std::sin(angle);
+
+	t_real len = 1;
+	if(!bIsNormalised)
+		len = norm<t_vec>(axis);
+
+	// special cases: rotations around [100], [010], [001]
+	if(equals(axis, create<t_vec>({len,0,0})))
+		return create<t_mat>({{1,0,0}, {0,c,s}, {0,-s,c}});
+	else if(equals(axis, create<t_vec>({0,len,0})))
+		return create<t_mat>({{c,0,-s}, {0,1,0}, {s,0,c}});
+	else if(equals(axis, create<t_vec>({0,0,len})))
+		return create<t_mat>({{c,s,0}, {-s,c,0}, {0,0,1}});
+
+	// general case
+
 	// project along rotation axis
 	t_mat matProj1 = projector<t_mat, t_vec>(axis, bIsNormalised);
 
 	// project along axis 2 in plane perpendiculat to rotation axis
-	t_mat matProj2 = ortho_projector<t_mat, t_vec>(axis, bIsNormalised) * std::cos(angle);
+	t_mat matProj2 = ortho_projector<t_mat, t_vec>(axis, bIsNormalised) * c;
 
 	// project along axis 3 in plane perpendiculat to rotation axis and axis 2
-	typename t_vec::value_type len = 1;
-	if(!bIsNormalised)
-		len = norm<t_vec>(axis);
-	t_mat matProj3 = skewsymmetric<t_mat, t_vec>(axis/len) * std::sin(angle);
+	t_mat matProj3 = skewsymmetric<t_mat, t_vec>(axis/len) * s;
 
 	return matProj1 + matProj2 + matProj3;
 }
