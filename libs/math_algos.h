@@ -13,7 +13,9 @@
 #include <vector>
 #include <iterator>
 #include <limits>
+//#include <iostream>
 
+namespace m {
 
 // ----------------------------------------------------------------------------
 // concepts
@@ -110,9 +112,8 @@ public:
 	constexpr size_t size() const { return N; }
 
 	T& operator[](size_t i) { return base_type::operator()(i,0); }
-	const T& operator[](size_t i) const { return base_type::operator()(i,0); }
+	const T operator[](size_t i) const { return base_type::operator()(i,0); }
 };
-
 
 template<typename size_t, size_t ROWS, size_t COLS, typename T, template<size_t, size_t, class...> class t_mat_base>
 class qmat_adapter : public t_mat_base<COLS, ROWS, T>
@@ -126,6 +127,43 @@ public:
 	// constructors
 	using base_type::base_type;
 	qmat_adapter(const base_type& mat) : base_type{mat} {}
+
+	size_t size1() const { return ROWS; }
+	size_t size2() const { return COLS; }
+};
+
+
+template<typename size_t, size_t N, typename T, class t_vec_base>
+class qvecN_adapter : public t_vec_base
+{
+public:
+	// types
+	using base_type = t_vec_base;
+	using size_type = size_t;
+	using value_type = T;
+
+	// constructors
+	using base_type::base_type;
+	qvecN_adapter(const base_type& vec) : base_type{vec} {}
+
+	constexpr size_t size() const { return N; }
+
+	T& operator[](size_t i) { return static_cast<base_type&>(*this)[i]; }
+	const T operator[](size_t i) const { return static_cast<const base_type&>(*this)[i]; }
+};
+
+template<typename size_t, size_t ROWS, size_t COLS, typename T, class t_mat_base>
+class qmatNN_adapter : public t_mat_base
+{
+public:
+	// types
+	using base_type = t_mat_base;
+	using size_type = size_t;
+	using value_type = T;
+
+	// constructors
+	using base_type::base_type;
+	qmatNN_adapter(const base_type& mat) : base_type{mat} {}
 
 	size_t size1() const { return ROWS; }
 	size_t size2() const { return COLS; }
@@ -197,21 +235,42 @@ requires is_mat<t_mat>
 
 
 /**
+ * set submatrix to unity
+ */
+template<class t_mat>
+void unity(t_mat& mat, std::size_t rows_begin, std::size_t cols_begin, std::size_t rows_end, std::size_t cols_end)
+requires is_mat<t_mat>
+{
+	for(std::size_t i=rows_begin; i<rows_end; ++i)
+		for(std::size_t j=cols_begin; j<cols_end; ++j)
+			mat(i,j) = (i==j ? 1 : 0);
+}
+
+
+/**
  * unit matrix
  */
 template<class t_mat>
-t_mat unity(std::size_t N)
+t_mat unity(std::size_t N1, std::size_t N2)
 requires is_mat<t_mat>
 {
 	t_mat mat;
 	if constexpr(is_dyn_mat<t_mat>)
-		mat = t_mat(N,N);
+		mat = t_mat(N1, N2);
 
-	for(std::size_t i=0; i<N; ++i)
-		for(std::size_t j=0; j<N; ++j)
-			mat(i,j) = (i==j ? 1 : 0);
-
+	unity<t_mat>(mat, 0,0, mat.size1(),mat.size2());
 	return mat;
+}
+
+
+/**
+ * unit matrix
+ */
+template<class t_mat>
+t_mat unity(std::size_t N=0)
+requires is_mat<t_mat>
+{
+	return unity<t_mat>(N,N);
 }
 
 
@@ -226,11 +285,21 @@ requires is_mat<t_mat>
 	if constexpr(is_dyn_mat<t_mat>)
 		mat = t_mat(N1, N2);
 
-	for(std::size_t i=0; i<N1; ++i)
-		for(std::size_t j=0; j<N2; ++j)
+	for(std::size_t i=0; i<mat.size1(); ++i)
+		for(std::size_t j=0; j<mat.size2(); ++j)
 			mat(i,j) = 0;
 
 	return mat;
+}
+
+/**
+ * zero matrix
+ */
+template<class t_mat>
+t_mat zero(std::size_t N=0)
+requires is_mat<t_mat>
+{
+	return zero<t_mat>(N, N);
 }
 
 
@@ -238,14 +307,14 @@ requires is_mat<t_mat>
  * zero vector
  */
 template<class t_vec>
-t_vec zero(std::size_t N)
+t_vec zero(std::size_t N=0)
 requires is_basic_vec<t_vec>
 {
 	t_vec vec;
 	if constexpr(is_dyn_vec<t_vec>)
 		vec = t_vec(N);
 
-	for(std::size_t i=0; i<N; ++i)
+	for(std::size_t i=0; i<vec.size(); ++i)
 		vec[i] = 0;
 
 	return vec;
@@ -263,12 +332,18 @@ requires is_basic_vec<t_vec>
 	if constexpr(is_dyn_vec<t_vec>)
 		vec = t_vec(lst.size());
 
-	const std::size_t iMax = std::min(lst.size(), std::size_t(vec.size()));
 	auto iterLst = lst.begin();
-	for(std::size_t i=0; i<iMax; ++i)
+	for(std::size_t i=0; i<vec.size(); ++i)
 	{
-		vec[i] = *iterLst;
-		std::advance(iterLst, 1);
+		if(iterLst != lst.end())
+		{
+			vec[i] = *iterLst;
+			std::advance(iterLst, 1);
+		}
+		else	// vector larger than given list?
+		{
+			vec[i] = 0;
+		}
 	}
 
 	return vec;
@@ -286,9 +361,7 @@ requires is_mat<t_mat>
 	const std::size_t iCols = lst.size();
 	const std::size_t iRows = lst.begin()->size();
 
-	t_mat mat;
-	if constexpr(is_dyn_mat<t_mat>)
-		mat = t_mat(iRows, iCols);
+	t_mat mat = unity<t_mat>(iRows, iCols);
 
 	auto iterCol = lst.begin();
 	for(std::size_t iCol=0; iCol<iCols; ++iCol)
@@ -632,8 +705,8 @@ requires is_basic_vec<t_vec>
 {
 	t_vec vec;
 
-	// only valid for 3-vectors
-	if(vec1.size() != 3 || vec2.size() != 3)
+	// only valid for 3-vectors -> use first three components
+	if(vec1.size() < 3 || vec2.size() < 3)
 		return vec;
 
 	if constexpr(is_dyn_vec<t_vec>)
@@ -656,6 +729,10 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 	t_mat mat;
 	if constexpr(is_dyn_mat<t_mat>)
 		mat = t_mat(3,3);
+
+	// if static matrix is larger than 3x3 (e.g. for homogeneous coordinates), initialise as identity
+	if(mat.size1() > 3 || mat.size2() > 3)
+		mat = unity<t_mat>(mat.size1(), mat.size2());
 
 	mat(0,0) = 0; 		mat(0,1) = -vec[2]; 	mat(0,2) = vec[1];
 	mat(1,0) = vec[2]; 	mat(1,1) = 0; 			mat(1,2) = -vec[0];
@@ -681,6 +758,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	if(!bIsNormalised)
 		len = norm<t_vec>(axis);
 
+	// ----------------------------------------------------
 	// special cases: rotations around [100], [010], [001]
 	if(equals(axis, create<t_vec>({len,0,0})))
 		return create<t_mat>({{1,0,0}, {0,c,s}, {0,-s,c}});
@@ -689,8 +767,8 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	else if(equals(axis, create<t_vec>({0,0,len})))
 		return create<t_mat>({{c,s,0}, {-s,c,0}, {0,0,1}});
 
+	// ----------------------------------------------------
 	// general case
-
 	// project along rotation axis
 	t_mat matProj1 = projector<t_mat, t_vec>(axis, bIsNormalised);
 
@@ -700,11 +778,16 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	// project along axis 3 in plane perpendiculat to rotation axis and axis 2
 	t_mat matProj3 = skewsymmetric<t_mat, t_vec>(axis/len) * s;
 
-	return matProj1 + matProj2 + matProj3;
+	//std::cout << matProj1(3,3) <<  " " << matProj2(3,3) <<  " " << matProj3(3,3) << std::endl;
+	t_mat matProj = matProj1 + matProj2 + matProj3;
+
+	// if matrix is larger than 3x3 (e.g. for homogeneous cooridnates), fill up with identity
+	unity<t_mat>(matProj, 3,3, matProj.size1(),matProj.size2());
+	return matProj;
 }
 
 
 // ----------------------------------------------------------------------------
 
-
+}
 #endif

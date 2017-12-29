@@ -4,11 +4,12 @@
  * @date 9-dec-17
  * @license: see 'LICENSE' file
  *
- * g++ -o math_algos_tst math_algos_tst.cpp -std=c++17 -fconcepts -lQtCore
+ * g++ -fPIC -I/usr/include/qt5 -o math_algos_tst math_algos_tst.cpp -std=c++17 -fconcepts -lQt5Core
  */
 
 #include <iostream>
 #include "math_algos.h"
+using namespace m;
 
 #include <vector>
 #include <array>
@@ -22,8 +23,9 @@ namespace ublas = boost::numeric::ublas;
 namespace ty = boost::typeindex;
 
 #include <QtCore/QVector>
-//#include <QtGui/QVector3D>
 #include <QtGui/QGenericMatrix>
+#include <QtGui/QMatrix4x4>
+#include <QtGui/QVector4D>
 
 
 template<class t_vec, class t_mat>
@@ -126,9 +128,9 @@ int main()
 		t_vec vec3 = zero<t_vec>(3);
 		t_mat mat1 = outer_prod<t_mat, t_vec>(vec1, vec2);
 		std::cout << mat1 << "\n";
+	
+		std::cout << "\n\n";
 	}
-
-	std::cout << "\n";
 
 
 	// using static STL containers
@@ -145,9 +147,9 @@ int main()
 		t_vec vec3 = zero<t_vec>(3);
 		t_mat mat1 = outer_prod<t_mat, t_vec>(vec1, vec2);
 		std::cout << mat1 << "\n";
-	}
 
-	std::cout << "\n";
+		std::cout << "\n\n";
+	}
 
 
 	// using Qt classes
@@ -157,9 +159,18 @@ int main()
 		using t_mat = qmat_adapter<int, 3, 3, t_real, QGenericMatrix>;
 
 		vecmat_tsts<t_vec, t_mat>();
+		std::cout << "\n\n";
 	}
 
-	std::cout << "\n\n";
+
+	// using specialised Qt classes
+	{
+		using t_vec = qvecN_adapter<int, 4, float, QVector4D>;
+		using t_mat = qmatNN_adapter<int, 4, 4, float, QMatrix4x4>;
+
+		vecmat_tsts<t_vec, t_mat>();
+		std::cout << "\n\n";
+	}
 
 
 	// using ublas classes
@@ -169,6 +180,7 @@ int main()
 		using t_mat = ublas::matrix<t_real>;
 
 		vecmat_tsts<t_vec, t_mat>();
+		std::cout << "\n\n";
 	}
 
 	return 0;
