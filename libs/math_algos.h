@@ -518,7 +518,7 @@ requires is_vec<t_vec>
 
 /**
  * matrix to project onto plane perpendicular to vector: P = 1-|v><v|
- * from: 1 = sum_i |v_i><v_i| = |x><x| + |y><y| + |z><z|
+ * from completeness relation: 1 = sum_i |v_i><v_i| = |x><x| + |y><y| + |z><z|
  */
 template<class t_mat, class t_vec>
 t_mat ortho_projector(const t_vec& vec, bool bIsNormalised=1)
@@ -684,17 +684,15 @@ requires is_basic_vec<t_vec>
 
 	// recursively expand determiant along a row
 	T fullDet = T(0);
-	bool bSign = 1;
 	std::size_t iRow = 0;
 
 	for(std::size_t iCol=0; iCol<iN; ++iCol)
 	{
-		t_vec subMat = flat_submat<t_vec>(mat, iN, iN, iRow, iCol);
-		T subDet = flat_det<t_vec>(subMat, iN-1);
-		if(!bSign) subDet = -subDet;
+		const T sgn = ((iRow+iCol) % 2) == 0 ? T(1) : T(-1);
+		const t_vec subMat = flat_submat<t_vec>(mat, iN, iN, iRow, iCol);
+		const T subDet = flat_det<t_vec>(subMat, iN-1) * sgn;
 
 		fullDet += mat[iRow*iN + iCol] * subDet;
-		bSign = !bSign;
 	}
 
 	return fullDet;
@@ -715,6 +713,47 @@ requires is_mat<t_mat>
 
 	std::vector<T> matFlat = flatten<t_mat, std::vector>(mat);
 	return flat_det<std::vector<T>>(matFlat, mat.size1());
+}
+
+
+/**
+ * inverted matrix
+ */
+template<class t_mat>
+std::tuple<t_mat, bool> inv(const t_mat& mat)
+requires is_mat<t_mat>
+{
+	using T = typename t_mat::value_type;
+	using t_vec = std::vector<T>;
+	const std::size_t N = mat.size1();
+
+	// fail if matrix is not square
+	if(N != mat.size2())
+		return std::make_tuple(t_mat(), false);
+
+	const t_vec matFlat = flatten<t_mat, std::vector>(mat);
+	const T fullDet = flat_det<t_vec>(matFlat, N);
+
+	// fail if determinant is zero
+	if(equals<T>(fullDet, 0))
+		return std::make_tuple(t_mat(), false);	
+
+	t_mat matInv;
+	if constexpr(is_dyn_mat<t_mat>)
+		matInv = t_mat(N, N);
+
+	for(std::size_t i=0; i<N; ++i)
+	{
+		for(std::size_t j=0; j<N; ++j)
+		{
+			const T sgn = ((i+j) % 2) == 0 ? T(1) : T(-1);
+			const t_vec subMat = flat_submat<t_vec>(matFlat, N, N, i, j);
+			matInv(j,i) = sgn * flat_det<t_vec>(subMat, N-1);
+		}
+	}
+
+	matInv *= T(1) / fullDet;
+	return std::make_tuple(matInv, true);
 }
 // ----------------------------------------------------------------------------
 

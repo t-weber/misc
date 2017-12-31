@@ -166,18 +166,21 @@ void GlWidget::resizeGL(int w, int h)
 	std::cerr << std::dec << __func__ << ": w = " << w << ", h = " << h << std::endl;
 	if(!m_pGl) return;
 
+	m_matViewport = m::hom_viewport<t_mat>(w, h, 0., 1.);
+	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat>(m_matViewport);
 	//m_matViewport.setToIdentity();
 	//m_matViewport.viewport(0, 0, w, h, 0., 1.);
-	m_matViewport = m::hom_viewport<t_mat>(w, h, 0., 1.);
-	m_matViewport_inv = m_matViewport.inverted();
+	//m_matViewport_inv = m_matViewport.inverted();
+
 
 	m_pGl->glViewport(0, 0, w, h);
 	m_pGl->glDepthRange(0, 1);
 
+	m_matPerspective = m::hom_perspective<t_mat>(0.01, 100., m::pi<t_real>*0.5, t_real(h)/t_real(w));
+	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat>(m_matPerspective);
 	//m_matPerspective.setToIdentity();
 	//m_matPerspective.perspective(90., double(w)/double(h), 0.01, 100.);
-	m_matPerspective = m::hom_perspective<t_mat>(0.01, 100., m::pi<t_real>*0.5, t_real(h)/t_real(w));
-	m_matPerspective_inv = m_matPerspective.inverted();
+	//m_matPerspective_inv = m_matPerspective.inverted();
 
 
 	// bind shaders
@@ -269,11 +272,11 @@ void GlWidget::paintGL()
 
 
 	// test
-	/*auto [ vecPersp, vec ] =
+	auto [ vecPersp, vec ] =
 		m::hom_to_screen_coords<t_mat, t_vec>(t_vec(0.67, -0.89, -0.01, 1.), m_matCam, m_matPerspective, m_matViewport, true);
 	std::cout << vec[0] << " " << vec[1] << " " << vec[2] << " " << vec[3] << "  ->  ";
 	t_vec vecWorld = m::hom_from_screen_coords<t_mat, t_vec>(vec[0], vec[1], 0., m_matCam_inv, m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
-	std::cout << vecWorld[0] << " " << vecWorld[1] << " " << vecWorld[2] << " " << vecWorld[3] << std::endl;*/
+	std::cout << vecWorld[0] << " " << vecWorld[1] << " " << vecWorld[2] << " " << vecWorld[3] << std::endl;
 }
 
 
@@ -286,8 +289,9 @@ void GlWidget::tick(const std::chrono::milliseconds& ms)
 {
 	t_mat matRot = m::rotation<t_mat, t_vec>(m::create<t_vec>({0.,0.,1.,0.}), 2.5/180.*M_PI, 1);
 	m_matCam *= matRot;
+	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat>(m_matCam);
 	//m_matCam.rotate(2.5, 0.,0.,1.);
-	m_matCam_inv = m_matCam.inverted();
+	//m_matCam_inv = m_matCam.inverted();
 
 	update();
 }

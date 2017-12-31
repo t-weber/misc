@@ -34,6 +34,12 @@ ublas::vector<T> operator*(const ublas::matrix<T>& mat, const ublas::vector<T>& 
 	return ublas::prod(mat, vec);
 }
 
+template<class T>
+ublas::matrix<T> operator*(const ublas::matrix<T>& m1, const ublas::matrix<T>& m2)
+{
+	return ublas::prod(m1, m2);
+}
+
 
 template<class t_vec, class t_mat>
 void vecmat_tsts()
@@ -41,7 +47,7 @@ void vecmat_tsts()
 	using t_real = typename t_vec::value_type;
 	std::cout << "Using " 
 		<< "t_vec = " << ty::type_id_with_cvr<t_vec>().pretty_name() << ", "
-		<< "t_mat = " << ty::type_id_with_cvr<t_vec>().pretty_name() << "\n";
+		<< "t_mat = " << ty::type_id_with_cvr<t_mat>().pretty_name() << "\n";
 
 	t_vec vec1 = create<t_vec>({1, 2, 3}),
 		vec2 = create<t_vec>({7, 8, 9});
@@ -66,6 +72,18 @@ void vecmat_tsts()
 	mat3(1,0) = 1; mat3(1,1) = 2; mat3(1,2) = 2;
 	mat3(2,0) = 3; mat3(2,1) = 2; mat3(2,2) = 1;
 	std::cout << "det = " << det<t_mat>(mat3) << "\n";
+
+	auto [matInv, bInvExists] = inv<t_mat>(mat3);
+	std::cout << "\ninverse: " << std::boolalpha << bInvExists << "\n";
+	std::cout << matInv(0,0) << " " << matInv(0,1) << " " << matInv(0,2) << "\n";
+	std::cout << matInv(1,0) << " " << matInv(1,1) << " " << matInv(1,2) << "\n";
+	std::cout << matInv(2,0) << " " << matInv(2,1) << " " << matInv(2,2) << "\n";
+
+	t_mat matE = mat3*matInv;
+	std::cout << matE(0,0) << " " << matE(0,1) << " " << matE(0,2) << "\n";
+	std::cout << matE(1,0) << " " << matE(1,1) << " " << matE(1,2) << "\n";
+	std::cout << matE(2,0) << " " << matE(2,1) << " " << matE(2,2) << "\n";
+	std::cout << "\n";
 
 
 	auto newsys = orthonorm_sys<std::vector, t_vec>({vec1, vec2, vec3});
@@ -213,6 +231,20 @@ int main()
 
 		vecmat_tsts<t_vec, t_mat>();
 		vecmat_tsts_hom<t_vec, t_mat>();
+
+		auto [matInv, bInvExists] = inv<t_mat>(create<t_mat>(
+		{
+			1, 2, 3, 4,
+			4, 3, 2, 1,
+			1, 0, 1, 1,
+			1, 5, 9, 10
+		}));
+		std::cout << "\ninverse 2: " << std::boolalpha << bInvExists << "\n";
+		std::cout << matInv(0,0) << " " << matInv(0,1) << " " << matInv(0,2) << " " << matInv(0,3) << "\n";
+		std::cout << matInv(1,0) << " " << matInv(1,1) << " " << matInv(1,2) << " " << matInv(1,3) << "\n";
+		std::cout << matInv(2,0) << " " << matInv(2,1) << " " << matInv(2,2) << " " << matInv(2,3) << "\n";
+		std::cout << matInv(3,0) << " " << matInv(3,1) << " " << matInv(3,2) << " " << matInv(3,3) << "\n";
+
 		std::cout << "\n\n";
 	}
 
