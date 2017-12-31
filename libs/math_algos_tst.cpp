@@ -28,6 +28,13 @@ namespace ty = boost::typeindex;
 #include <QtGui/QVector4D>
 
 
+template<class T>
+ublas::vector<T> operator*(const ublas::matrix<T>& mat, const ublas::vector<T>& vec)
+{
+	return ublas::prod(mat, vec);
+}
+
+
 template<class t_vec, class t_mat>
 void vecmat_tsts()
 {
@@ -112,6 +119,42 @@ void vecmat_tsts()
 }
 
 
+template<class t_vec, class t_mat>
+void vecmat_tsts_hom()
+{
+	std::cout << "\nviewport\n";
+	t_mat matVP = hom_viewport<t_mat>(800., 600.);
+	std::cout << matVP(0,0) << " " << matVP(0,1) << " " << matVP(0,2) << " " << matVP(0,3) << "\n";
+	std::cout << matVP(1,0) << " " << matVP(1,1) << " " << matVP(1,2) << " " << matVP(1,3) << "\n";
+	std::cout << matVP(2,0) << " " << matVP(2,1) << " " << matVP(2,2) << " " << matVP(2,3) << "\n";
+	std::cout << matVP(3,0) << " " << matVP(3,1) << " " << matVP(3,2) << " " << matVP(3,3) << "\n";
+
+
+	std::cout << "\nperspective\n";
+	t_mat matPersp = hom_perspective<t_mat>();
+	std::cout << matPersp(0,0) << " " << matPersp(0,1) << " " << matPersp(0,2) << " " << matPersp(0,3) << "\n";
+	std::cout << matPersp(1,0) << " " << matPersp(1,1) << " " << matPersp(1,2) << " " << matPersp(1,3) << "\n";
+	std::cout << matPersp(2,0) << " " << matPersp(2,1) << " " << matPersp(2,2) << " " << matPersp(2,3) << "\n";
+	std::cout << matPersp(3,0) << " " << matPersp(3,1) << " " << matPersp(3,2) << " " << matPersp(3,3) << "\n";
+
+	auto fktProj = [&matPersp](const t_vec& vec1)
+	{
+		t_vec vec1p = matPersp * vec1;
+		t_vec vec1p_div = vec1p / vec1p[3];
+		std::cout << vec1[0] << " " << vec1[1] << " " << vec1[2] << " " << vec1[3] << "  ->  ";
+		std::cout << vec1p[0] << " " << vec1p[1] << " " << vec1p[2] << " " << vec1p[3] << "  ->  ";
+		std::cout << vec1p_div[0] << " " << vec1p_div[1] << " " << vec1p_div[2] << "\n";
+	};
+
+	fktProj(create<t_vec>({0, 0, -0.01, 1}));
+	fktProj(create<t_vec>({0, 1, -0.01, 1}));
+	fktProj(create<t_vec>({1, 1, -0.01, 1}));
+	fktProj(create<t_vec>({0, 0, -100, 1}));
+	fktProj(create<t_vec>({0, 1, -100, 1}));
+	fktProj(create<t_vec>({1, 1, -100, 1}));
+}
+
+
 int main()
 {
 	// using dynamic STL containers
@@ -169,6 +212,7 @@ int main()
 		using t_mat = qmatNN_adapter<int, 4, 4, float, QMatrix4x4>;
 
 		vecmat_tsts<t_vec, t_mat>();
+		vecmat_tsts_hom<t_vec, t_mat>();
 		std::cout << "\n\n";
 	}
 
@@ -180,6 +224,7 @@ int main()
 		using t_mat = ublas::matrix<t_real>;
 
 		vecmat_tsts<t_vec, t_mat>();
+		vecmat_tsts_hom<t_vec, t_mat>();
 		std::cout << "\n\n";
 	}
 

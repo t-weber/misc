@@ -41,9 +41,10 @@ using qgl_funcs = QOpenGLFunctions_4_5_Core;
 #include <chrono>
 #include "../../libs/math_algos.h"
 
-using t_vec3 = m::qvecN_adapter<int, 3, float, QVector3D>;
-using t_vec = m::qvecN_adapter<int, 4, float, QVector4D>;
-using t_mat = m::qmatNN_adapter<int, 4, 4, float, QMatrix4x4>;
+using t_real = float;
+using t_vec3 = m::qvecN_adapter<int, 3, t_real, QVector3D>;
+using t_vec = m::qvecN_adapter<int, 4, t_real, QVector4D>;
+using t_mat = m::qmatNN_adapter<int, 4, 4, t_real, QMatrix4x4>;
 
 
 class GlWidget : public QOpenGLWidget
@@ -54,7 +55,7 @@ public:
 	GlWidget(QWidget *pParent);
 	virtual ~GlWidget();
 
-	QPointF GlToScreenCoords(const t_vec3& vec, bool *pVisible=nullptr);
+	QPointF GlToScreenCoords(const t_vec& vec, bool *pVisible=nullptr);
 
 protected:
 	virtual void initializeGL() override;
@@ -68,7 +69,9 @@ private:
 	std::shared_ptr<QOpenGLShaderProgram> m_pShaders;
 	std::shared_ptr<QOpenGLBuffer> m_pvertexbuf;
 
-	t_mat m_matPerspective, m_matViewport, m_matCam;
+	t_mat m_matPerspective, m_matPerspective_inv;
+	t_mat m_matViewport, m_matViewport_inv;
+	t_mat m_matCam, m_matCam_inv;
 
 	GLuint m_vertexarr = 0;
 	GLint m_attrVertex = -1;

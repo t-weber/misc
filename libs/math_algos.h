@@ -1,7 +1,7 @@
 /**
  * container-agnostic math algorithms
  * @author Tobias Weber
- * @date 9-dec-17
+ * @date dec-17
  * @license: see 'LICENSE' file
  */
 
@@ -10,12 +10,16 @@
 
 #include <cstddef>
 #include <cmath>
+#include <tuple>
 #include <vector>
 #include <iterator>
 #include <limits>
 //#include <iostream>
 
 namespace m {
+
+template<typename T> T pi = T(M_PI);
+
 
 // ----------------------------------------------------------------------------
 // concepts
@@ -351,7 +355,7 @@ requires is_basic_vec<t_vec>
 
 
 /**
- * create matrix from initializer_list
+ * create matrix from nested initializer_lists
  * in columns[rows] order
  */
 template<class t_mat>
@@ -374,6 +378,32 @@ requires is_mat<t_mat>
 		}
 
 		std::advance(iterCol, 1);
+	}
+
+	return mat;
+}
+
+
+/**
+ * create matrix from initializer_list
+ * in column/row order
+ */
+template<class t_mat>
+t_mat create(const std::initializer_list<typename t_mat::value_type>& lst)
+requires is_mat<t_mat>
+{
+	const std::size_t N = std::sqrt(lst.size());
+
+	t_mat mat = unity<t_mat>(N, N);
+
+	auto iter = lst.begin();
+	for(std::size_t iRow=0; iRow<N; ++iRow)
+	{
+		for(std::size_t iCol=0; iCol<N; ++iCol)
+		{
+			mat(iRow, iCol) = *iter;
+			std::advance(iter, 1);
+		}
 	}
 
 	return mat;
@@ -720,7 +750,7 @@ requires is_basic_vec<t_vec>
 
 
 /**
- * cross product matrix
+ * cross product matrix (3x3)
  */
 template<class t_mat, class t_vec>
 t_mat skewsymmetric(const t_vec& vec)
@@ -786,6 +816,113 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	return matProj;
 }
 
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
+// 3-dim algos in homogeneous coordinates
+// ----------------------------------------------------------------------------
+
+/**
+ * project a homogeneous vector to screen coordinates 
+ * returns [vecPersp, vecScreen]
+ */
+template<class t_mat, class t_vec>
+std::tuple<t_vec, t_vec> hom_to_screen_coords(const t_vec& vec4,
+	const t_mat& matModelView, const t_mat& matProj, const t_mat& matViewport,
+	bool bFlipY = false, bool bFlipX = false)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	// perspective trafo and divide
+	t_vec vecPersp = matProj * matModelView * vec4;
+	vecPersp /= vecPersp[3];
+
+	// viewport trafo
+	t_vec vec = matViewport * vecPersp;
+
+	// flip y coordinate
+	if(bFlipY) vec[1] = matViewport(1,1)*2 - vec[1];
+	// flip x coordinate
+	if(bFlipX) vec[0] = matViewport(0,0)*2 - vec[0];
+
+	return std::make_tuple(vecPersp, vec);
+}
+
+
+/**
+ * calculate world coordinates from screen coordinates
+ * (vary zPlane to get the points of the z-line at constant (x,y))
+ */
+template<class t_mat, class t_vec>
+t_vec hom_from_screen_coords(
+	typename t_vec::value_type xScreen, typename t_vec::value_type yScreen, typename t_vec::value_type zPlane,
+	const t_mat& matModelView_inv, const t_mat& matProj_inv, const t_mat& matViewport_inv,
+	const t_mat* pmatViewport = nullptr, bool bFlipY = false, bool bFlipX = false)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	t_vec vecScreen = create<t_vec>({xScreen, yScreen, zPlane, 1.});
+
+	// flip y coordinate
+	if(pmatViewport && bFlipY) vecScreen[1] = (*pmatViewport)(1,1)*2 - vecScreen[1];
+	// flip x coordinate
+	if(pmatViewport && bFlipX) vecScreen[0] = (*pmatViewport)(0,0)*2 - vecScreen[0];
+
+	t_vec vecWorld = matModelView_inv * matProj_inv * matViewport_inv * vecScreen;
+
+	vecWorld /= vecWorld[3];
+	return vecWorld;
+}
+
+
+/**
+ * perspective matrix (homogeneous 4x4)
+ * see: https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluPerspective.xml
+ */
+template<class t_mat>
+t_mat hom_perspective(
+	typename t_mat::value_type n = 0.01, typename t_mat::value_type f = 100.,
+	typename t_mat::value_type fov = 0.5*pi<typename t_mat::value_type>, typename t_mat::value_type ratio = 3./4.,
+	bool bRHS = true, bool bZ01 = false)
+requires is_mat<t_mat>
+{
+	using T = typename t_mat::value_type;
+	const T c = 1./std::tan(0.5 * fov);
+	const T n0 = bZ01 ? T(0) : n;
+	const T sc = bZ01 ? T(1) : T(2);
+	const T zs = bRHS ? T(1) : T(-1);
+
+	//         ( x*c*r                           )      ( -x*c*r/z                         )
+	//         ( y*c                             )      ( -y*c/z                           )
+	// P * x = ( z*(n0+f)/(n-f) + w*sc*n*f/(n-f) )  =>  ( -(n0+f)/(n-f) - w/z*sc*n*f/(n-f) )
+	//         ( -z                              )      ( 1                                )
+	return create<t_mat>({
+		c*ratio, 	0., 	0., 				0.,
+		0, 			c, 		0., 				0.,
+		0.,			0.,		zs*(n0+f)/(n-f), 	sc*n*f/(n-f),
+		0.,			0.,		-zs,				0. 
+	});
+}
+
+
+/**
+ * viewport matrix (homogeneous 4x4)
+ * see: https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/glViewport.xml
+ */
+template<class t_mat>
+t_mat hom_viewport(typename t_mat::value_type w, typename t_mat::value_type h,
+	typename t_mat::value_type n = 0, typename t_mat::value_type f = 1)
+requires is_mat<t_mat>
+{
+	using T = typename t_mat::value_type;
+
+	return create<t_mat>({
+		T(0.5)*w, 	0., 		0., 			T(0.5)*w,
+		0, 			T(0.5)*h, 	0., 			T(0.5)*h,
+		0.,			0.,			T(0.5)*(f-n), 	T(0.5)*(f+n),
+		0.,			0.,			0.,				1. 
+	});
+}
 
 // ----------------------------------------------------------------------------
 
