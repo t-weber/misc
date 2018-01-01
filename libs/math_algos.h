@@ -465,7 +465,7 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
  * from: |x'> = <v|x> * |v> = |v><v|x> = |v><v| * |x>
  */
 template<class t_mat, class t_vec>
-t_mat projector(const t_vec& vec, bool bIsNormalised=1)
+t_mat projector(const t_vec& vec, bool bIsNormalised = true)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	if(bIsNormalised)
@@ -485,7 +485,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * project vector vec onto another vector vecProj
  */
 template<class t_vec>
-t_vec project(const t_vec& vec, const t_vec& vecProj, bool bIsNormalised=1)
+t_vec project(const t_vec& vec, const t_vec& vecProj, bool bIsNormalised = true)
 requires is_vec<t_vec>
 {
 	if(bIsNormalised)
@@ -504,15 +504,19 @@ requires is_vec<t_vec>
 /**
  * project vector vec onto the line lineOrigin + lam*lineDir
  * shift line to go through origin, calculate projection and shift back
+ * returns [closest point, distance]
  */
 template<class t_vec>
-t_vec project_line(const t_vec& vec,
-	const t_vec& lineOrigin, const t_vec& lineDir, bool bIsNormalised=1)
+std::tuple<t_vec, typename t_vec::value_type> project_line(const t_vec& vec,
+	const t_vec& lineOrigin, const t_vec& lineDir, bool bIsNormalised = true)
 requires is_vec<t_vec>
 {
-	t_vec ptShifted = vec - lineOrigin;
-	t_vec ptProj = project<t_vec>(ptShifted, lineDir, bIsNormalised);
-	return lineOrigin + ptProj;
+	const t_vec ptShifted = vec - lineOrigin;
+	const t_vec ptProj = project<t_vec>(ptShifted, lineDir, bIsNormalised);
+	const t_vec ptNearest = lineOrigin + ptProj;
+
+	const typename t_vec::value_type dist = norm<t_vec>(vec - ptNearest);
+	return std::make_tuple(ptNearest, dist);
 }
 
 
@@ -521,7 +525,7 @@ requires is_vec<t_vec>
  * from completeness relation: 1 = sum_i |v_i><v_i| = |x><x| + |y><y| + |z><z|
  */
 template<class t_mat, class t_vec>
-t_mat ortho_projector(const t_vec& vec, bool bIsNormalised=1)
+t_mat ortho_projector(const t_vec& vec, bool bIsNormalised = true)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	const std::size_t iSize = vec.size();
@@ -535,7 +539,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * subtracts twice its projection onto the plane normal from the vector
  */
 template<class t_mat, class t_vec>
-t_mat ortho_mirror_op(const t_vec& vec, bool bIsNormalised=1)
+t_mat ortho_mirror_op(const t_vec& vec, bool bIsNormalised = true)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	using T = typename t_vec::value_type;
@@ -550,7 +554,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * project vector vec onto plane through the origin and perpendicular to vector vecNorm
  */
 template<class t_vec>
-t_vec ortho_project(const t_vec& vec, const t_vec& vecNorm, bool bIsNormalised=1)
+t_vec ortho_project(const t_vec& vec, const t_vec& vecNorm, bool bIsNormalised = true)
 requires is_vec<t_vec>
 {
 	const std::size_t iSize = vec.size();
@@ -911,6 +915,30 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 	vecWorld /= vecWorld[3];
 	return vecWorld;
+}
+
+
+/**
+ * calculate line from screen coordinates
+ * returns [pos, dir]
+ */
+template<class t_mat, class t_vec>
+std::tuple<t_vec, t_vec> hom_line_from_screen_coords(
+	typename t_vec::value_type xScreen, typename t_vec::value_type yScreen,
+	typename t_vec::value_type z1, typename t_vec::value_type z2,
+	const t_mat& matModelView_inv, const t_mat& matProj_inv, const t_mat& matViewport_inv,
+	const t_mat* pmatViewport = nullptr, bool bFlipY = false, bool bFlipX = false)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	const t_vec lineOrg = hom_from_screen_coords<t_mat, t_vec>(xScreen, yScreen, z1, matModelView_inv, matProj_inv,
+		matViewport_inv, pmatViewport, bFlipY, bFlipX);
+	const t_vec linePos2 = hom_from_screen_coords<t_mat, t_vec>(xScreen, yScreen, z2, matModelView_inv, matProj_inv,
+		matViewport_inv, pmatViewport, bFlipY, bFlipX);
+
+	t_vec lineDir = linePos2 - lineOrg;
+	lineDir /= norm<t_vec>(lineDir);
+
+	return std::make_tuple(lineOrg, lineDir);
 }
 
 

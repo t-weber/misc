@@ -114,8 +114,9 @@ void vecmat_tsts()
 	t_vec lineOrigin = create<t_vec>({10., 20., 30.});
 	t_vec lineDir = create<t_vec>({0., 1., 0.});
 	t_vec vecPos = create<t_vec>({1., 2., 3.});
-	t_vec vecLineProj = project_line<t_vec>(vecPos, lineOrigin, lineDir, 0);
-	std::cout << vecLineProj[0] << " "  << vecLineProj[1]  << " " << vecLineProj[2] << "\n";
+	auto [vecLineProj, lineDist] = project_line<t_vec>(vecPos, lineOrigin, lineDir, 0);
+	std::cout << vecLineProj[0] << " "  << vecLineProj[1]  << " " << vecLineProj[2]
+		<< ", dist: " << lineDist << "\n";
 
 	std::cout << "dist pt-line: " << norm<t_vec>(vecPos-vecLineProj) << "\n";
 	std::cout << "dist pt-line (direct): " << 

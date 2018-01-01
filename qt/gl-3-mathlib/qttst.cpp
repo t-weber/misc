@@ -36,6 +36,7 @@ GlWidget::GlWidget(QWidget *pParent)
 {
 	connect(&m_timer, &QTimer::timeout, this, static_cast<void (GlWidget::*)()>(&GlWidget::tick));
 	m_timer.start(std::chrono::milliseconds(1000 / 60));
+	setMouseTracking(true);
 }
 
 
@@ -143,7 +144,7 @@ void GlWidget::initializeGL()
 
 		std::vector<GLfloat> vecVerts =
 		{
-			-0.5, 0., -1., 1.,	// vert
+			-0.7, 0.2, -4., 1.,	// vert
 			1., 0., 0., 1.,		// color
 			0.5, 0., -2., 1.,	// vert
 			0., 1., 0., 1.,		// color
@@ -168,9 +169,6 @@ void GlWidget::resizeGL(int w, int h)
 
 	m_matViewport = m::hom_viewport<t_mat>(w, h, 0., 1.);
 	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat>(m_matViewport);
-	//m_matViewport.setToIdentity();
-	//m_matViewport.viewport(0, 0, w, h, 0., 1.);
-	//m_matViewport_inv = m_matViewport.inverted();
 
 
 	m_pGl->glViewport(0, 0, w, h);
@@ -178,9 +176,6 @@ void GlWidget::resizeGL(int w, int h)
 
 	m_matPerspective = m::hom_perspective<t_mat>(0.01, 100., m::pi<t_real>*0.5, t_real(h)/t_real(w));
 	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat>(m_matPerspective);
-	//m_matPerspective.setToIdentity();
-	//m_matPerspective.perspective(90., double(w)/double(h), 0.01, 100.);
-	//m_matPerspective_inv = m_matPerspective.inverted();
 
 
 	// bind shaders
@@ -265,18 +260,10 @@ void GlWidget::paintGL()
 
 	// classic painting
 	{
-		painter.drawText(GlToScreenCoords(t_vec(-0.5,0., -1., 1.)), "* Vertex 1");
+		painter.drawText(GlToScreenCoords(t_vec(-0.7, 0.2, -4., 1.)), "* Vertex 1");
 		painter.drawText(GlToScreenCoords(t_vec(0.5, 0., -2., 1.)), "* Vertex 2");
 		painter.drawText(GlToScreenCoords(t_vec(0.5, 0.5, -1., 1.)), "* Vertex 3");
 	}
-
-
-	// test
-	auto [ vecPersp, vec ] =
-		m::hom_to_screen_coords<t_mat, t_vec>(t_vec(0.67, -0.89, -0.01, 1.), m_matCam, m_matPerspective, m_matViewport, true);
-	std::cout << vec[0] << " " << vec[1] << " " << vec[2] << " " << vec[3] << "  ->  ";
-	t_vec vecWorld = m::hom_from_screen_coords<t_mat, t_vec>(vec[0], vec[1], 0., m_matCam_inv, m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
-	std::cout << vecWorld[0] << " " << vecWorld[1] << " " << vecWorld[2] << " " << vecWorld[3] << std::endl;
 }
 
 
@@ -287,12 +274,11 @@ void GlWidget::tick()
 
 void GlWidget::tick(const std::chrono::milliseconds& ms)
 {
-	t_mat matRot = m::rotation<t_mat, t_vec>(m::create<t_vec>({0.,0.,1.,0.}), 2.5/180.*M_PI, 1);
+	t_mat matRot = m::rotation<t_mat, t_vec>(m::create<t_vec>({0.,0.,1.,0.}), 0.5/180.*M_PI, 1);
 	m_matCam *= matRot;
 	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat>(m_matCam);
-	//m_matCam.rotate(2.5, 0.,0.,1.);
-	//m_matCam_inv = m_matCam.inverted();
 
+	updatePicker();
 	update();
 }
 
@@ -311,6 +297,24 @@ QPointF GlWidget::GlToScreenCoords(const t_vec& vec4, bool *pVisible)
 
 	if(pVisible) *pVisible = true;
 	return QPointF(vec[0], vec[1]);
+}
+
+
+void GlWidget::mouseMoveEvent(QMouseEvent *pEvt)
+{
+	m_posMouse = pEvt->localPos();
+	updatePicker();
+}
+
+
+void GlWidget::updatePicker()
+{
+	// test
+	t_vec vecProbe{-0.7, 0.2, -4., 1.};
+	auto [org, dir] = m::hom_line_from_screen_coords<t_mat, t_vec>(m_posMouse.x(), m_posMouse.y(), 0., 1.,
+		m_matCam_inv, m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
+	auto [vecNearest, dist] = m::project_line(vecProbe, org, dir, true);
+	std::cout << "dist to vertex = " << dist << std::endl;
 }
 // ----------------------------------------------------------------------------
 

@@ -28,6 +28,7 @@ using qgl_funcs = QOpenGLFunctions_4_5_Core;
 
 #include <QDialog>
 #include <QTimer>
+#include <QMouseEvent>
 
 #include <QOpenGLShaderProgram>
 #include <QOpenGLBuffer>
@@ -62,7 +63,10 @@ protected:
 	virtual void resizeGL(int w, int h) override;
 	virtual void paintGL() override;
 
+	virtual void mouseMoveEvent(QMouseEvent *pEvt) override;
+
 	void tick(const std::chrono::milliseconds& ms);
+	void updatePicker();
 
 private:
 	qgl_funcs *m_pGl = nullptr;
@@ -79,6 +83,7 @@ private:
 	GLint m_uniMatrixProj = -1, m_uniMatrixCam = -1;
 
 	int m_iScreenDims[2] = { -1, -1 };
+	QPointF m_posMouse;
 
 	QTimer m_timer;
 
