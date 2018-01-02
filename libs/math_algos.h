@@ -436,6 +436,40 @@ requires is_mat<t_mat>
 }
 
 
+/**
+ * get a column vector from a matrix
+ */
+template<class t_mat, class t_vec>
+t_vec col(const t_mat& mat, std::size_t col)
+requires is_mat<t_mat> && is_basic_vec<t_vec>
+{
+	t_vec vec;
+	if constexpr(is_dyn_vec<t_vec>)
+		vec = t_vec(mat.size1());
+
+	for(std::size_t i=0; i<mat.size1(); ++i)
+		vec[i] = mat(i, col);
+
+	return vec;
+}
+
+/**
+ * get a row vector from a matrix
+ */
+template<class t_mat, class t_vec>
+t_vec row(const t_mat& mat, std::size_t row)
+requires is_mat<t_mat> && is_basic_vec<t_vec>
+{
+	t_vec vec;
+	if constexpr(is_dyn_vec<t_vec>)
+		vec = t_vec(mat.size2());
+
+	for(std::size_t i=0; i<mat.size2(); ++i)
+		vec[i] = mat(row, i);
+
+	return vec;
+}
+
 
 /**
  * inner product
@@ -573,6 +607,58 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 	return unity<t_mat>(iSize) -
 		T(2)*projector<t_mat, t_vec>(vec, bIsNormalised);
+}
+
+
+/**
+ * matrix to mirror [a, b, c, ...] into, e.g.,  [a, b', 0, 0]
+ */
+template<class t_mat, class t_vec>
+t_mat ortho_mirror_zero_op(const t_vec& vec, std::size_t row)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	using T = typename t_vec::value_type;
+	const std::size_t N = vec.size();
+
+	t_vec vecSub = zero<t_vec>(N);
+	for(std::size_t i=0; i<row; ++i)
+		vecSub[i] = vec[i];
+
+	// norm of rest vector
+	T n = T(0);
+	for(std::size_t i=row; i<N; ++i)
+		n += vec[i]*vec[i];
+	vecSub[row] = std::sqrt(n);
+
+	return ortho_mirror_op<t_mat, t_vec>(vec - vecSub, false);
+}
+
+
+/**
+ * QR decomposition of a matrix
+ * returns [Q, R]
+ */
+template<class t_mat, class t_vec>
+std::tuple<t_mat, t_mat> qr(const t_mat& mat)
+requires is_mat<t_mat> && is_vec<t_vec>
+{
+	using T = typename t_mat::value_type;
+	const std::size_t rows = mat.size1();
+	const std::size_t cols = mat.size2();
+	const std::size_t N = std::min(cols, rows);
+
+	t_mat R = mat;
+	t_mat Q = unity<t_mat>(N, N);
+
+	for(std::size_t icol=0; icol<N-1; ++icol)
+	{
+		t_vec vecCol = col<t_mat, t_vec>(R, icol);
+		t_mat matMirror = ortho_mirror_zero_op<t_mat, t_vec>(vecCol, icol);
+		Q = Q * matMirror;
+		R = matMirror * R;
+	}
+
+	return std::make_tuple(Q, R);
 }
 
 
@@ -790,29 +876,36 @@ requires is_mat<t_mat>
 
 /**
  * intersection of plane <x|n> = d and line |org> + lam*|dir>
- * returns [position of intersection, intersects?, line parameter lambda]
+ * returns [position of intersection, 0: no intersection, 1: intersection, 2: line on plane, line parameter lambda]
  * insert |x> = |org> + lam*|dir> in plane equation:
  * <org|n> + lam*<dir|n> = d
  * lam = (d - <org|n>) / <dir|n>
  */
 template<class t_vec>
-std::tuple<t_vec, bool, typename t_vec::value_type> intersect_line_plane(
+std::tuple<t_vec, int, typename t_vec::value_type> intersect_line_plane(
 	const t_vec& lineOrg, const t_vec& lineDir,
 	const t_vec& planeNorm, typename t_vec::value_type plane_d)
 requires is_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
 
-	// no intersection if line and plane are parallel
+	// are line and plane parallel?
 	const T dir_n = inner_prod<t_vec>(lineDir, planeNorm);
 	if(equals<T>(dir_n, 0))
-		return std::make_tuple(t_vec(), false, T(0));
+	{
+		const T org_n = inner_prod<t_vec>(lineOrg, planeNorm);
+		// line on plane?
+		if(equals<T>(org_n, plane_d))		
+			return std::make_tuple(t_vec(), 2, T(0));
+		// no intersection
+		return std::make_tuple(t_vec(), 0, T(0));
+	}
 
 	const T org_n = inner_prod<t_vec>(lineOrg, planeNorm);
 	const T lam = (plane_d - org_n) / dir_n;
 
 	const t_vec vecInters = lineOrg + lam*lineDir;
-	return std::make_tuple(vecInters, true, lam);
+	return std::make_tuple(vecInters, 1, lam);
 }
 
 
@@ -827,7 +920,8 @@ requires is_vec<t_vec>
  * |lam2 lam1> = ((dir2 | -dir1)^T * (dir2 | -dir1))^(-1) * (dir2 | -dir1)^T * (|org1> - |org2>)
  */
 template<class t_vec>
-std::tuple<t_vec, t_vec, bool, typename t_vec::value_type, typename t_vec::value_type, typename t_vec::value_type> intersect_line_line(
+std::tuple<t_vec, t_vec, bool, typename t_vec::value_type, typename t_vec::value_type, typename t_vec::value_type> 
+	intersect_line_line(
 	const t_vec& line1Org, const t_vec& line1Dir,
 	const t_vec& line2Org, const t_vec& line2Dir)
 requires is_vec<t_vec>

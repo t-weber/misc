@@ -110,6 +110,32 @@ void vecmat_tsts()
 	std::cout << vecPlane[0] << " "  << vecPlane[1]  << " " << vecPlane[2] << "\n";
 
 
+	std::cout << "\nmirror\n";
+	t_real a=1.23, b=23, c=4;
+	t_vec vecToMirror = create<t_vec>({a, b, c});
+	{	// mirror to [x 0 0]
+		//t_vec vecMirror = vecToMirror - create<t_vec>({std::sqrt(a*a + b*b + c*c), 0, 0});
+		//t_mat opMirror = ortho_mirror_op<t_mat, t_vec>(vecMirror, false);
+		t_mat opMirror = ortho_mirror_zero_op<t_mat, t_vec>(vecToMirror, 0);
+		t_vec vecMirrored = opMirror * vecToMirror;
+		std::cout << vecMirrored[0] << " "  << vecMirrored[1]  << " " << vecMirrored[2] << "\n";
+	}
+	{ // mirror to [x y 0]
+		//t_vec vecMirror = vecToMirror - create<t_vec>({a, std::sqrt(b*b + c*c), 0});
+		//t_mat opMirror = ortho_mirror_op<t_mat, t_vec>(vecMirror, false);
+		t_mat opMirror = ortho_mirror_zero_op<t_mat, t_vec>(vecToMirror, 1);
+		t_vec vecMirrored = opMirror * vecToMirror;
+		std::cout << vecMirrored[0] << " "  << vecMirrored[1]  << " " << vecMirrored[2] << "\n";
+	}
+	{ // mirror to [0 y 0]
+		t_vec vecMirror = vecToMirror - create<t_vec>({0, std::sqrt(a*a + b*b + c*c), 0});
+		t_mat opMirror = ortho_mirror_op<t_mat, t_vec>(vecMirror, false);
+		t_vec vecMirrored = opMirror * vecToMirror;
+		std::cout << vecMirrored[0] << " "  << vecMirrored[1]  << " " << vecMirrored[2] << "\n";
+	}
+
+
+
 	std::cout << "\nproject_line\n";
 	t_vec lineOrigin = create<t_vec>({10., 20., 30.});
 	t_vec lineDir = create<t_vec>({0., 1., 0.});
@@ -153,6 +179,20 @@ void vecmat_tsts()
 		<< pt2[0] << " " << pt2[1] << " " << pt2[2] << ",  dist: " << distLines << "\n";
 	std::cout << "dist line-line (direct): " << det<t_mat>(create<t_mat, t_vec>({t_vec(line1[0]-line2[0]), line1[1], line2[1]}))
 		/ norm<t_vec>(cross_prod<t_vec>(line1[1], line2[1])) << "\n";
+
+
+	std::cout << "\nQR\n";
+	auto [Q, R] = qr<t_mat, t_vec>(create<t_mat>({1, 23, 4,  5, -3, 23,  9, -3, -4}));
+	std::cout << Q(0,0) << " " << Q(0,1) << " " << Q(0,2) << "\n";
+	std::cout << Q(1,0) << " " << Q(1,1) << " " << Q(1,2) << "\n";
+	std::cout << Q(2,0) << " " << Q(2,1) << " " << Q(2,2) << "\n";	
+	std::cout << R(0,0) << " " << R(0,1) << " " << R(0,2) << "\n";
+	std::cout << R(1,0) << " " << R(1,1) << " " << R(1,2) << "\n";
+	std::cout << R(2,0) << " " << R(2,1) << " " << R(2,2) << "\n";
+	t_mat QR = Q*R;
+	std::cout << QR(0,0) << " " << QR(0,1) << " " << QR(0,2) << "\n";
+	std::cout << QR(1,0) << " " << QR(1,1) << " " << QR(1,2) << "\n";
+	std::cout << QR(2,0) << " " << QR(2,1) << " " << QR(2,2) << "\n";
 }
 
 
