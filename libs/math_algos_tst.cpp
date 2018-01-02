@@ -135,6 +135,24 @@ void vecmat_tsts()
 	std::cout << std::boolalpha << equals<t_vec>(create<t_vec>({1,2,3.1}), create<t_vec>({1,2,3})) << "\n";
 	std::cout << std::boolalpha << equals<t_mat>(create<t_mat>({{1,2}, {3,4}}), create<t_mat>({{1,2}, {3,4}})) << "\n";
 	std::cout << std::boolalpha << equals<t_mat>(create<t_mat>({{1,2}, {3.1,4}}), create<t_mat>({{1,2}, {3,4}})) << "\n";
+
+
+	std::cout << "\nintersect_line_plane\n";
+	auto [vecInters, bInters, lamInters] =
+		intersect_line_plane<t_vec>(create<t_vec>({1,3,-5}), create<t_vec>({0,0,1}), 
+			create<t_vec>({0,0,1}), 10);
+	std::cout << std::boolalpha << bInters << ", " << vecInters[0] << " " << vecInters[1] << " " << vecInters[2] << "\n";
+
+
+	std::cout << "\nintersect_line_line\n";
+	t_vec line1[] = { create<t_vec>({0,1,0}), create<t_vec>({0,0,1}) };
+	t_vec line2[] = { create<t_vec>({0,-1,0}), create<t_vec>({0.1,1,0.}) };
+	auto [pt1, pt2, bValid, distLines, lam1, lam2] = m::intersect_line_line<t_vec>(
+		line1[0], line1[1], line2[0], line2[1]);
+	std::cout << std::boolalpha << bValid << ",  " << pt1[0] << " " << pt1[1] << " " << pt1[2] << ",  "
+		<< pt2[0] << " " << pt2[1] << " " << pt2[2] << ",  dist: " << distLines << "\n";
+	std::cout << "dist line-line (direct): " << det<t_mat>(create<t_mat, t_vec>({t_vec(line1[0]-line2[0]), line1[1], line2[1]}))
+		/ norm<t_vec>(cross_prod<t_vec>(line1[1], line2[1])) << "\n";
 }
 
 

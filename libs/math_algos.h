@@ -358,8 +358,10 @@ requires is_basic_vec<t_vec>
  * create matrix from nested initializer_lists
  * in columns[rows] order
  */
-template<class t_mat>
-t_mat create(const std::initializer_list<std::initializer_list<typename t_mat::value_type>>& lst)
+template<class t_mat,
+	template<class...> class t_cont_outer = std::initializer_list,
+	template<class...> class t_cont = std::initializer_list>
+t_mat create(const t_cont_outer<t_cont<typename t_mat::value_type>>& lst)
 requires is_mat<t_mat>
 {
 	const std::size_t iCols = lst.size();
@@ -377,6 +379,30 @@ requires is_mat<t_mat>
 			std::advance(iterRow, 1);
 		}
 
+		std::advance(iterCol, 1);
+	}
+
+	return mat;
+}
+
+
+/**
+ * create matrix from column vectors
+ */
+template<class t_mat, class t_vec, template<class...> class t_cont_outer = std::initializer_list>
+t_mat create(const t_cont_outer<t_vec>& lst)
+requires is_mat<t_mat>
+{
+	const std::size_t iCols = lst.size();
+	const std::size_t iRows = lst.begin()->size();
+
+	t_mat mat = unity<t_mat>(iRows, iCols);
+
+	auto iterCol = lst.begin();
+	for(std::size_t iCol=0; iCol<iCols; ++iCol)
+	{
+		for(std::size_t iRow=0; iRow<iRows; ++iRow)
+			mat(iRow, iCol) = (*iterCol)[iRow];
 		std::advance(iterCol, 1);
 	}
 
@@ -759,6 +785,87 @@ requires is_mat<t_mat>
 	matInv *= T(1) / fullDet;
 	return std::make_tuple(matInv, true);
 }
+
+
+
+/**
+ * intersection of plane <x|n> = d and line |org> + lam*|dir>
+ * returns [position of intersection, intersects?, line parameter lambda]
+ * insert |x> = |org> + lam*|dir> in plane equation:
+ * <org|n> + lam*<dir|n> = d
+ * lam = (d - <org|n>) / <dir|n>
+ */
+template<class t_vec>
+std::tuple<t_vec, bool, typename t_vec::value_type> intersect_line_plane(
+	const t_vec& lineOrg, const t_vec& lineDir,
+	const t_vec& planeNorm, typename t_vec::value_type plane_d)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	// no intersection if line and plane are parallel
+	const T dir_n = inner_prod<t_vec>(lineDir, planeNorm);
+	if(equals<T>(dir_n, 0))
+		return std::make_tuple(t_vec(), false, T(0));
+
+	const T org_n = inner_prod<t_vec>(lineOrg, planeNorm);
+	const T lam = (plane_d - org_n) / dir_n;
+
+	const t_vec vecInters = lineOrg + lam*lineDir;
+	return std::make_tuple(vecInters, true, lam);
+}
+
+
+/**
+ * intersection or closest points of lines |org1> + lam1*|dir1> and |org2> + lam2*|dir2>
+ * returns [nearest position 1, nearest position 2, dist, valid?, line parameter 1, line parameter 2]
+ * 
+ * |org1> + lam1*|dir1>  =  |org2> + lam2*|dir2>
+ * |org1> - |org2>  =  lam2*|dir2> - lam1*|dir1>
+ * |org1> - |org2>  =  (dir2 | -dir1) * |lam2 lam1>
+ * (dir2 | -dir1)^T * (|org1> - |org2>)  =  (dir2 | -dir1)^T * (dir2 | -dir1) * |lam2 lam1>
+ * |lam2 lam1> = ((dir2 | -dir1)^T * (dir2 | -dir1))^(-1) * (dir2 | -dir1)^T * (|org1> - |org2>)
+ */
+template<class t_vec>
+std::tuple<t_vec, t_vec, bool, typename t_vec::value_type, typename t_vec::value_type, typename t_vec::value_type> intersect_line_line(
+	const t_vec& line1Org, const t_vec& line1Dir,
+	const t_vec& line2Org, const t_vec& line2Dir)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+	const std::size_t N = line1Dir.size();
+
+	const t_vec orgdiff = line1Org - line2Org;
+
+	// direction matrix (symmetric)
+	const T d11 = inner_prod<t_vec>(line2Dir, line2Dir);
+	const T d12 = -inner_prod<t_vec>(line2Dir, line1Dir);
+	const T d22 = inner_prod<t_vec>(line1Dir, line1Dir);
+
+	const T d_det = d11*d22 - d12*d12;
+
+	// check if matrix is invertible
+	if(equals<T>(d_det, 0))
+		return std::make_tuple(t_vec(), t_vec(), false, 0, 0, 0);
+
+	// inverse (symmetric)
+	const T d11_i = d22 / d_det;
+	const T d12_i = -d12 / d_det;
+	const T d22_i = d11 / d_det;
+
+	const t_vec v1 = d11_i*line2Dir - d12_i*line1Dir;
+	const t_vec v2 = d12_i*line2Dir - d22_i*line1Dir;
+
+	const T lam2 = inner_prod<t_vec>(v1, orgdiff);
+	const T lam1 = inner_prod<t_vec>(v2, orgdiff);
+
+	const t_vec pos1 = line1Org + lam1*line1Dir;
+	const t_vec pos2 = line2Org + lam2*line2Dir;
+	const T dist = norm<t_vec>(pos2-pos1);
+
+	return std::make_tuple(pos1, pos2, true, dist, lam1, lam2);
+}
+
 // ----------------------------------------------------------------------------
 
 
