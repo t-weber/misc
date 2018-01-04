@@ -52,8 +52,8 @@ void vecmat_tsts()
 	t_vec vec1 = create<t_vec>({1, 2, 3}),
 		vec2 = create<t_vec>({7, 8, 9});
 
-	std::cout << inner_prod<t_vec>(vec1, vec2) << "\n";
-	t_mat mat = outer_prod<t_mat, t_vec>(vec1, vec2);
+	std::cout << inner<t_vec>(vec1, vec2) << "\n";
+	t_mat mat = outer<t_mat, t_vec>(vec1, vec2);
 	std::cout << mat(0,0) << " " << mat(0,1) << " " << mat(0,2) << "\n";
 	std::cout << mat(1,0) << " " << mat(1,1) << " " << mat(1,2) << "\n";
 	std::cout << mat(2,0) << " " << mat(2,1) << " " << mat(2,2) << "\n";
@@ -89,9 +89,9 @@ void vecmat_tsts()
 	auto newsys = orthonorm_sys<std::vector, t_vec>({vec1, vec2, vec3});
 	for(const auto& vec : newsys)
 		std::cout << vec[0] << " " << vec[1] << " " << vec[2] << ", length: " << norm<t_vec>(vec) << "\n";
-	std::cout << "v0 * v1 = " << inner_prod<t_vec>(newsys[0], newsys[1]) << "\n";
-	std::cout << "v0 * v2 = " << inner_prod<t_vec>(newsys[0], newsys[2]) << "\n";
-	std::cout << "v1 * v2 = " << inner_prod<t_vec>(newsys[1], newsys[2]) << "\n";
+	std::cout << "v0 * v1 = " << inner<t_vec>(newsys[0], newsys[1]) << "\n";
+	std::cout << "v0 * v2 = " << inner<t_vec>(newsys[0], newsys[2]) << "\n";
+	std::cout << "v1 * v2 = " << inner<t_vec>(newsys[1], newsys[2]) << "\n";
 
 
 	std::cout << "\nrotation\n";
@@ -146,7 +146,7 @@ void vecmat_tsts()
 
 	std::cout << "dist pt-line: " << norm<t_vec>(vecPos-vecLineProj) << "\n";
 	std::cout << "dist pt-line (direct): " << 
-		norm<t_vec>(cross_prod<t_vec>(vecPos - lineOrigin, lineDir)) / norm<t_vec>(lineDir)
+		norm<t_vec>(cross<t_vec>(vecPos - lineOrigin, lineDir)) / norm<t_vec>(lineDir)
 		<< "\n";
 
 
@@ -169,7 +169,6 @@ void vecmat_tsts()
 			create<t_vec>({0,0,1}), 10);
 	std::cout << std::boolalpha << bInters << ", " << vecInters[0] << " " << vecInters[1] << " " << vecInters[2] << "\n";
 
-
 	std::cout << "\nintersect_line_line\n";
 	t_vec line1[] = { create<t_vec>({0,1,0}), create<t_vec>({0,0,1}) };
 	t_vec line2[] = { create<t_vec>({0,-1,0}), create<t_vec>({0.1,1,0.}) };
@@ -178,11 +177,17 @@ void vecmat_tsts()
 	std::cout << std::boolalpha << bValid << ",  " << pt1[0] << " " << pt1[1] << " " << pt1[2] << ",  "
 		<< pt2[0] << " " << pt2[1] << " " << pt2[2] << ",  dist: " << distLines << "\n";
 	std::cout << "dist line-line (direct): " << det<t_mat>(create<t_mat, t_vec>({t_vec(line1[0]-line2[0]), line1[1], line2[1]}))
-		/ norm<t_vec>(cross_prod<t_vec>(line1[1], line2[1])) << "\n";
+		/ norm<t_vec>(cross<t_vec>(line1[1], line2[1])) << "\n";
+
+	std::cout << "\nintersect_plane_plane\n";
+	m::intersect_plane_plane<t_vec, t_mat>(
+		create<t_vec>({0,0,1}), 0,
+		create<t_vec>({0,1,0}), 5);
 
 
 	std::cout << "\nQR\n";
-	auto [Q, R] = qr<t_mat, t_vec>(create<t_mat>({1, 23, 4,  5, -3, 23,  9, -3, -4}));
+	t_mat matOrg = create<t_mat>({1, 23, 4,  5, -3, 23,  9, -3, -4});
+	auto [Q, R] = qr<t_mat, t_vec>(matOrg);
 	std::cout << Q(0,0) << " " << Q(0,1) << " " << Q(0,2) << "\n";
 	std::cout << Q(1,0) << " " << Q(1,1) << " " << Q(1,2) << "\n";
 	std::cout << Q(2,0) << " " << Q(2,1) << " " << Q(2,2) << "\n";	
@@ -193,6 +198,7 @@ void vecmat_tsts()
 	std::cout << QR(0,0) << " " << QR(0,1) << " " << QR(0,2) << "\n";
 	std::cout << QR(1,0) << " " << QR(1,1) << " " << QR(1,2) << "\n";
 	std::cout << QR(2,0) << " " << QR(2,1) << " " << QR(2,2) << "\n";
+	std::cout << std::boolalpha << equals<t_mat>(matOrg, QR, 0.01) << "\n";
 }
 
 
@@ -232,9 +238,53 @@ void vecmat_tsts_hom()
 }
 
 
+template<class t_vec, class t_mat>
+void vecmat_tsts_nonsquare()
+{
+	{
+		std::cout << "\nQR -- non-square matrix\n";
+		t_mat matOrg = create<t_mat>({{1, 23},  {5, -3},  {9, -3}});
+		auto [Q, R] = qr<t_mat, t_vec>(matOrg);
+		t_mat QR = Q*R;
+		std::cout << "org = " << matOrg << "\n";
+		std::cout << "Q = " << Q << "\n";
+		std::cout << "R = " << R << "\n";
+		std::cout << "QR = " << QR << "; " << std::boolalpha << equals<t_mat>(matOrg, QR, 0.01) << "\n";
+	}
+
+	{
+		std::cout << "\nQR -- special case 1\n";
+		t_mat matOrg = create<t_mat>({{3.4, 0},  {5, -3},  {9, -3}});
+		auto [Q, R] = qr<t_mat, t_vec>(matOrg);
+		t_mat QR = Q*R;
+		std::cout << "org = " << matOrg << "\n";
+		std::cout << "Q = " << Q << "\n";
+		std::cout << "R = " << R << "\n";
+		std::cout << "QR = " << QR << "; " << std::boolalpha << equals<t_mat>(matOrg, QR, 0.01) << "\n";
+	}
+
+
+	{
+		std::cout << "\nQR -- special case 2\n";
+		t_mat matOrg = create<t_mat>({{0, 0, 0}, {3.4, 4, 3},  {5, -3, -1},  {9, -3, 2}});
+		auto [Q, R] = qr<t_mat, t_vec>(matOrg);
+		t_mat QR = Q*R;
+		std::cout << "org = " << matOrg << "\n";
+		std::cout << "Q = " << Q << "\n";
+		std::cout << "R = " << R << "\n";
+		std::cout << "QR = " << QR << "; " << std::boolalpha << equals<t_mat>(matOrg, QR, 0.01) << "\n";
+	}
+}
+
+
 int main()
 {
+	constexpr bool bUseSTL = 0;
+	constexpr bool bUseQt = 0;
+	constexpr bool bUseUblas = 1;
+
 	// using dynamic STL containers
+	if constexpr(bUseSTL)
 	{
 		using t_real = double;
 		using t_vec = std::vector<t_real>;
@@ -243,17 +293,19 @@ int main()
 
 		t_vec vec1{{1, 2, 3}};
 		t_vec vec2{{7, 8, 9}};
-		std::cout << inner_prod<t_vec>(vec1, vec2) << "\n";
+		std::cout << inner<t_vec>(vec1, vec2) << "\n";
 
 		t_vec vec3 = zero<t_vec>(3);
-		t_mat mat1 = outer_prod<t_mat, t_vec>(vec1, vec2);
+		t_mat mat1 = outer<t_mat, t_vec>(vec1, vec2);
 		std::cout << mat1 << "\n";
 	
+		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
 
 
 	// using static STL containers
+	if constexpr(bUseSTL && bUseUblas)
 	{
 		using t_real = double;
 		using t_vec = std::array<t_real, 3>;
@@ -262,28 +314,32 @@ int main()
 
 		t_vec vec1{{1, 2, 3}};
 		t_vec vec2{{7, 8, 9}};
-		std::cout << inner_prod<t_vec>(vec1, vec2) << "\n";
+		std::cout << inner<t_vec>(vec1, vec2) << "\n";
 
 		t_vec vec3 = zero<t_vec>(3);
-		t_mat mat1 = outer_prod<t_mat, t_vec>(vec1, vec2);
+		t_mat mat1 = outer<t_mat, t_vec>(vec1, vec2);
 		std::cout << mat1 << "\n";
 
+		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
 
 
 	// using Qt classes
+	if constexpr(bUseQt)
 	{
 		using t_real = float;
 		using t_vec = qvec_adapter<int, 3, t_real, QGenericMatrix>;
 		using t_mat = qmat_adapter<int, 3, 3, t_real, QGenericMatrix>;
 
 		vecmat_tsts<t_vec, t_mat>();
+		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
 
 
 	// using specialised Qt classes
+	if constexpr(bUseQt)
 	{
 		using t_vec = qvecN_adapter<int, 4, float, QVector4D>;
 		using t_mat = qmatNN_adapter<int, 4, 4, float, QMatrix4x4>;
@@ -304,11 +360,12 @@ int main()
 		std::cout << matInv(2,0) << " " << matInv(2,1) << " " << matInv(2,2) << " " << matInv(2,3) << "\n";
 		std::cout << matInv(3,0) << " " << matInv(3,1) << " " << matInv(3,2) << " " << matInv(3,3) << "\n";
 
+		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
 
-
 	// using ublas classes
+	if constexpr(bUseUblas)
 	{
 		using t_real = double;
 		using t_vec = ublas::vector<t_real>;
@@ -316,6 +373,9 @@ int main()
 
 		vecmat_tsts<t_vec, t_mat>();
 		vecmat_tsts_hom<t_vec, t_mat>();
+		vecmat_tsts_nonsquare<t_vec, t_mat>();
+
+		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
 

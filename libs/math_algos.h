@@ -326,6 +326,49 @@ requires is_basic_vec<t_vec>
 
 
 /**
+ * tests for zero vector
+ */
+template<class t_vec>
+bool equals_0(const t_vec& vec,
+	typename t_vec::value_type eps = std::numeric_limits<typename t_vec::value_type>::epsilon())
+requires is_basic_vec<t_vec>
+{
+	return equals<t_vec>(vec, zero<t_vec>(vec.size()), eps);
+}
+
+/**
+ * tests for zero matrix
+ */
+template<class t_mat>
+bool equals_0(const t_mat& mat,
+	typename t_mat::value_type eps = std::numeric_limits<typename t_mat::value_type>::epsilon())
+requires is_mat<t_mat>
+{
+	return equals<t_mat>(mat, zero<t_mat>(mat.size1(), mat.size2()), eps);
+}
+
+
+/**
+ * transpose matrix
+ * WARNING: not possible for static non-square matrix!
+ */
+template<class t_mat>
+t_mat trans(const t_mat& mat)
+requires is_mat<t_mat>
+{
+	t_mat mat2;
+	if constexpr(is_dyn_mat<t_mat>)
+		mat2 = t_mat(mat.size2(), mat.size1());
+
+	for(std::size_t i=0; i<mat.size1(); ++i)
+		for(std::size_t j=0; j<mat.size2(); ++j)
+			mat2(j,i) = mat(i,j);
+
+	return mat2;
+}
+
+
+/**
  * create vector from initializer_list
  */
 template<class t_vec>
@@ -355,8 +398,7 @@ requires is_basic_vec<t_vec>
 
 
 /**
- * create matrix from nested initializer_lists
- * in columns[rows] order
+ * create matrix from nested initializer_lists in columns[rows] order
  */
 template<class t_mat,
 	template<class...> class t_cont_outer = std::initializer_list,
@@ -387,10 +429,10 @@ requires is_mat<t_mat>
 
 
 /**
- * create matrix from column vectors
+ * create matrix from column (or row) vectors
  */
 template<class t_mat, class t_vec, template<class...> class t_cont_outer = std::initializer_list>
-t_mat create(const t_cont_outer<t_vec>& lst)
+t_mat create(const t_cont_outer<t_vec>& lst, bool bRow = 0)
 requires is_mat<t_mat>
 {
 	const std::size_t iCols = lst.size();
@@ -406,13 +448,13 @@ requires is_mat<t_mat>
 		std::advance(iterCol, 1);
 	}
 
+	if(bRow) mat = trans<t_mat>(mat);
 	return mat;
 }
 
 
 /**
- * create matrix from initializer_list
- * in column/row order
+ * create matrix from initializer_list in column/row order
  */
 template<class t_mat>
 t_mat create(const std::initializer_list<typename t_mat::value_type>& lst)
@@ -475,7 +517,7 @@ requires is_mat<t_mat> && is_basic_vec<t_vec>
  * inner product
  */
 template<class t_vec>
-typename t_vec::value_type inner_prod(const t_vec& vec1, const t_vec& vec2)
+typename t_vec::value_type inner(const t_vec& vec1, const t_vec& vec2)
 requires is_basic_vec<t_vec>
 {
 	typename t_vec::value_type val(0);
@@ -494,7 +536,7 @@ template<class t_vec>
 typename t_vec::value_type norm(const t_vec& vec)
 requires is_basic_vec<t_vec>
 {
-	return std::sqrt(inner_prod<t_vec>(vec, vec));
+	return std::sqrt(inner<t_vec>(vec, vec));
 }
 
 
@@ -502,7 +544,7 @@ requires is_basic_vec<t_vec>
  * outer product
  */
 template<class t_mat, class t_vec>
-t_mat outer_prod(const t_vec& vec1, const t_vec& vec2)
+t_mat outer(const t_vec& vec1, const t_vec& vec2)
 requires is_basic_vec<t_vec> && is_mat<t_mat>
 {
 	const std::size_t N1 = vec1.size();
@@ -530,13 +572,13 @@ requires is_vec<t_vec> && is_mat<t_mat>
 {
 	if(bIsNormalised)
 	{
-		return outer_prod<t_mat, t_vec>(vec, vec);
+		return outer<t_mat, t_vec>(vec, vec);
 	}
 	else
 	{
 		const auto len = norm<t_vec>(vec);
-		t_vec _vec = vec/len;
-		return outer_prod<t_mat, t_vec>(_vec, _vec);
+		t_vec _vec = vec / len;
+		return outer<t_mat, t_vec>(_vec, _vec);
 	}
 }
 
@@ -550,13 +592,13 @@ requires is_vec<t_vec>
 {
 	if(bIsNormalised)
 	{
-		return inner_prod<t_vec>(vec, vecProj) * vecProj;
+		return inner<t_vec>(vec, vecProj) * vecProj;
 	}
 	else
 	{
 		const auto len = norm<t_vec>(vecProj);
 		t_vec _vecProj = vecProj / len;
-		return inner_prod<t_vec>(vec, _vecProj) * _vecProj;
+		return inner<t_vec>(vec, _vecProj) * _vecProj;
 	}
 }
 
@@ -630,7 +672,13 @@ requires is_vec<t_vec> && is_mat<t_mat>
 		n += vec[i]*vec[i];
 	vecSub[row] = std::sqrt(n);
 
-	return ortho_mirror_op<t_mat, t_vec>(vec - vecSub, false);
+	const t_vec vecOp = vec - vecSub;
+
+	// nothing to do -> return unit matrix
+	if(equals_0<t_vec>(vecOp))
+		return unity<t_mat>(vecOp.size(), vecOp.size());
+
+	return ortho_mirror_op<t_mat, t_vec>(vecOp, false);
 }
 
 
@@ -890,10 +938,10 @@ requires is_vec<t_vec>
 	using T = typename t_vec::value_type;
 
 	// are line and plane parallel?
-	const T dir_n = inner_prod<t_vec>(lineDir, planeNorm);
+	const T dir_n = inner<t_vec>(lineDir, planeNorm);
 	if(equals<T>(dir_n, 0))
 	{
-		const T org_n = inner_prod<t_vec>(lineOrg, planeNorm);
+		const T org_n = inner<t_vec>(lineOrg, planeNorm);
 		// line on plane?
 		if(equals<T>(org_n, plane_d))		
 			return std::make_tuple(t_vec(), 2, T(0));
@@ -901,7 +949,7 @@ requires is_vec<t_vec>
 		return std::make_tuple(t_vec(), 0, T(0));
 	}
 
-	const T org_n = inner_prod<t_vec>(lineOrg, planeNorm);
+	const T org_n = inner<t_vec>(lineOrg, planeNorm);
 	const T lam = (plane_d - org_n) / dir_n;
 
 	const t_vec vecInters = lineOrg + lam*lineDir;
@@ -932,9 +980,9 @@ requires is_vec<t_vec>
 	const t_vec orgdiff = line1Org - line2Org;
 
 	// direction matrix (symmetric)
-	const T d11 = inner_prod<t_vec>(line2Dir, line2Dir);
-	const T d12 = -inner_prod<t_vec>(line2Dir, line1Dir);
-	const T d22 = inner_prod<t_vec>(line1Dir, line1Dir);
+	const T d11 = inner<t_vec>(line2Dir, line2Dir);
+	const T d12 = -inner<t_vec>(line2Dir, line1Dir);
+	const T d22 = inner<t_vec>(line1Dir, line1Dir);
 
 	const T d_det = d11*d22 - d12*d12;
 
@@ -950,14 +998,49 @@ requires is_vec<t_vec>
 	const t_vec v1 = d11_i*line2Dir - d12_i*line1Dir;
 	const t_vec v2 = d12_i*line2Dir - d22_i*line1Dir;
 
-	const T lam2 = inner_prod<t_vec>(v1, orgdiff);
-	const T lam1 = inner_prod<t_vec>(v2, orgdiff);
+	const T lam2 = inner<t_vec>(v1, orgdiff);
+	const T lam1 = inner<t_vec>(v2, orgdiff);
 
 	const t_vec pos1 = line1Org + lam1*line1Dir;
 	const t_vec pos2 = line2Org + lam2*line2Dir;
 	const T dist = norm<t_vec>(pos2-pos1);
 
 	return std::make_tuple(pos1, pos2, true, dist, lam1, lam2);
+}
+
+
+/**
+ * intersection of planes <x|n1> = d1 and <x|n2> = d2
+ * returns line [org, dir]
+ * 
+ * (n1)               ( d1 )
+ * (n2) * (x,y,z)^T = ( d2 )
+ *
+ * N x = d  ->  R x = Q^T d
+ */
+template<class t_vec, class t_mat>
+std::tuple<t_vec, t_vec>
+	intersect_plane_plane(
+	const t_vec& plane1Norm, typename t_vec::value_type plane1_d,
+	const t_vec& plane2Norm, typename t_vec::value_type plane2_d)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	const t_mat N = create<t_mat, t_vec>({plane1Norm, plane2Norm}, true);
+	const auto [Q, R] = qr<t_mat, t_vec>(N);
+
+	const T d1 = Q(0,0)*plane1_d + Q(1,0)*plane2_d;
+	const T d2 = Q(0,1)*plane1_d + Q(1,1)*plane2_d;
+
+	t_vec lineOrg = zero<t_vec>(plane1Norm.size());
+	t_vec lineDir = zero<t_vec>(plane1Norm.size());
+
+	// TODO: back-substitute R*x = [d1 d2]^T
+	std::cout << "d: " << d1 << ", " << d2 << std::endl;
+	std::cout << "R = " << R << std::endl;
+
+	return std::make_tuple(lineOrg, lineDir);
 }
 
 // ----------------------------------------------------------------------------
@@ -974,7 +1057,7 @@ requires is_vec<t_vec>
  * cross product
  */
 template<class t_vec>
-t_vec cross_prod(const t_vec& vec1, const t_vec& vec2)
+t_vec cross(const t_vec& vec1, const t_vec& vec2)
 requires is_basic_vec<t_vec>
 {
 	t_vec vec;
