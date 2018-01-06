@@ -852,11 +852,15 @@ requires is_basic_vec<t_vec>
 
 	for(std::size_t iCol=0; iCol<iN; ++iCol)
 	{
+		const T elem = mat[iRow*iN + iCol];
+		if(equals<T>(elem, 0))
+			continue;
+
 		const T sgn = ((iRow+iCol) % 2) == 0 ? T(1) : T(-1);
 		const t_vec subMat = flat_submat<t_vec>(mat, iN, iN, iRow, iCol);
 		const T subDet = flat_det<t_vec>(subMat, iN-1) * sgn;
 
-		fullDet += mat[iRow*iN + iCol] * subDet;
+		fullDet += elem * subDet;
 	}
 
 	return fullDet;
@@ -900,7 +904,10 @@ requires is_mat<t_mat>
 
 	// fail if determinant is zero
 	if(equals<T>(fullDet, 0))
+	{
+		//std::cerr << "det == 0" << std::endl;
 		return std::make_tuple(t_mat(), false);	
+	}
 
 	t_mat matInv;
 	if constexpr(is_dyn_mat<t_mat>)
@@ -1010,37 +1017,84 @@ requires is_vec<t_vec>
 
 
 /**
+ * general n-dim cross product using determinant definition
+ */
+template<class t_vec, template<class...> class t_cont = std::initializer_list>
+t_vec cross(const t_cont<t_vec>& vecs)
+requires is_basic_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+	// N also has to be equal to the vector size!
+	const std::size_t N = vecs.size()+1;
+	t_vec vec = zero<t_vec>(N);
+
+	for(std::size_t iComp=0; iComp<N; ++iComp)
+	{
+		std::vector<T> mat = zero<std::vector<T>>(N*N);
+		mat[0*N + iComp] = T(1);
+
+		std::size_t iRow = 0;
+		for(const t_vec& vec : vecs)
+		{
+			for(std::size_t iCol=0; iCol<N; ++iCol)
+				mat[(iRow+1)*N + iCol] = vec[iCol];
+			++iRow;
+		}
+
+		vec[iComp] = flat_det<decltype(mat)>(mat, N);
+	}
+
+	return vec;
+}
+
+
+/**
  * intersection of planes <x|n1> = d1 and <x|n2> = d2
- * returns line [org, dir]
- * 
- * (n1)               ( d1 )
- * (n2) * (x,y,z)^T = ( d2 )
- *
- * N x = d  ->  R x = Q^T d
+ * returns line [org, dir, 0: no intersection, 1: intersection, 2: planes coincide]
  */
 template<class t_vec, class t_mat>
-std::tuple<t_vec, t_vec>
+std::tuple<t_vec, t_vec, int>
 	intersect_plane_plane(
 	const t_vec& plane1Norm, typename t_vec::value_type plane1_d,
 	const t_vec& plane2Norm, typename t_vec::value_type plane2_d)
 requires is_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
+	const std::size_t dim = plane1Norm.size();
 
+	/*
+	// alternate, direct calculation (TODO): 
+	// (n1)               ( d1 )
+	// (n2) * (x,y,z)^T = ( d2 )
+	//
+	// N x = d  ->  R x = Q^T d  ->  back-substitute
+	
 	const t_mat N = create<t_mat, t_vec>({plane1Norm, plane2Norm}, true);
 	const auto [Q, R] = qr<t_mat, t_vec>(N);
 
-	const T d1 = Q(0,0)*plane1_d + Q(1,0)*plane2_d;
-	const T d2 = Q(0,1)*plane1_d + Q(1,1)*plane2_d;
+	const T d[] =
+	{
+		Q(0,0)*plane1_d + Q(1,0)*plane2_d,
+		Q(0,1)*plane1_d + Q(1,1)*plane2_d
+	};*/
 
-	t_vec lineOrg = zero<t_vec>(plane1Norm.size());
-	t_vec lineDir = zero<t_vec>(plane1Norm.size());
+	t_vec lineDir = cross<t_vec>({plane1Norm, plane2Norm});
+	const T lenCross = norm<t_vec>(lineDir);
 
-	// TODO: back-substitute R*x = [d1 d2]^T
-	std::cout << "d: " << d1 << ", " << d2 << std::endl;
-	std::cout << "R = " << R << std::endl;
+	// planes parallel or coinciding
+	if(equals<T>(lenCross, 0))
+	{
+		const bool bCoincide = equals<T>(plane1_d, plane2_d);
+		return std::make_tuple(t_vec(), t_vec(), bCoincide ? 2 : 0);
+	}
 
-	return std::make_tuple(lineOrg, lineDir);
+	lineDir /= lenCross;
+
+	t_vec lineOrg = - cross<t_vec>({plane1Norm, lineDir}) * plane2_d
+		+ cross<t_vec>({plane2Norm, lineDir}) * plane1_d;
+	lineOrg /= lenCross;
+
+	return std::make_tuple(lineOrg, lineDir, 1);
 }
 
 // ----------------------------------------------------------------------------
@@ -1054,7 +1108,7 @@ requires is_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 /**
- * cross product
+ * 3-dim cross product
  */
 template<class t_vec>
 t_vec cross(const t_vec& vec1, const t_vec& vec2)

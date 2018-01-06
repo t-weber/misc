@@ -58,6 +58,12 @@ void vecmat_tsts()
 	std::cout << mat(1,0) << " " << mat(1,1) << " " << mat(1,2) << "\n";
 	std::cout << mat(2,0) << " " << mat(2,1) << " " << mat(2,2) << "\n";
 
+	t_vec cross1 = cross<t_vec>(vec1, vec2);
+	t_vec cross2 = cross<t_vec>({vec1, vec2});
+	std::cout << "cross: " 
+		<< cross1[0] << ", " << cross1[1] << ", " << cross1[2] << ";  "	
+		<< cross2[0] << ", " << cross2[1] << ", " << cross2[2] << "\n";
+
 	t_vec vec3 = zero<t_vec>(3);
 	vec3[1] = 1;
 	vec3[2] = 1;
@@ -180,9 +186,12 @@ void vecmat_tsts()
 		/ norm<t_vec>(cross<t_vec>(line1[1], line2[1])) << "\n";
 
 	std::cout << "\nintersect_plane_plane\n";
-	m::intersect_plane_plane<t_vec, t_mat>(
+	auto [lineorg, linedir, lineok] = m::intersect_plane_plane<t_vec, t_mat>(
 		create<t_vec>({0,0,1}), 0,
-		create<t_vec>({0,1,0}), 5);
+		create<t_vec>({0,1,0}), -5);
+	std::cout << std::boolalpha << lineok << ";  "
+		<< lineorg[0] << " " << lineorg[1] << " " << lineorg[2] << ";  "
+		<< linedir[0] << " " << linedir[1] << " " << linedir[2] << "\n";
 
 
 	std::cout << "\nQR\n";
@@ -279,8 +288,8 @@ void vecmat_tsts_nonsquare()
 
 int main()
 {
-	constexpr bool bUseSTL = 0;
-	constexpr bool bUseQt = 0;
+	constexpr bool bUseSTL = 1;
+	constexpr bool bUseQt = 1;
 	constexpr bool bUseUblas = 1;
 
 	// using dynamic STL containers
