@@ -4,12 +4,14 @@
  * @date 9-dec-17
  * @license: see 'LICENSE' file
  *
- * g++ -fPIC -I/usr/include/qt5 -o math_algos_tst math_algos_tst.cpp -std=c++17 -fconcepts -lQt5Core
+ * g++ -fPIC -I/usr/include/qt5 -o math_algos_tst math_algos_tst.cpp -std=c++17 -fconcepts -lQt5Core -lQt5Gui
  */
 
 #include <iostream>
 #include "math_algos.h"
+#include "math_conts.h"
 using namespace m;
+using namespace m_ops;
 
 #include <vector>
 #include <array>
@@ -291,6 +293,7 @@ int main()
 	constexpr bool bUseSTL = 1;
 	constexpr bool bUseQt = 1;
 	constexpr bool bUseUblas = 1;
+	constexpr bool bUseInternals = 1;
 
 	// using dynamic STL containers
 	if constexpr(bUseSTL)
@@ -373,12 +376,29 @@ int main()
 		std::cout << "\n\n";
 	}
 
+
 	// using ublas classes
 	if constexpr(bUseUblas)
 	{
 		using t_real = double;
 		using t_vec = ublas::vector<t_real>;
 		using t_mat = ublas::matrix<t_real>;
+
+		vecmat_tsts<t_vec, t_mat>();
+		vecmat_tsts_hom<t_vec, t_mat>();
+		vecmat_tsts_nonsquare<t_vec, t_mat>();
+
+		std::cout << "----------------------------------------\n";
+		std::cout << "\n\n";
+	}
+
+
+	// using internal classes
+	if constexpr(bUseInternals)
+	{	
+		using t_real = double;
+		using t_vec = vec<t_real, std::vector>;
+		using t_mat = mat<t_real, std::vector>;
 
 		vecmat_tsts<t_vec, t_mat>();
 		vecmat_tsts_hom<t_vec, t_mat>();
