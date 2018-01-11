@@ -896,7 +896,7 @@ requires is_basic_vec<t_vec>
  * intersection of planes <x|n1> = d1 and <x|n2> = d2
  * returns line [org, dir, 0: no intersection, 1: intersection, 2: planes coincide]
  */
-template<class t_vec, class t_mat>
+template<class t_vec>
 std::tuple<t_vec, t_vec, int>
 	intersect_plane_plane(
 	const t_vec& plane1Norm, typename t_vec::value_type plane1_d,

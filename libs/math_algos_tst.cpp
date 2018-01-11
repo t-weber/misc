@@ -188,7 +188,7 @@ void vecmat_tsts()
 		/ norm<t_vec>(cross<t_vec>(line1[1], line2[1])) << "\n";
 
 	std::cout << "\nintersect_plane_plane\n";
-	auto [lineorg, linedir, lineok] = m::intersect_plane_plane<t_vec, t_mat>(
+	auto [lineorg, linedir, lineok] = m::intersect_plane_plane<t_vec>(
 		create<t_vec>({0,0,1}), 0,
 		create<t_vec>({0,1,0}), -5);
 	std::cout << std::boolalpha << lineok << ";  "

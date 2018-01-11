@@ -9,7 +9,7 @@
 #define __MATH_CONTS_H__
 
 #include "math_concepts.h"
-
+#include <cassert>
 #include <vector>
 
 
@@ -57,10 +57,6 @@ public:
 	mat() = default;
 	mat(std::size_t ROWS, std::size_t COLS) : m_data(ROWS*COLS), m_rowsize(ROWS), m_colsize(COLS) {}
 	~mat() = default;
-
-	/*std::size_t size() const { return m_data.size(); }
-	const T& operator[](std::size_t i) const { return m_data[i]; }
-	T& operator[](std::size_t i) { return m_data[i]; }*/
 
 	std::size_t size1() const { return m_rowsize; }
 	std::size_t size2() const { return m_colsize; }
@@ -116,6 +112,11 @@ template<class t_vec>
 t_vec operator+(const t_vec& vec1, const t_vec& vec2)
 requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
+	if constexpr(m::is_dyn_vec<t_vec>)
+		assert((vec1.size() == vec2.size()));
+	else
+		static_assert(vec1.size() == vec2.size());
+
 	t_vec vec(vec1.size());
 
 	for(std::size_t i=0; i<vec1.size(); ++i)
@@ -282,6 +283,11 @@ template<class t_mat>
 t_mat operator+(const t_mat& mat1, const t_mat& mat2)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
+	if constexpr(m::is_dyn_mat<t_mat>)
+		assert((mat1.size1() == mat2.size1() && mat1.size2() == mat2.size2()));
+	else
+		static_assert(mat1.size1() == mat2.size1() && mat1.size2() == mat2.size2());
+
 	t_mat mat(mat1.size1(), mat1.size2());
 
 	for(std::size_t i=0; i<mat1.size1(); ++i)
@@ -348,8 +354,12 @@ template<class t_mat>
 t_mat operator*(const t_mat& mat1, const t_mat& mat2)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
+	if constexpr(m::is_dyn_mat<t_mat>)
+		assert((mat1.size2() == mat2.size1()));
+	else
+		static_assert(mat1.size2() == mat2.size1());
+
 	t_mat matRet(mat1.size1(), mat2.size2());
-	// assert mat1.size2() == mat2.size1()
 
 	for(std::size_t row=0; row<matRet.size1(); ++row)
 	{
@@ -406,6 +416,12 @@ t_vec operator*(const t_mat& mat, const t_vec& vec)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 	&& m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
+	if constexpr(m::is_dyn_mat<t_mat>)
+		assert((mat.size2() == vec.size()));
+	else
+		static_assert(mat.size2() == vec.size());
+
+
 	t_vec vecRet(mat.size1());
 
 	for(std::size_t row=0; row<mat.size1(); ++row)
