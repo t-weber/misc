@@ -16,33 +16,6 @@
 namespace m {
 
 // ----------------------------------------------------------------------------
-// vector
-// ----------------------------------------------------------------------------
-
-template<class T=double, template<class...> class t_cont = std::vector>
-requires is_basic_vec<t_cont<T>> && is_dyn_vec<t_cont<T>>
-class vec
-{
-public:
-	using value_type = T;
-	using container_type = t_cont<T>;
-
-	vec() = default;
-	vec(std::size_t N) : m_data(N) {}
-	~vec() = default;
-
-	std::size_t size() const { return m_data.size(); }
-	const T& operator[](std::size_t i) const { return m_data[i]; }
-	T& operator[](std::size_t i) { return m_data[i]; }
-
-private:
-	container_type m_data;
-};
-// ----------------------------------------------------------------------------
-
-
-
-// ----------------------------------------------------------------------------
 // matrix
 // ----------------------------------------------------------------------------
 
@@ -68,7 +41,6 @@ private:
 	std::size_t m_rowsize, m_colsize;
 };
 // ----------------------------------------------------------------------------
-
 
 }
 
@@ -427,11 +399,8 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 	for(std::size_t row=0; row<mat.size1(); ++row)
 	{
 		vecRet[row] = 0;
-
 		for(std::size_t col=0; col<mat.size2(); ++col)
-		{
 			vecRet[row] += mat(row, col) * vec[col];
-		}
 	}
 
 	return vecRet;

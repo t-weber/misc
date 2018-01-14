@@ -1037,10 +1037,155 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	t_mat matProj = matProj1 + matProj2 + matProj3;
 
 	// if matrix is larger than 3x3 (e.g. for homogeneous cooridnates), fill up with identity
-	unity<t_mat>(matProj, 3,3, matProj.size1(),matProj.size2());
+	unity<t_mat>(matProj, 3,3, matProj.size1(), matProj.size2());
 	return matProj;
 }
 
+
+/**
+ * create the faces of a cube
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_cube(typename t_vec::value_type l = 1)
+requires is_vec<t_vec>
+{
+	t_cont<t_vec> vertices =
+	{
+		create<t_vec>({ +l, -l, -l }),	// vertex 0
+		create<t_vec>({ -l, -l, -l }),	// vertex 1
+		create<t_vec>({ -l, +l, -l }),	// vertex 2
+		create<t_vec>({ +l, +l, -l }),	// vertex 3
+
+		create<t_vec>({ -l, -l, +l }),	// vertex 4
+		create<t_vec>({ +l, -l, +l }),	// vertex 5
+		create<t_vec>({ +l, +l, +l }),	// vertex 6
+		create<t_vec>({ -l, +l, +l }),	// vertex 7
+	};
+
+	t_cont<t_cont<std::size_t>> faces =
+	{
+		{ 0, 1, 2, 3 },	// -z face
+		{ 4, 5, 6, 7 },	// +z face
+		{ 1, 0, 5, 4 }, // -y face
+		{ 7, 6, 3, 2 },	// +y face
+		{ 1, 4, 7, 2 },	// -x face
+		{ 5, 0, 3, 6 },	// +x face
+	};
+
+	t_cont<t_vec> normals =
+	{
+		create<t_vec>({ 0, 0, -1 }),	// -z face
+		create<t_vec>({ 0, 0, +1 }),	// +z face
+		create<t_vec>({ 0, -1, 0 }),	// -y face
+		create<t_vec>({ 0, +1, 0 }),	// +y face
+		create<t_vec>({ -1, 0, 0 }),	// -x face
+		create<t_vec>({ +1, 0, 0 }),	// +x face
+	};
+
+	t_cont<t_cont<t_vec>> uvs =
+	{
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -z face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +z face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -y face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +y face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -x face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +x face
+	};
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+/**
+ * triangulates polygon object, takes input from e.g. create_cube()
+ * returns [triangles, face normals, vertex uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>
+create_triangles(const std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>& tup)
+requires is_vec<t_vec>
+{
+	const t_cont<t_vec>& vertices = std::get<0>(tup);
+	const t_cont<t_cont<std::size_t>>& faces = std::get<1>(tup);
+	const t_cont<t_vec>& normals = std::get<2>(tup);
+	const t_cont<t_cont<t_vec>>& uvs = std::get<3>(tup);
+
+	t_cont<t_vec> triangles;
+	t_cont<t_vec> vert_normals;
+	t_cont<t_vec> vert_uvs;
+
+	auto iterFaces = faces.begin();
+	auto iterNorms = normals.begin();
+	auto iterUVs = uvs.begin();
+
+	// iterate over faces
+	while(iterFaces != faces.end())
+	{
+		// triangulate faces
+		auto iterFaceVertIdx = iterFaces->begin();
+		std::size_t vert1Idx = *iterFaceVertIdx;
+		std::advance(iterFaceVertIdx, 1);
+		std::size_t vert2Idx = *iterFaceVertIdx;
+
+		auto iterFaceUVIdx = iterUVs->begin();
+		const t_vec *puv1 = nullptr;
+		const t_vec *puv2 = nullptr;
+		const t_vec *puv3 = nullptr;
+		if(iterFaceUVIdx != iterUVs->end())
+		{
+			puv1 = &(*iterFaceUVIdx);
+			std::advance(iterFaceUVIdx, 1);
+			puv2 = &(*iterFaceUVIdx);
+		}
+
+
+		while(1)
+		{
+			std::advance(iterFaceVertIdx, 1);
+			if(iterFaceVertIdx == iterFaces->end())
+				break;
+			std::size_t vert3Idx = *iterFaceVertIdx;
+
+			if(iterFaceUVIdx != iterUVs->end())
+			{
+				std::advance(iterFaceUVIdx, 1);
+				puv3 = &(*iterFaceUVIdx);
+			}
+
+			// create triangle
+			triangles.push_back(vertices[vert1Idx]);
+			triangles.push_back(vertices[vert2Idx]);
+			triangles.push_back(vertices[vert3Idx]);
+
+			// triangle normal
+			vert_normals.push_back(*iterNorms);
+			//vert_normals.push_back(*iterNorms);
+			//vert_normals.push_back(*iterNorms);
+
+			// triangle vertex uvs
+			if(puv1 && puv2 && puv3)
+			{
+				vert_uvs.push_back(*puv1);
+				vert_uvs.push_back(*puv2);
+				vert_uvs.push_back(*puv3);
+			}
+
+
+			// next vertex
+			vert2Idx = vert3Idx;
+			puv2 = puv3;
+		}
+
+
+		std::advance(iterFaces, 1);
+		if(iterNorms != normals.end()) std::advance(iterNorms, 1);
+		if(iterUVs != uvs.end()) std::advance(iterUVs, 1);
+	}
+
+	return std::make_tuple(triangles, vert_normals, vert_uvs);
+}
 // ----------------------------------------------------------------------------
 
 

@@ -388,6 +388,8 @@ int main()
 		vecmat_tsts_hom<t_vec, t_mat>();
 		vecmat_tsts_nonsquare<t_vec, t_mat>();
 
+		create_cube<t_vec, std::vector>(1.);
+
 		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
@@ -397,7 +399,7 @@ int main()
 	if constexpr(bUseInternals)
 	{	
 		using t_real = double;
-		using t_vec = vec<t_real, std::vector>;
+		using t_vec = std::vector<t_real>;
 		using t_mat = mat<t_real, std::vector>;
 
 		vecmat_tsts<t_vec, t_mat>();
