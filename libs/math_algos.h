@@ -772,6 +772,37 @@ requires is_mat<t_mat>
 }
 
 
+/**
+ * general n-dim cross product using determinant definition
+ */
+template<class t_vec, template<class...> class t_cont = std::initializer_list>
+t_vec cross(const t_cont<t_vec>& vecs)
+requires is_basic_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+	// N also has to be equal to the vector size!
+	const std::size_t N = vecs.size()+1;
+	t_vec vec = zero<t_vec>(N);
+
+	for(std::size_t iComp=0; iComp<N; ++iComp)
+	{
+		std::vector<T> mat = zero<std::vector<T>>(N*N);
+		mat[0*N + iComp] = T(1);
+
+		std::size_t iRow = 0;
+		for(const t_vec& vec : vecs)
+		{
+			for(std::size_t iCol=0; iCol<N; ++iCol)
+				mat[(iRow+1)*N + iCol] = vec[iCol];
+			++iRow;
+		}
+
+		vec[iComp] = flat_det<decltype(mat)>(mat, N);
+	}
+
+	return vec;
+}
+
 
 /**
  * intersection of plane <x|n> = d and line |org> + lam*|dir>
@@ -781,7 +812,8 @@ requires is_mat<t_mat>
  * lam = (d - <org|n>) / <dir|n>
  */
 template<class t_vec>
-std::tuple<t_vec, int, typename t_vec::value_type> intersect_line_plane(
+std::tuple<t_vec, int, typename t_vec::value_type>
+intersect_line_plane(
 	const t_vec& lineOrg, const t_vec& lineDir,
 	const t_vec& planeNorm, typename t_vec::value_type plane_d)
 requires is_vec<t_vec>
@@ -809,6 +841,88 @@ requires is_vec<t_vec>
 
 
 /**
+ * average vector or matrix
+ */
+template<class ty, template<class ...> class t_cont = std::vector>
+ty avg(const t_cont<ty>& vecs)
+requires is_vec<ty> || is_mat<ty>
+{
+	if(vecs.size() == 0)
+		return ty();
+
+	typename ty::value_type num = 1;
+	ty vec = *vecs.begin();
+
+	auto iter = vecs.begin();
+	std::advance(iter, 1);
+
+	for(; iter!=vecs.end(); std::advance(iter, 1))
+	{
+		vec += *iter;
+		++num;
+	}
+	vec /= num;
+
+	return vec;
+}
+
+
+/**
+ * intersection of a polygon and a line
+ * returns [position of intersection, intersects?, line parameter lambda]
+ */
+template<class t_vec, template<class ...> class t_cont = std::vector>
+std::tuple<t_vec, bool, typename t_vec::value_type>
+intersect_line_poly(
+	const t_vec& lineOrg, const t_vec& lineDir,
+	const t_cont<t_vec>& poly)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	// middle point
+	const t_vec mid = avg<t_vec, t_cont>(poly);
+
+	// calculate polygon plane
+	const t_vec vec0 = poly[0] - mid;
+	const t_vec vec1 = poly[1] - mid;
+	t_vec planeNorm = cross<t_vec>({vec0, vec1});
+	planeNorm /= norm<t_vec>(planeNorm);
+	const T planeD = inner<t_vec>(poly[0], planeNorm);
+
+	// intersection with plane
+	auto [vec, intersects, lam] = intersect_line_plane<t_vec>(lineOrg, lineDir, planeNorm, planeD);
+	if(intersects != 1)
+		return std::make_tuple(t_vec(), false, T(0));
+
+	// is intersection point contained in polygon?
+	const t_vec* vecFirst = &(*poly.rbegin());
+	for(auto iter=poly.begin(); iter!=poly.end(); std::advance(iter, 1))
+	{
+		const t_vec* vecSecond = &(*iter);
+		const t_vec edge = *vecSecond - *vecFirst;
+
+		// plane through edge
+		t_vec edgeNorm = cross<t_vec>({edge, planeNorm});
+		edgeNorm /= norm<t_vec>(edgeNorm);
+		const T edgePlaneD = inner<t_vec>(*vecFirst, edgeNorm);
+
+		// side of intersection
+		const T ptEdgeD = inner<t_vec>(vec, edgeNorm);
+
+		// outside polygon?
+		if(ptEdgeD > edgePlaneD)
+			return std::make_tuple(t_vec(), false, T(0));
+
+		vecFirst = vecSecond;
+	}
+
+	// intersects with polygon
+	return std::make_tuple(vec, true, lam);
+}
+
+
+/**
  * intersection or closest points of lines |org1> + lam1*|dir1> and |org2> + lam2*|dir2>
  * returns [nearest position 1, nearest position 2, dist, valid?, line parameter 1, line parameter 2]
  * 
@@ -820,7 +934,7 @@ requires is_vec<t_vec>
  */
 template<class t_vec>
 std::tuple<t_vec, t_vec, bool, typename t_vec::value_type, typename t_vec::value_type, typename t_vec::value_type> 
-	intersect_line_line(
+intersect_line_line(
 	const t_vec& line1Org, const t_vec& line1Dir,
 	const t_vec& line2Org, const t_vec& line2Dir)
 requires is_vec<t_vec>
@@ -857,38 +971,6 @@ requires is_vec<t_vec>
 	const T dist = norm<t_vec>(pos2-pos1);
 
 	return std::make_tuple(pos1, pos2, true, dist, lam1, lam2);
-}
-
-
-/**
- * general n-dim cross product using determinant definition
- */
-template<class t_vec, template<class...> class t_cont = std::initializer_list>
-t_vec cross(const t_cont<t_vec>& vecs)
-requires is_basic_vec<t_vec>
-{
-	using T = typename t_vec::value_type;
-	// N also has to be equal to the vector size!
-	const std::size_t N = vecs.size()+1;
-	t_vec vec = zero<t_vec>(N);
-
-	for(std::size_t iComp=0; iComp<N; ++iComp)
-	{
-		std::vector<T> mat = zero<std::vector<T>>(N*N);
-		mat[0*N + iComp] = T(1);
-
-		std::size_t iRow = 0;
-		for(const t_vec& vec : vecs)
-		{
-			for(std::size_t iCol=0; iCol<N; ++iCol)
-				mat[(iRow+1)*N + iCol] = vec[iCol];
-			++iRow;
-		}
-
-		vec[iComp] = flat_det<decltype(mat)>(mat, N);
-	}
-
-	return vec;
 }
 
 

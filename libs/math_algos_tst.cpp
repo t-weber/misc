@@ -177,6 +177,12 @@ void vecmat_tsts()
 			create<t_vec>({0,0,1}), 10);
 	std::cout << std::boolalpha << bInters << ", " << vecInters[0] << " " << vecInters[1] << " " << vecInters[2] << "\n";
 
+	std::cout << "\nintersect_line_poly\n";
+	auto [vecInters2, bInters2, lamInters2] =
+	intersect_line_poly<t_vec>(create<t_vec>({-0.8,0.9,0}), create<t_vec>({0,0,1}),
+		{ create<t_vec>({-1,-1,-1}), create<t_vec>({1,-1,-1}), create<t_vec>({1,1,-1}), create<t_vec>({-1,1,-1}) } );
+	std::cout << std::boolalpha << bInters2 << ", " << vecInters2[0] << " " << vecInters2[1] << " " << vecInters2[2] << "\n";
+
 	std::cout << "\nintersect_line_line\n";
 	t_vec line1[] = { create<t_vec>({0,1,0}), create<t_vec>({0,0,1}) };
 	t_vec line2[] = { create<t_vec>({0,-1,0}), create<t_vec>({0.1,1,0.}) };
