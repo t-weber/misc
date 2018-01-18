@@ -71,13 +71,13 @@ void GlWidget::initializeGL()
 
 		in vec4 vertex;
 		in vec3 normal;
-		//in vec4 vertexcolor;
+		in vec4 vertexcolor;
 		out vec4 fragcolor;
 
 		uniform mat4 proj = mat4(1.);
 		uniform mat4 cam = mat4(1.);
 
-		vec4 vertexcolor = vec4(0, 0, 1, 1);
+		//vec4 vertexcolor = vec4(0, 0, 1, 1);
 		vec3 light_dir = vec3(1, 0.5, 0.25);
 
 
@@ -93,9 +93,8 @@ void GlWidget::initializeGL()
 			gl_Position = proj * cam * vertex;
 
 			float I = lighting(light_dir);
-			vertexcolor *= I;
-			vertexcolor[3] = 1;
-			fragcolor = vertexcolor;
+			fragcolor = vertexcolor * I;
+			fragcolor[3] = 1;
 		})RAW";
 	// --------------------------------------------------------------------
 
@@ -170,19 +169,21 @@ void GlWidget::initializeGL()
 		m_uniMatrixProj = m_pShaders->uniformLocation("proj");
 		m_attrVertex = m_pShaders->attributeLocation("vertex");
 		m_attrVertexNormal = m_pShaders->attributeLocation("normal");
+		m_attrVertexColor = m_pShaders->attributeLocation("vertexcolor");
 	}
 	LOGGLERR
 
 
 	// geometries
 	{
-		auto [verts, norms, uvs] = m::create_triangles<t_vec>(m::create_cube<t_vec>(1.));
+		auto cube = m::create_cube<t_vec3>(1.);
+		auto [verts, norms, uvs] = m::create_triangles<t_vec3>(cube);
 
 		// main vertex array object
 		m_pGl->glGenVertexArrays(1, &m_vertexarr);
 		m_pGl->glBindVertexArray(m_vertexarr);
 
-		{
+		{	// vertices
 			m_pvertexbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
 
 			m_pvertexbuf->create();
@@ -201,9 +202,10 @@ void GlWidget::initializeGL()
 			}
 
 			m_pvertexbuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(GLfloat));
+			m_pGl->glVertexAttribPointer(m_attrVertex, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(GLfloat)));
 		}
 
-		{
+		{	// normals
 			m_pnormalsbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
 
 			m_pnormalsbuf->create();
@@ -226,29 +228,34 @@ void GlWidget::initializeGL()
 			}
 
 			m_pnormalsbuf->allocate(vecNorms.data(), vecNorms.size()*sizeof(GLfloat));
+			m_pGl->glVertexAttribPointer(m_attrVertexNormal, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(GLfloat)));
 		}
 
-		{
-			// triangles
-			m_pvertexbuf->bind();
-			BOOST_SCOPE_EXIT(&m_pvertexbuf)
-			{ m_pvertexbuf->release(); }
+		{	// colors
+			m_pcolorbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+
+			m_pcolorbuf->create();
+			m_pcolorbuf->bind();
+			BOOST_SCOPE_EXIT(&m_pcolorbuf)
+			{ m_pcolorbuf->release(); }
 			BOOST_SCOPE_EXIT_END
-			LOGGLERR
 
-			m_pGl->glVertexAttribPointer(m_attrVertex, 3, GL_FLOAT, 0, 3*sizeof(GLfloat), (void*)(0*sizeof(GLfloat)));
+			std::vector<GLfloat> vecCols;
+			vecCols.reserve(4*verts.size());
+			for(std::size_t iVert=0; iVert<verts.size(); ++iVert)
+			{
+				vecCols.push_back(0);
+				vecCols.push_back(0);
+				vecCols.push_back(1);
+				vecCols.push_back(1);
+			}
+
+			m_pcolorbuf->allocate(vecCols.data(), vecCols.size()*sizeof(GLfloat));
+			m_pGl->glVertexAttribPointer(m_attrVertexColor, 4, GL_FLOAT, 0, 0, (void*)(0*sizeof(GLfloat)));
 		}
 
-		{
-			// normals
-			m_pnormalsbuf->bind();
-			BOOST_SCOPE_EXIT(&m_pnormalsbuf)
-			{ m_pnormalsbuf->release(); }
-			BOOST_SCOPE_EXIT_END
-			LOGGLERR
-
-			m_pGl->glVertexAttribPointer(m_attrVertexNormal, 3, GL_FLOAT, 0, 3*sizeof(GLfloat), (void*)(0*sizeof(GLfloat)));
-		}
+		m_vertices = std::move(std::get<0>(cube));
+		m_triangles = std::move(verts);
 	}
 	LOGGLERR
 }
@@ -326,8 +333,10 @@ void GlWidget::paintGL()
 
 			m_pGl->glEnableVertexAttribArray(m_attrVertex);
 			m_pGl->glEnableVertexAttribArray(m_attrVertexNormal);
-			BOOST_SCOPE_EXIT(m_pGl, &m_attrVertex, &m_attrVertexNormal)
+			m_pGl->glEnableVertexAttribArray(m_attrVertexColor);
+			BOOST_SCOPE_EXIT(m_pGl, &m_attrVertex, &m_attrVertexNormal, &m_attrVertexColor)
 			{
+				m_pGl->glDisableVertexAttribArray(m_attrVertexColor);
 				m_pGl->glDisableVertexAttribArray(m_attrVertexNormal);
 				m_pGl->glDisableVertexAttribArray(m_attrVertex);
 			}
@@ -344,14 +353,13 @@ void GlWidget::paintGL()
 	{
 		m_pGl->glDisable(GL_DEPTH_TEST);
 
-		painter.drawText(GlToScreenCoords(t_vec(+1, -1, -1, 1)), "* 0");
-		painter.drawText(GlToScreenCoords(t_vec(-1, -1, -1, 1)), "* 1");
-		painter.drawText(GlToScreenCoords(t_vec(-1, +1, -1, 1)), "* 2");
-		painter.drawText(GlToScreenCoords(t_vec(+1, +1, -1, 1)), "* 3");
-		painter.drawText(GlToScreenCoords(t_vec(-1, -1, +1, 1)), "* 4");
-		painter.drawText(GlToScreenCoords(t_vec(+1, -1, +1, 1)), "* 5");
-		painter.drawText(GlToScreenCoords(t_vec(+1, +1, +1, 1)), "* 6");
-		painter.drawText(GlToScreenCoords(t_vec(-1, +1, +1, 1)), "* 7");
+		std::size_t i = 0;
+		for(const auto& vert : m_vertices)
+		{
+			std::string strName = "* " + std::to_string(i);
+			painter.drawText(GlToScreenCoords(t_vec(vert[0], vert[1], vert[2], 1)), strName.c_str());
+			++i;
+		}
 	}
 }
 
@@ -401,12 +409,34 @@ void GlWidget::mouseMoveEvent(QMouseEvent *pEvt)
 
 void GlWidget::updatePicker()
 {
-	/*// test
-	t_vec vecProbe{-0.7, 0.2, -4., 1.};
+	if(!m_pcolorbuf) return;
+
+	m_pcolorbuf->bind();
+	BOOST_SCOPE_EXIT(&m_pcolorbuf)
+	{ m_pcolorbuf->release(); }
+	BOOST_SCOPE_EXIT_END
+	LOGGLERR
+
 	auto [org, dir] = m::hom_line_from_screen_coords<t_mat, t_vec>(m_posMouse.x(), m_posMouse.y(), 0., 1.,
 		m_matCam_inv, m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
-	auto [vecNearest, dist] = m::project_line(vecProbe, org, dir, true);
-// 	std::cout << "dist to vertex = " << dist << std::endl;*/
+
+	GLfloat red[] = {1.,0.,0.,1., 1.,0.,0.,1., 1.,0.,0.,1.};
+	GLfloat blue[] = {0.,0.,1.,1., 0.,0.,1.,1., 0.,0.,1.,1.};
+
+	for(std::size_t startidx=0; startidx+2<m_triangles.size(); startidx+=3)
+	{
+		std::vector<t_vec3> poly{{ m_triangles[startidx+0], m_triangles[startidx+1], m_triangles[startidx+2] }};
+		auto [vecInters, bInters, lamInters] =
+			m::intersect_line_poly<t_vec3>(
+				t_vec3(org[0], org[1], org[2]), t_vec3(dir[0], dir[1], dir[2]), poly);
+		//if(bInters)
+		//	std::cout << "Intersection with polygon " << startidx/3 << std::endl;
+
+		if(bInters)
+			m_pcolorbuf->write(sizeof(GLfloat)*startidx*4, red, sizeof(red));
+		else
+			m_pcolorbuf->write(sizeof(GLfloat)*startidx*4, blue, sizeof(blue));
+	}
 }
 // ----------------------------------------------------------------------------
 

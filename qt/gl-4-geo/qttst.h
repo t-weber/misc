@@ -73,6 +73,7 @@ private:
 	std::shared_ptr<QOpenGLShaderProgram> m_pShaders;
 	std::shared_ptr<QOpenGLBuffer> m_pvertexbuf;
 	std::shared_ptr<QOpenGLBuffer> m_pnormalsbuf;
+	std::shared_ptr<QOpenGLBuffer> m_pcolorbuf;
 
 	t_mat m_matPerspective, m_matPerspective_inv;
 	t_mat m_matViewport, m_matViewport_inv;
@@ -83,6 +84,8 @@ private:
 	GLint m_attrVertexNormal = -1;
 	GLint m_attrVertexColor = -1;
 	GLint m_uniMatrixProj = -1, m_uniMatrixCam = -1;
+
+	std::vector<t_vec3> m_vertices, m_triangles;
 
 	int m_iScreenDims[2] = { -1, -1 };
 	QPointF m_posMouse;
