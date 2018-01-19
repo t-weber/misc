@@ -177,7 +177,9 @@ void GlWidget::initializeGL()
 	// geometries
 	{
 		auto cube = m::create_cube<t_vec3>(1.);
-		auto [verts, norms, uvs] = m::create_triangles<t_vec3>(cube);
+		auto [verts, norms, uvs] =
+			m::subdivide_triangles<t_vec3>(m::subdivide_triangles<t_vec3>(
+				m::create_triangles<t_vec3>(cube)));
 
 		// main vertex array object
 		m_pGl->glGenVertexArrays(1, &m_vertexarr);
@@ -343,7 +345,7 @@ void GlWidget::paintGL()
 			BOOST_SCOPE_EXIT_END
 			LOGGLERR
 
-			m_pGl->glDrawArrays(GL_TRIANGLES, 0, 3*12);
+			m_pGl->glDrawArrays(GL_TRIANGLES, 0, m_triangles.size());
 			LOGGLERR
 		}
 	}

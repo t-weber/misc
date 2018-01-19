@@ -1195,7 +1195,7 @@ requires is_vec<t_vec>
 	const t_cont<t_cont<t_vec>>& uvs = std::get<3>(tup);
 
 	t_cont<t_vec> triangles;
-	t_cont<t_vec> vert_normals;
+	t_cont<t_vec> triag_normals;
 	t_cont<t_vec> vert_uvs;
 
 	auto iterFaces = faces.begin();
@@ -1242,9 +1242,9 @@ requires is_vec<t_vec>
 			triangles.push_back(vertices[vert3Idx]);
 
 			// triangle normal
-			vert_normals.push_back(*iterNorms);
-			//vert_normals.push_back(*iterNorms);
-			//vert_normals.push_back(*iterNorms);
+			triag_normals.push_back(*iterNorms);
+			//triag_normals.push_back(*iterNorms);
+			//triag_normals.push_back(*iterNorms);
 
 			// triangle vertex uvs
 			if(puv1 && puv2 && puv3)
@@ -1266,7 +1266,120 @@ requires is_vec<t_vec>
 		if(iterUVs != uvs.end()) std::advance(iterUVs, 1);
 	}
 
-	return std::make_tuple(triangles, vert_normals, vert_uvs);
+	return std::make_tuple(triangles, triag_normals, vert_uvs);
+}
+
+
+/**
+ * subdivides triangles
+ * returns [triangles, face normals, vertex uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>
+subdivide_triangles(const std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>& tup)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	const t_cont<t_vec>& vertices = std::get<0>(tup);
+	const t_cont<t_vec>& normals = std::get<1>(tup);
+	const t_cont<t_vec>& uvs = std::get<2>(tup);
+
+	t_cont<t_vec> vertices_new;
+	t_cont<t_vec> normals_new;
+	t_cont<t_vec> uvs_new;
+
+
+	// iterate over triplets forming triangles
+	auto itervert = vertices.begin();
+	auto iternorm = normals.begin();
+	auto iteruv = uvs.begin();
+
+	while(itervert != vertices.end())
+	{
+		const t_vec& vec1 = *itervert;
+		std::advance(itervert, 1); if(itervert == vertices.end()) break;
+		const t_vec& vec2 = *itervert;
+		std::advance(itervert, 1); if(itervert == vertices.end()) break;
+		const t_vec& vec3 = *itervert;
+		std::advance(itervert, 1);
+
+		const t_vec vecmid = avg<t_vec>({ vec1, vec2, vec3 });
+
+		// triangle 1
+		vertices_new.push_back(vec1);
+		vertices_new.push_back(vec2);
+		vertices_new.push_back(vecmid);
+
+		// triangle 2
+		vertices_new.push_back(vec2);
+		vertices_new.push_back(vec3);
+		vertices_new.push_back(vecmid);
+
+		// triangle 3
+		vertices_new.push_back(vec3);
+		vertices_new.push_back(vec1);
+		vertices_new.push_back(vecmid);
+
+
+		// duplicate normals for sub-triangles
+		if(iternorm != normals.end())
+		{
+			normals_new.push_back(*iternorm);
+			normals_new.push_back(*iternorm);
+			normals_new.push_back(*iternorm);
+
+			std::advance(iternorm, 1);
+		}
+
+
+		// uv coords
+		if(iteruv != uvs.end())
+		{
+			// uv coords at vertices
+			const t_vec& uv1 = *iteruv;
+			std::advance(iteruv, 1); if(iteruv == uvs.end()) break;
+			const t_vec& uv2 = *iteruv;
+			std::advance(iteruv, 1); if(iteruv == uvs.end()) break;
+			const t_vec& uv3 = *iteruv;
+			std::advance(iteruv, 1);
+
+
+			// triangle edges
+			const t_vec vec12 = vec2 - vec1;
+			const t_vec vec13 = vec3 - vec1;
+
+			// project midpoint onto edges
+			t_vec vec12_div, vec13_div;
+			std::tie(vec12_div, std::ignore) = project_line<t_vec>(vecmid, vec1, vec12, false);
+			std::tie(vec13_div, std::ignore) = project_line<t_vec>(vecmid, vec1, vec13, false);
+
+			// fraction along edges
+			const T frac12 = norm<t_vec>(vec12_div-vec1) / norm<t_vec>(vec12);
+			const T frac13 = norm<t_vec>(vec13_div-vec1) / norm<t_vec>(vec13);
+
+			// uv coords of midpoint
+			const t_vec uv_mid = uv1 + frac12*(uv2-uv1) + frac13*(uv3-uv1);
+
+
+			// uvs of triangle 1
+			uvs_new.push_back(uv1);
+			uvs_new.push_back(uv2);
+			uvs_new.push_back(uv_mid);
+
+			// uvs of triangle 2
+			uvs_new.push_back(uv2);
+			uvs_new.push_back(uv3);
+			uvs_new.push_back(uv_mid);
+
+			// uvs of triangle 3
+			uvs_new.push_back(uv3);
+			uvs_new.push_back(uv1);
+			uvs_new.push_back(uv_mid);
+		}
+	}
+
+	return std::make_tuple(vertices_new, normals_new, uvs_new);
 }
 // ----------------------------------------------------------------------------
 
