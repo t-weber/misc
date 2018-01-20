@@ -70,7 +70,7 @@ void GlWidget::initializeGL()
 		#version ${GLSL_VERSION}
 
 		in vec4 vertex;
-		in vec3 normal;
+		in vec4 normal;
 		in vec4 vertexcolor;
 		out vec4 fragcolor;
 
@@ -78,13 +78,12 @@ void GlWidget::initializeGL()
 		uniform mat4 cam = mat4(1.);
 
 		//vec4 vertexcolor = vec4(0, 0, 1, 1);
-		vec3 light_dir = vec3(1, 0.5, 0.25);
-
+		vec3 light_dir = vec3(2, 2, -1);
 
 		float lighting(vec3 lightdir)
 		{
-			float I = dot(normal, normalize(lightdir));
-			I = abs(I);
+			float I = dot(vec3(cam*normal), normalize(lightdir));
+			if(I < 0) I = 0;
 			return I;
 		}
 
@@ -190,11 +189,13 @@ void GlWidget::initializeGL()
 	// geometries
 	{
 		//auto solid = m::create_cube<t_vec3>(1.);
-		auto solid = m::create_octahedron<t_vec3>(1.5);
 		//auto solid = m::create_tetrahedron<t_vec3>(0.5);
+		//auto solid = m::create_octahedron<t_vec3>(0.5);
+		auto solid = m::create_icosahedron<t_vec3>(0.75);
 		auto [verts, norms, uvs] =
-			m::subdivide_triangles<t_vec3>(m::subdivide_triangles<t_vec3>(
-				m::create_triangles<t_vec3>(solid)));
+			m::spherify<t_vec3>(
+				m::subdivide_triangles<t_vec3>(
+					m::create_triangles<t_vec3>(solid), 2), 1.);
 		m_lines = m::create_lines<t_vec3>(std::get<0>(solid), std::get<1>(solid));
 
 		// main vertex array object

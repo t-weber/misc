@@ -1212,17 +1212,19 @@ requires is_vec<t_vec>
 		std::advance(iterFaceVertIdx, 1);
 		std::size_t vert2Idx = *iterFaceVertIdx;
 
-		auto iterFaceUVIdx = iterUVs->begin();
 		const t_vec *puv1 = nullptr;
 		const t_vec *puv2 = nullptr;
 		const t_vec *puv3 = nullptr;
-		if(iterFaceUVIdx != iterUVs->end())
+
+		typename t_cont<t_vec>::const_iterator iterFaceUVIdx;
+		if(iterUVs != uvs.end() && iterFaceUVIdx != iterUVs->end())
 		{
+			iterFaceUVIdx = iterUVs->begin();
+
 			puv1 = &(*iterFaceUVIdx);
 			std::advance(iterFaceUVIdx, 1);
 			puv2 = &(*iterFaceUVIdx);
 		}
-
 
 		while(1)
 		{
@@ -1231,7 +1233,7 @@ requires is_vec<t_vec>
 				break;
 			std::size_t vert3Idx = *iterFaceVertIdx;
 
-			if(iterFaceUVIdx != iterUVs->end())
+			if(iterUVs != uvs.end() && iterFaceUVIdx != iterUVs->end())
 			{
 				std::advance(iterFaceUVIdx, 1);
 				puv3 = &(*iterFaceUVIdx);
@@ -1273,6 +1275,7 @@ requires is_vec<t_vec>
 
 /**
  * subdivides triangles
+ * input: [triangle vertices, normals, uvs]
  * returns [triangles, face normals, vertex uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
@@ -1381,6 +1384,75 @@ requires is_vec<t_vec>
 
 	return std::make_tuple(vertices_new, normals_new, uvs_new);
 }
+
+
+/**
+ * subdivides triangles (with specified iterations)
+ * input: [triangle vertices, normals, uvs]
+ * returns [triangles, face normals, vertex uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>
+subdivide_triangles(const std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>& tup, std::size_t iters)
+requires is_vec<t_vec>
+{
+	auto tupDiv = tup;
+	for(std::size_t i=0; i<iters; ++i)
+		tupDiv = subdivide_triangles<t_vec, t_cont>(tupDiv);
+	return tupDiv;
+}
+
+
+/**
+ * create the faces of a sphere
+ * input: [triangle vertices, normals, uvs] (like subdivide_triangles)
+ * returns [triangles, face normals, vertex uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>
+spherify(const std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>& tup,
+	typename t_vec::value_type rad = 1)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	const t_cont<t_vec>& vertices = std::get<0>(tup);
+	const t_cont<t_vec>& normals = std::get<1>(tup);
+	const t_cont<t_vec>& uvs = std::get<2>(tup);
+
+	t_cont<t_vec> vertices_new;
+	t_cont<t_vec> normals_new;
+
+
+	// vertices
+	for(t_vec vec : vertices)
+	{
+		vec /= norm<t_vec>(vec);
+		vec *= rad;
+		vertices_new.emplace_back(std::move(vec));
+	}
+
+
+	// normals
+	auto itervert = vertices.begin();
+	// iterate over triplets forming triangles
+	while(itervert != vertices.end())
+	{
+		const t_vec& vec1 = *itervert;
+		std::advance(itervert, 1); if(itervert == vertices.end()) break;
+		const t_vec& vec2 = *itervert;
+		std::advance(itervert, 1); if(itervert == vertices.end()) break;
+		const t_vec& vec3 = *itervert;
+		std::advance(itervert, 1);
+
+		t_vec vecmid = avg<t_vec>({ vec1, vec2, vec3 });
+		vecmid /= norm<t_vec>(vecmid);
+		normals_new.emplace_back(std::move(vecmid));
+	}
+
+	return std::make_tuple(vertices_new, normals_new, uvs);
+}
+
 // ----------------------------------------------------------------------------
 
 
@@ -1439,6 +1511,66 @@ requires is_vec<t_vec>
 		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +y face
 		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -x face
 		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +x face
+	};
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+/**
+ * create the faces of a icosahedron
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_icosahedron(typename t_vec::value_type l = 1)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+	const T g = golden<T>;
+
+	t_cont<t_vec> vertices =
+	{
+		create<t_vec>({ 0, -l, -g*l }), create<t_vec>({ 0, -l, +g*l }),
+		create<t_vec>({ 0, +l, -g*l }), create<t_vec>({ 0, +l, +g*l }),
+
+		create<t_vec>({ -g*l, 0, -l }), create<t_vec>({ -g*l, 0, +l }),
+		create<t_vec>({ +g*l, 0, -l }), create<t_vec>({ +g*l, 0, +l }),
+
+		create<t_vec>({ -l, -g*l, 0 }), create<t_vec>({ -l, +g*l, 0 }),
+		create<t_vec>({ +l, -g*l, 0 }), create<t_vec>({ +l, +g*l, 0 }),
+	};
+
+	t_cont<t_cont<std::size_t>> faces =
+	{
+		{ 4, 2, 0 }, { 0, 6, 10 }, { 10, 7, 1 }, { 1, 3, 5 }, { 5, 9, 4 },
+		{ 7, 10, 6 }, { 6, 0, 2 }, { 2, 4, 9 }, { 9, 5, 3 }, { 3, 1, 7 },
+		{ 0, 10, 8 }, { 10, 1, 8 }, { 1, 5, 8 }, { 5, 4, 8 }, { 4, 0, 8 },
+		{ 3, 7, 11 }, { 7, 6, 11 }, { 6, 2, 11 }, { 2, 9, 11 }, { 9, 3, 11 },
+	};
+
+
+	t_cont<t_vec> normals;
+	normals.reserve(faces.size());
+
+	for(const auto& face : faces)
+	{
+		auto iter = face.begin();
+		const t_vec& vec1 = *(vertices.begin() + *iter); std::advance(iter,1);
+		const t_vec& vec2 = *(vertices.begin() + *iter); std::advance(iter,1);
+		const t_vec& vec3 = *(vertices.begin() + *iter);
+
+		const t_vec vec12 = vec2 - vec1;
+		const t_vec vec13 = vec3 - vec1;
+
+		t_vec n = cross<t_vec>({vec12, vec13});
+		n /= norm<t_vec>(n);
+		normals.emplace_back(std::move(n));
+	}
+
+	// TODO
+	t_cont<t_cont<t_vec>> uvs =
+	{
 	};
 
 	return std::make_tuple(vertices, faces, normals, uvs);
@@ -1552,6 +1684,7 @@ requires is_vec<t_vec>
 
 	return std::make_tuple(vertices, faces, normals, uvs);
 }
+
 // ----------------------------------------------------------------------------
 
 
