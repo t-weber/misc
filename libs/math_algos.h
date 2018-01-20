@@ -1126,6 +1126,62 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
+ * extracts lines from polygon object, takes input from e.g. create_cube()
+ * returns [point pairs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+t_cont<t_vec> create_lines(const t_cont<t_vec>& vertices, const t_cont<t_cont<std::size_t>>& faces)
+requires is_vec<t_vec>
+{
+	t_cont<t_vec> lineverts;
+
+	auto line_already_seen = [&lineverts](const t_vec& vec1, const t_vec& vec2) -> bool
+	{
+		auto iter = lineverts.begin();
+
+		while(1)
+		{
+			const t_vec& linevec1 = *iter;
+			std::advance(iter, 1); if(iter == lineverts.end()) break;
+			const t_vec& linevec2 = *iter;
+
+			if(equals<t_vec>(vec1, linevec1) && equals<t_vec>(vec2, linevec2))
+				return true;
+			if(equals<t_vec>(vec1, linevec2) && equals<t_vec>(vec2, linevec1))
+				return true;
+
+			std::advance(iter, 1); if(iter == lineverts.end()) break;
+		}
+
+		return false;
+	};
+
+	for(const auto& face : faces)
+	{
+		// iterator to last point
+		auto iter1 = face.begin();
+		std::advance(iter1, face.size()-1);
+
+		for(auto iter2 = face.begin(); iter2 != face.end(); std::advance(iter2, 1))
+		{
+			const t_vec& vec1 = vertices[*iter1];
+			const t_vec& vec2 = vertices[*iter2];
+
+			//if(!line_already_seen(vec1, vec2))
+			{
+				lineverts.push_back(vec1);
+				lineverts.push_back(vec2);
+			}
+
+			iter1 = iter2;
+		}
+	}
+
+	return lineverts;
+}
+
+
+/**
  * triangulates polygon object, takes input from e.g. create_cube()
  * returns [triangles, face normals, vertex uvs]
  */

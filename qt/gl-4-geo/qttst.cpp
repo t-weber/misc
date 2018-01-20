@@ -59,7 +59,7 @@ void GlWidget::initializeGL()
 
 		void main()
 		{
-			outcolor = vec4(0,0,0,1);
+			//outcolor = vec4(0,0,0,1);
 			outcolor = fragcolor;
 		})RAW";
 	// --------------------------------------------------------------------
@@ -109,10 +109,10 @@ void GlWidget::initializeGL()
 	// --------------------------------------------------------------------
 
 
+	// set glsl version
 	std::string strGlsl = std::to_string(_GL_MAJ_VER*100 + _GL_MIN_VER*10);
-	algo::replace_all(strFragShader, std::string("${GLSL_VERSION}"), strGlsl);
-	algo::replace_all(strVertexShader, std::string("${GLSL_VERSION}"), strGlsl);
-	algo::replace_all(strGeoShader, std::string("${GLSL_VERSION}"), strGlsl);
+	for(std::string* strSrc : { &strFragShader, &strVertexShader, &strGeoShader })
+		algo::replace_all(*strSrc, std::string("${GLSL_VERSION}"), strGlsl);
 
 
 	// GL functions
@@ -173,6 +173,19 @@ void GlWidget::initializeGL()
 	}
 	LOGGLERR
 
+	// flatten vertex array into raw float array
+	auto to_float_array = [](const std::vector<t_vec3>& verts, int iRepeat=1, int iElems=3)
+		-> std::vector<GLfloat>
+	{
+		std::vector<GLfloat> vecRet;
+		vecRet.reserve(iRepeat*verts.size()*iElems);
+
+		for(const t_vec3& vert : verts)
+			for(int i=0; i<iRepeat; ++i)
+				for(int iElem=0; iElem<iElems; ++iElem)
+					vecRet.push_back(vert[iElem]);
+		return vecRet;
+	};
 
 	// geometries
 	{
@@ -182,10 +195,11 @@ void GlWidget::initializeGL()
 		auto [verts, norms, uvs] =
 			m::subdivide_triangles<t_vec3>(m::subdivide_triangles<t_vec3>(
 				m::create_triangles<t_vec3>(solid)));
+		m_lines = m::create_lines<t_vec3>(std::get<0>(solid), std::get<1>(solid));
 
 		// main vertex array object
-		m_pGl->glGenVertexArrays(1, &m_vertexarr);
-		m_pGl->glBindVertexArray(m_vertexarr);
+		m_pGl->glGenVertexArrays(2, m_vertexarr.data());
+		m_pGl->glBindVertexArray(m_vertexarr[0]);
 
 		{	// vertices
 			m_pvertexbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
@@ -196,17 +210,9 @@ void GlWidget::initializeGL()
 			{ m_pvertexbuf->release(); }
 			BOOST_SCOPE_EXIT_END
 
-			std::vector<GLfloat> vecVerts;
-			vecVerts.reserve(verts.size()*3);
-			for(const t_vec& vert : verts)
-			{
-				vecVerts.push_back(vert[0]);
-				vecVerts.push_back(vert[1]);
-				vecVerts.push_back(vert[2]);
-			}
-
-			m_pvertexbuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(GLfloat));
-			m_pGl->glVertexAttribPointer(m_attrVertex, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(GLfloat)));
+			auto vecVerts = to_float_array(verts);
+			m_pvertexbuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(typename decltype(vecVerts)::value_type));
+			m_pGl->glVertexAttribPointer(m_attrVertex, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecVerts)::value_type)));
 		}
 
 		{	// normals
@@ -218,21 +224,9 @@ void GlWidget::initializeGL()
 			{ m_pnormalsbuf->release(); }
 			BOOST_SCOPE_EXIT_END
 
-			std::vector<GLfloat> vecNorms;
-			vecNorms.reserve(3*norms.size()*3);
-			for(const t_vec& norm : norms)
-			{
-				// 3 vertices per triangle
-				for(int i=0; i<3; ++i)
-				{
-					vecNorms.push_back(norm[0]);
-					vecNorms.push_back(norm[1]);
-					vecNorms.push_back(norm[2]);
-				}
-			}
-
-			m_pnormalsbuf->allocate(vecNorms.data(), vecNorms.size()*sizeof(GLfloat));
-			m_pGl->glVertexAttribPointer(m_attrVertexNormal, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(GLfloat)));
+			auto vecNorms = to_float_array(norms, 3);
+			m_pnormalsbuf->allocate(vecNorms.data(), vecNorms.size()*sizeof(typename decltype(vecNorms)::value_type));
+			m_pGl->glVertexAttribPointer(m_attrVertexNormal, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecNorms)::value_type)));
 		}
 
 		{	// colors
@@ -248,14 +242,29 @@ void GlWidget::initializeGL()
 			vecCols.reserve(4*verts.size());
 			for(std::size_t iVert=0; iVert<verts.size(); ++iVert)
 			{
-				vecCols.push_back(0);
-				vecCols.push_back(0);
-				vecCols.push_back(1);
-				vecCols.push_back(1);
+				vecCols.push_back(0); vecCols.push_back(0);
+				vecCols.push_back(1); vecCols.push_back(1);
 			}
 
-			m_pcolorbuf->allocate(vecCols.data(), vecCols.size()*sizeof(GLfloat));
-			m_pGl->glVertexAttribPointer(m_attrVertexColor, 4, GL_FLOAT, 0, 0, (void*)(0*sizeof(GLfloat)));
+			m_pcolorbuf->allocate(vecCols.data(), vecCols.size()*sizeof(typename decltype(vecCols)::value_type));
+			m_pGl->glVertexAttribPointer(m_attrVertexColor, 4, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecCols)::value_type)));
+		}
+
+
+		m_pGl->glBindVertexArray(m_vertexarr[1]);
+
+		{	// lines
+			m_plinebuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+
+			m_plinebuf->create();
+			m_plinebuf->bind();
+			BOOST_SCOPE_EXIT(&m_plinebuf)
+			{ m_plinebuf->release(); }
+			BOOST_SCOPE_EXIT_END
+
+			auto vecVerts = to_float_array(m_lines);
+			m_plinebuf->allocate(vecVerts.data(), vecVerts.size()*sizeof(typename decltype(vecVerts)::value_type));
+			m_pGl->glVertexAttribPointer(m_attrVertex, 3, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecVerts)::value_type)));
 		}
 
 		m_vertices = std::move(std::get<0>(solid));
@@ -336,12 +345,11 @@ void GlWidget::paintGL()
 		// set cam matrix
 		m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
 
-
-		// geometry
+		// triangle geometry
 		if(m_pvertexbuf)
 		{
 			// main vertex array object
-			m_pGl->glBindVertexArray(m_vertexarr);
+			m_pGl->glBindVertexArray(m_vertexarr[0]);
 
 			m_pGl->glEnableVertexAttribArray(m_attrVertex);
 			m_pGl->glEnableVertexAttribArray(m_attrVertexNormal);
@@ -356,6 +364,22 @@ void GlWidget::paintGL()
 			LOGGLERR
 
 			m_pGl->glDrawArrays(GL_TRIANGLES, 0, m_triangles.size());
+			LOGGLERR
+		}
+
+		// lines
+		if(m_plinebuf)
+		{
+			// auxiliary vertex array object
+			m_pGl->glBindVertexArray(m_vertexarr[1]);
+
+			m_pGl->glEnableVertexAttribArray(m_attrVertex);
+			BOOST_SCOPE_EXIT(m_pGl, &m_attrVertex)
+			{ m_pGl->glDisableVertexAttribArray(m_attrVertex); }
+			BOOST_SCOPE_EXIT_END
+			LOGGLERR
+
+			m_pGl->glDrawArrays(GL_LINES, 0, m_lines.size());
 			LOGGLERR
 		}
 	}
@@ -445,9 +469,9 @@ void GlWidget::updatePicker()
 		//	std::cout << "Intersection with polygon " << startidx/3 << std::endl;
 
 		if(bInters)
-			m_pcolorbuf->write(sizeof(GLfloat)*startidx*4, red, sizeof(red));
+			m_pcolorbuf->write(sizeof(red[0])*startidx*4, red, sizeof(red));
 		else
-			m_pcolorbuf->write(sizeof(GLfloat)*startidx*4, blue, sizeof(blue));
+			m_pcolorbuf->write(sizeof(blue[0])*startidx*4, blue, sizeof(blue));
 	}
 }
 // ----------------------------------------------------------------------------

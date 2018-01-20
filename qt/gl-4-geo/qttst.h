@@ -72,6 +72,7 @@ private:
 	qgl_funcs *m_pGl = nullptr;
 	std::shared_ptr<QOpenGLShaderProgram> m_pShaders;
 	std::shared_ptr<QOpenGLBuffer> m_pvertexbuf;
+	std::shared_ptr<QOpenGLBuffer> m_plinebuf;
 	std::shared_ptr<QOpenGLBuffer> m_pnormalsbuf;
 	std::shared_ptr<QOpenGLBuffer> m_pcolorbuf;
 
@@ -79,13 +80,14 @@ private:
 	t_mat m_matViewport, m_matViewport_inv;
 	t_mat m_matCam, m_matCam_inv;
 
-	GLuint m_vertexarr = 0;
+	std::array<GLuint, 2> m_vertexarr;
 	GLint m_attrVertex = -1;
 	GLint m_attrVertexNormal = -1;
 	GLint m_attrVertexColor = -1;
 	GLint m_uniMatrixProj = -1, m_uniMatrixCam = -1;
 
 	std::vector<t_vec3> m_vertices, m_triangles;
+	std::vector<t_vec3> m_lines;
 
 	int m_iScreenDims[2] = { -1, -1 };
 	QPointF m_posMouse;
