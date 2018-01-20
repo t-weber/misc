@@ -176,10 +176,12 @@ void GlWidget::initializeGL()
 
 	// geometries
 	{
-		auto cube = m::create_cube<t_vec3>(1.);
+		//auto solid = m::create_cube<t_vec3>(1.);
+		auto solid = m::create_octahedron<t_vec3>(1.5);
+		//auto solid = m::create_tetrahedron<t_vec3>(0.5);
 		auto [verts, norms, uvs] =
 			m::subdivide_triangles<t_vec3>(m::subdivide_triangles<t_vec3>(
-				m::create_triangles<t_vec3>(cube)));
+				m::create_triangles<t_vec3>(solid)));
 
 		// main vertex array object
 		m_pGl->glGenVertexArrays(1, &m_vertexarr);
@@ -256,10 +258,18 @@ void GlWidget::initializeGL()
 			m_pGl->glVertexAttribPointer(m_attrVertexColor, 4, GL_FLOAT, 0, 0, (void*)(0*sizeof(GLfloat)));
 		}
 
-		m_vertices = std::move(std::get<0>(cube));
+		m_vertices = std::move(std::get<0>(solid));
 		m_triangles = std::move(verts);
 	}
 	LOGGLERR
+
+
+	// options
+	m_pGl->glCullFace(GL_BACK);
+	m_pGl->glEnable(GL_CULL_FACE);
+
+	//m_pGl->glEnable(GL_LINE_SMOOTH);
+	//m_pGl->glEnable(GL_POLYGON_SMOOTH);
 }
 
 

@@ -17,7 +17,8 @@
 
 namespace m {
 
-template<typename T> T pi = T(M_PI);
+template<typename T> constexpr T pi = T(M_PI);
+template<typename T> T golden = T(0.5) + std::sqrt(T(5))/T(2);
 
 
 // ----------------------------------------------------------------------------
@@ -1125,62 +1126,6 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
- * create the faces of a cube
- * returns [vertices, face vertex indices, face normals, face uvs]
- */
-template<class t_vec, template<class...> class t_cont = std::vector>
-std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
-create_cube(typename t_vec::value_type l = 1)
-requires is_vec<t_vec>
-{
-	t_cont<t_vec> vertices =
-	{
-		create<t_vec>({ +l, -l, -l }),	// vertex 0
-		create<t_vec>({ -l, -l, -l }),	// vertex 1
-		create<t_vec>({ -l, +l, -l }),	// vertex 2
-		create<t_vec>({ +l, +l, -l }),	// vertex 3
-
-		create<t_vec>({ -l, -l, +l }),	// vertex 4
-		create<t_vec>({ +l, -l, +l }),	// vertex 5
-		create<t_vec>({ +l, +l, +l }),	// vertex 6
-		create<t_vec>({ -l, +l, +l }),	// vertex 7
-	};
-
-	t_cont<t_cont<std::size_t>> faces =
-	{
-		{ 0, 1, 2, 3 },	// -z face
-		{ 4, 5, 6, 7 },	// +z face
-		{ 1, 0, 5, 4 }, // -y face
-		{ 7, 6, 3, 2 },	// +y face
-		{ 1, 4, 7, 2 },	// -x face
-		{ 5, 0, 3, 6 },	// +x face
-	};
-
-	t_cont<t_vec> normals =
-	{
-		create<t_vec>({ 0, 0, -1 }),	// -z face
-		create<t_vec>({ 0, 0, +1 }),	// +z face
-		create<t_vec>({ 0, -1, 0 }),	// -y face
-		create<t_vec>({ 0, +1, 0 }),	// +y face
-		create<t_vec>({ -1, 0, 0 }),	// -x face
-		create<t_vec>({ +1, 0, 0 }),	// +x face
-	};
-
-	t_cont<t_cont<t_vec>> uvs =
-	{
-		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -z face
-		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +z face
-		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -y face
-		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +y face
-		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -x face
-		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +x face
-	};
-
-	return std::make_tuple(vertices, faces, normals, uvs);
-}
-
-
-/**
  * triangulates polygon object, takes input from e.g. create_cube()
  * returns [triangles, face normals, vertex uvs]
  */
@@ -1304,27 +1249,35 @@ requires is_vec<t_vec>
 		const t_vec& vec3 = *itervert;
 		std::advance(itervert, 1);
 
-		const t_vec vecmid = avg<t_vec>({ vec1, vec2, vec3 });
+		const t_vec vec12mid = avg<t_vec>({ vec1, vec2 });
+		const t_vec vec23mid = avg<t_vec>({ vec2, vec3 });
+		const t_vec vec31mid = avg<t_vec>({ vec3, vec1 });
 
 		// triangle 1
 		vertices_new.push_back(vec1);
-		vertices_new.push_back(vec2);
-		vertices_new.push_back(vecmid);
+		vertices_new.push_back(vec12mid);
+		vertices_new.push_back(vec31mid);
 
 		// triangle 2
+		vertices_new.push_back(vec12mid);
 		vertices_new.push_back(vec2);
-		vertices_new.push_back(vec3);
-		vertices_new.push_back(vecmid);
+		vertices_new.push_back(vec23mid);
 
 		// triangle 3
+		vertices_new.push_back(vec31mid);
+		vertices_new.push_back(vec23mid);
 		vertices_new.push_back(vec3);
-		vertices_new.push_back(vec1);
-		vertices_new.push_back(vecmid);
+
+		// triangle 4
+		vertices_new.push_back(vec12mid);
+		vertices_new.push_back(vec23mid);
+		vertices_new.push_back(vec31mid);
 
 
-		// duplicate normals for sub-triangles
+		// duplicate normals for the four sub-triangles
 		if(iternorm != normals.end())
 		{
+			normals_new.push_back(*iternorm);
 			normals_new.push_back(*iternorm);
 			normals_new.push_back(*iternorm);
 			normals_new.push_back(*iternorm);
@@ -1344,42 +1297,204 @@ requires is_vec<t_vec>
 			const t_vec& uv3 = *iteruv;
 			std::advance(iteruv, 1);
 
-
-			// triangle edges
-			const t_vec vec12 = vec2 - vec1;
-			const t_vec vec13 = vec3 - vec1;
-
-			// project midpoint onto edges
-			t_vec vec12_div, vec13_div;
-			std::tie(vec12_div, std::ignore) = project_line<t_vec>(vecmid, vec1, vec12, false);
-			std::tie(vec13_div, std::ignore) = project_line<t_vec>(vecmid, vec1, vec13, false);
-
-			// fraction along edges
-			const T frac12 = norm<t_vec>(vec12_div-vec1) / norm<t_vec>(vec12);
-			const T frac13 = norm<t_vec>(vec13_div-vec1) / norm<t_vec>(vec13);
-
-			// uv coords of midpoint
-			const t_vec uv_mid = uv1 + frac12*(uv2-uv1) + frac13*(uv3-uv1);
-
+			const t_vec uv12mid = avg<t_vec>({ uv1, uv2 });
+			const t_vec uv23mid = avg<t_vec>({ uv2, uv3 });
+			const t_vec uv31mid = avg<t_vec>({ uv3, uv1 });
 
 			// uvs of triangle 1
 			uvs_new.push_back(uv1);
-			uvs_new.push_back(uv2);
-			uvs_new.push_back(uv_mid);
+			uvs_new.push_back(uv12mid);
+			uvs_new.push_back(uv31mid);
 
 			// uvs of triangle 2
+			uvs_new.push_back(uv12mid);
 			uvs_new.push_back(uv2);
-			uvs_new.push_back(uv3);
-			uvs_new.push_back(uv_mid);
+			uvs_new.push_back(uv23mid);
 
 			// uvs of triangle 3
+			uvs_new.push_back(uv31mid);
+			uvs_new.push_back(uv23mid);
 			uvs_new.push_back(uv3);
-			uvs_new.push_back(uv1);
-			uvs_new.push_back(uv_mid);
+
+			// uvs of triangle 4
+			uvs_new.push_back(uv12mid);
+			uvs_new.push_back(uv23mid);
+			uvs_new.push_back(uv31mid);
 		}
 	}
 
 	return std::make_tuple(vertices_new, normals_new, uvs_new);
+}
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
+// 3-dim solids
+// ----------------------------------------------------------------------------
+
+/**
+ * create the faces of a cube
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_cube(typename t_vec::value_type l = 1)
+requires is_vec<t_vec>
+{
+	t_cont<t_vec> vertices =
+	{
+		create<t_vec>({ +l, -l, -l }),	// vertex 0
+		create<t_vec>({ -l, -l, -l }),	// vertex 1
+		create<t_vec>({ -l, +l, -l }),	// vertex 2
+		create<t_vec>({ +l, +l, -l }),	// vertex 3
+
+		create<t_vec>({ -l, -l, +l }),	// vertex 4
+		create<t_vec>({ +l, -l, +l }),	// vertex 5
+		create<t_vec>({ +l, +l, +l }),	// vertex 6
+		create<t_vec>({ -l, +l, +l }),	// vertex 7
+	};
+
+	t_cont<t_cont<std::size_t>> faces =
+	{
+		{ 0, 1, 2, 3 },	// -z face
+		{ 4, 5, 6, 7 },	// +z face
+		{ 1, 0, 5, 4 }, // -y face
+		{ 7, 6, 3, 2 },	// +y face
+		{ 1, 4, 7, 2 },	// -x face
+		{ 5, 0, 3, 6 },	// +x face
+	};
+
+	t_cont<t_vec> normals =
+	{
+		create<t_vec>({ 0, 0, -1 }),	// -z face
+		create<t_vec>({ 0, 0, +1 }),	// +z face
+		create<t_vec>({ 0, -1, 0 }),	// -y face
+		create<t_vec>({ 0, +1, 0 }),	// +y face
+		create<t_vec>({ -1, 0, 0 }),	// -x face
+		create<t_vec>({ +1, 0, 0 }),	// +x face
+	};
+
+	t_cont<t_cont<t_vec>> uvs =
+	{
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -z face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +z face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -y face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +y face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// -x face
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({1,1}), create<t_vec>({0,1}) },	// +x face
+	};
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+/**
+ * create the faces of a octahedron
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_octahedron(typename t_vec::value_type l = 1)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	t_cont<t_vec> vertices =
+	{
+		create<t_vec>({ +l, 0, 0 }),	// vertex 0
+		create<t_vec>({ 0, +l, 0 }),	// vertex 1
+		create<t_vec>({ 0, 0, +l }),	// vertex 2
+
+		create<t_vec>({ -l, 0, 0 }),	// vertex 3
+		create<t_vec>({ 0, -l, 0 }),	// vertex 4
+		create<t_vec>({ 0, 0, -l }),	// vertex 5
+	};
+
+	t_cont<t_cont<std::size_t>> faces =
+	{
+		{ 2, 0, 1 }, { 0, 5, 1 }, { 5, 3, 1 }, { 3, 2, 1 },	// upper half
+		{ 0, 2, 4 }, { 5, 0, 4 }, { 3, 5, 4 }, { 2, 3, 4 },	// lower half
+	};
+
+
+	const T len = std::sqrt(3);
+
+	t_cont<t_vec> normals =
+	{
+		create<t_vec>({ +1/len, +1/len, +1/len }),
+		create<t_vec>({ +1/len, +1/len, -1/len }),
+		create<t_vec>({ -1/len, +1/len, -1/len }),
+		create<t_vec>({ -1/len, +1/len, +1/len }),
+
+		create<t_vec>({ +1/len, -1/len, +1/len }),
+		create<t_vec>({ +1/len, -1/len, -1/len }),
+		create<t_vec>({ -1/len, -1/len, -1/len }),
+		create<t_vec>({ -1/len, -1/len, +1/len }),
+	};
+
+	t_cont<t_cont<t_vec>> uvs =
+	{
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+	};
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+/**
+ * create the faces of a tetrahedron
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_tetrahedron(typename t_vec::value_type l = 1)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	t_cont<t_vec> vertices =
+	{
+		create<t_vec>({ -l, -l, +l }),	// vertex 0
+		create<t_vec>({ +l, +l, +l }),	// vertex 1
+		create<t_vec>({ -l, +l, -l }),	// vertex 2
+		create<t_vec>({ +l, -l, -l }),	// vertex 3
+	};
+
+	t_cont<t_cont<std::size_t>> faces =
+	{
+		{ 1, 2, 0 }, { 2, 1, 3 },	// connected to upper edge
+		{ 0, 3, 1 }, { 3, 0, 2 },	// connected to lower edge
+	};
+
+
+	const T len = std::sqrt(3);
+
+	t_cont<t_vec> normals =
+	{
+		create<t_vec>({ -1/len, +1/len, +1/len }),
+		create<t_vec>({ +1/len, +1/len, -1/len }),
+		create<t_vec>({ +1/len, -1/len, +1/len }),
+		create<t_vec>({ -1/len, -1/len, -1/len }),
+	};
+
+	t_cont<t_cont<t_vec>> uvs =
+	{
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+		{ create<t_vec>({0,0}), create<t_vec>({1,0}), create<t_vec>({0.5,1}) },
+	};
+
+	return std::make_tuple(vertices, faces, normals, uvs);
 }
 // ----------------------------------------------------------------------------
 
