@@ -9,6 +9,7 @@
 #define __MATH_ALGOS_H__
 
 #include "math_concepts.h"
+//#include "math_conts.h"
 
 #include <cmath>
 #include <tuple>
@@ -1126,6 +1127,28 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
+ * matrix to rotate vector vec1 into vec2
+ */
+template<class t_mat, class t_vec>
+t_mat rotation(const t_vec& vec1, const t_vec& vec2, bool bIsNormalised=1)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	using t_real = typename t_vec::value_type;
+
+	t_vec axis = cross<t_vec>({ vec1, vec2 });
+	const t_real lenaxis = norm<t_vec>(axis);
+	const t_real angle = std::atan2(lenaxis, inner<t_vec>(vec1, vec2));
+
+	if(!bIsNormalised)
+		axis /= lenaxis;
+
+	t_mat mat = rotation<t_mat, t_vec>(axis, angle, bIsNormalised);
+	return mat;
+}
+
+
+
+/**
  * extracts lines from polygon object, takes input from e.g. create_cube()
  * returns [point pairs]
  */
@@ -1460,6 +1483,50 @@ requires is_vec<t_vec>
 // ----------------------------------------------------------------------------
 // 3-dim solids
 // ----------------------------------------------------------------------------
+
+/**
+ * create a plane
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_mat, class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_plane(const t_vec& norm, typename t_vec::value_type l=1)
+requires is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+	//using t_mat = m::mat<t_real, std::vector>;
+	//using namespace m_ops;
+
+	t_vec norm_old = create<t_vec>({ 0, 0, -1 });
+	t_mat rot = rotation<t_mat, t_vec>(norm_old, norm);
+
+	t_cont<t_vec> vertices =
+	{
+		create<t_vec>({ -l, -l, 0. }),	// vertex 0
+		create<t_vec>({ +l, -l, 0. }),	// vertex 1
+		create<t_vec>({ +l, +l, 0. }),	// vertex 2
+		create<t_vec>({ -l, +l, 0. }),	// vertex 3
+	};
+
+	// rotate according to given normal
+	for(t_vec& vec : vertices)
+		vec = rot * vec;
+
+	t_cont<t_cont<std::size_t>> faces = { { 0, 1, 2, 3 } };
+	t_cont<t_vec> normals = { norm };
+
+	t_cont<t_cont<t_vec>> uvs =
+	{{
+		create<t_vec>({0,0}),
+		create<t_vec>({1,0}),
+		create<t_vec>({1,1}),
+		create<t_vec>({0,1})
+	}};
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
 
 /**
  * create the faces of a cube
