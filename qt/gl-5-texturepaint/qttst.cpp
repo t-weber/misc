@@ -6,6 +6,7 @@
  *
  * References:
  *  * http://doc.qt.io/qt-5/qopenglwidget.html#details
+ *  * http://doc.qt.io/qt-5/qopengltexture.html
  */
 #include "qttst.h"
 
@@ -57,11 +58,14 @@ void GlWidget::initializeGL()
 		in vec4 fragcolor;
 		out vec4 outcolor;
 
+		uniform sampler2D img;
+		in vec2 fragtexcoords;
+
 		void main()
 		{
-			//outcolor = vec4(0,0,0,1);
-			outcolor = fragcolor;
-		})RAW";
+			outcolor = texture2D(img, fragtexcoords.xy);
+			outcolor *= fragcolor;
+})RAW";
 	// --------------------------------------------------------------------
 
 
@@ -74,10 +78,12 @@ void GlWidget::initializeGL()
 		in vec4 vertexcolor;
 		out vec4 fragcolor;
 
+		in vec2 texcoords;
+		out vec2 fragtexcoords;
+
 		uniform mat4 proj = mat4(1.);
 		uniform mat4 cam = mat4(1.);
 
-		//vec4 vertexcolor = vec4(0, 0, 1, 1);
 		vec3 light_dir = vec3(2, 2, -1);
 
 		float lighting(vec3 lightdir)
@@ -94,6 +100,8 @@ void GlWidget::initializeGL()
 			float I = lighting(light_dir);
 			fragcolor = vertexcolor * I;
 			fragcolor[3] = 1;
+
+			fragtexcoords = texcoords;
 		})RAW";
 	// --------------------------------------------------------------------
 
@@ -166,9 +174,11 @@ void GlWidget::initializeGL()
 
 		m_uniMatrixCam = m_pShaders->uniformLocation("cam");
 		m_uniMatrixProj = m_pShaders->uniformLocation("proj");
+		m_uniImg = m_pShaders->uniformLocation("img");
 		m_attrVertex = m_pShaders->attributeLocation("vertex");
 		m_attrVertexNormal = m_pShaders->attributeLocation("normal");
 		m_attrVertexColor = m_pShaders->attributeLocation("vertexcolor");
+		m_attrTexCoords = m_pShaders->attributeLocation("texcoords");
 	}
 	LOGGLERR
 
@@ -246,6 +256,30 @@ void GlWidget::initializeGL()
 		}
 
 
+		{	// texture
+			QImage img("/home/tw/tmp/I/0.jpg");
+			img = img.mirrored(false, true);
+			//QImage img = QImage::fromData(data, size);
+			if(!img.isNull())
+				m_pTexture = std::make_shared<QOpenGLTexture>(img);
+			else
+				std::cerr << "Cannot load texture!" << std::endl;
+
+			// uv coords
+			m_puvbuf = std::make_shared<QOpenGLBuffer>(QOpenGLBuffer::VertexBuffer);
+
+			m_puvbuf->create();
+			m_puvbuf->bind();
+			BOOST_SCOPE_EXIT(&m_puvbuf)
+			{ if(m_puvbuf) m_puvbuf->release(); }
+			BOOST_SCOPE_EXIT_END
+
+			auto vecUVS = to_float_array(uvs, 1, 2);
+			m_puvbuf->allocate(vecUVS.data(), vecUVS.size()*sizeof(typename decltype(vecUVS)::value_type));
+			m_pGl->glVertexAttribPointer(m_attrTexCoords, 2, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecUVS)::value_type)));
+		}
+
+
 		m_pGl->glBindVertexArray(m_vertexarr[1]);
 
 		{	// lines
@@ -270,7 +304,7 @@ void GlWidget::initializeGL()
 
 	// options
 	m_pGl->glCullFace(GL_BACK);
-	//m_pGl->glEnable(GL_CULL_FACE);
+	m_pGl->glDisable(GL_CULL_FACE);
 
 	//m_pGl->glEnable(GL_LINE_SMOOTH);
 	//m_pGl->glEnable(GL_POLYGON_SMOOTH);
@@ -339,6 +373,9 @@ void GlWidget::paintGL()
 
 		// set cam matrix
 		m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
+		// texture
+		m_pShaders->setUniformValue(m_uniImg, 0);
+
 
 		// triangle geometry
 		if(m_pvertexbuf)
@@ -349,14 +386,21 @@ void GlWidget::paintGL()
 			m_pGl->glEnableVertexAttribArray(m_attrVertex);
 			m_pGl->glEnableVertexAttribArray(m_attrVertexNormal);
 			m_pGl->glEnableVertexAttribArray(m_attrVertexColor);
-			BOOST_SCOPE_EXIT(m_pGl, &m_attrVertex, &m_attrVertexNormal, &m_attrVertexColor)
+			m_pGl->glEnableVertexAttribArray(m_attrTexCoords);
+			BOOST_SCOPE_EXIT(m_pGl, &m_attrVertex, &m_attrVertexNormal, &m_attrVertexColor, &m_attrTexCoords)
 			{
+				m_pGl->glDisableVertexAttribArray(m_attrTexCoords);
 				m_pGl->glDisableVertexAttribArray(m_attrVertexColor);
 				m_pGl->glDisableVertexAttribArray(m_attrVertexNormal);
 				m_pGl->glDisableVertexAttribArray(m_attrVertex);
 			}
 			BOOST_SCOPE_EXIT_END
 			LOGGLERR
+
+			if(m_pTexture) m_pTexture->bind();
+			BOOST_SCOPE_EXIT(&m_pTexture)
+			{ if(m_pTexture) m_pTexture->release(); }
+			BOOST_SCOPE_EXIT_END
 
 			m_pGl->glDrawArrays(GL_TRIANGLES, 0, m_triangles.size());
 			LOGGLERR
@@ -451,8 +495,8 @@ void GlWidget::updatePicker()
 	auto [org, dir] = m::hom_line_from_screen_coords<t_mat, t_vec>(m_posMouse.x(), m_posMouse.y(), 0., 1.,
 		m_matCam_inv, m_matPerspective_inv, m_matViewport_inv, &m_matViewport, true);
 
-	GLfloat red[] = {1.,0.,0.,1., 1.,0.,0.,1., 1.,0.,0.,1.};
-	GLfloat blue[] = {0.,0.,1.,1., 0.,0.,1.,1., 0.,0.,1.,1.};
+	const GLfloat unsel[] = {1.,1.,1.,1., 1.,1.,1.,1., 1.,1.,1.,1.};
+	const GLfloat sel[] = {1.,0.,0.,1., 1.,0.,0.,1., 1.,0.,0.,1.};
 
 	for(std::size_t startidx=0; startidx+2<m_triangles.size(); startidx+=3)
 	{
@@ -464,9 +508,9 @@ void GlWidget::updatePicker()
 		//	std::cout << "Intersection with polygon " << startidx/3 << std::endl;
 
 		if(bInters)
-			m_pcolorbuf->write(sizeof(red[0])*startidx*4, red, sizeof(red));
+			m_pcolorbuf->write(sizeof(sel[0])*startidx*4, sel, sizeof(sel));
 		else
-			m_pcolorbuf->write(sizeof(blue[0])*startidx*4, blue, sizeof(blue));
+			m_pcolorbuf->write(sizeof(unsel[0])*startidx*4, unsel, sizeof(unsel));
 	}
 }
 // ----------------------------------------------------------------------------

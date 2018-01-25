@@ -34,6 +34,7 @@ using qgl_funcs = QOpenGLFunctions_4_5_Core;
 #include <QOpenGLShaderProgram>
 #include <QOpenGLBuffer>
 #include <QOpenGLWidget>
+#include <QOpenGLTexture>
 
 #include <QMatrix4x4>
 #include <QVector4D>
@@ -73,10 +74,16 @@ protected:
 private:
 	qgl_funcs *m_pGl = nullptr;
 	std::shared_ptr<QOpenGLShaderProgram> m_pShaders;
+
 	std::shared_ptr<QOpenGLBuffer> m_pvertexbuf;
-	std::shared_ptr<QOpenGLBuffer> m_plinebuf;
 	std::shared_ptr<QOpenGLBuffer> m_pnormalsbuf;
+
+	std::shared_ptr<QOpenGLBuffer> m_plinebuf;
+
+	std::shared_ptr<QOpenGLTexture> m_pTexture;
+	std::shared_ptr<QOpenGLBuffer> m_puvbuf;
 	std::shared_ptr<QOpenGLBuffer> m_pcolorbuf;
+
 
 	t_mat m_matPerspective, m_matPerspective_inv;
 	t_mat m_matViewport, m_matViewport_inv;
@@ -86,7 +93,9 @@ private:
 	GLint m_attrVertex = -1;
 	GLint m_attrVertexNormal = -1;
 	GLint m_attrVertexColor = -1;
+	GLint m_attrTexCoords = -1;
 	GLint m_uniMatrixProj = -1, m_uniMatrixCam = -1;
+	GLint m_uniImg = -1;
 
 	std::vector<t_vec3> m_vertices, m_triangles;
 	std::vector<t_vec3> m_lines;

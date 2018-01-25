@@ -1130,19 +1130,24 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * matrix to rotate vector vec1 into vec2
  */
 template<class t_mat, class t_vec>
-t_mat rotation(const t_vec& vec1, const t_vec& vec2, bool bIsNormalised=1)
+t_mat rotation(const t_vec& vec1, const t_vec& vec2)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	using t_real = typename t_vec::value_type;
 
+	// rotation axis
 	t_vec axis = cross<t_vec>({ vec1, vec2 });
 	const t_real lenaxis = norm<t_vec>(axis);
+
+	// collinear vectors?
+	if(equals<t_real>(std::fmod(lenaxis, pi<t_real>), 0))
+		return unity<t_mat>(vec1.size());
+
+	// rotation angle
 	const t_real angle = std::atan2(lenaxis, inner<t_vec>(vec1, vec2));
+	axis /= lenaxis;
 
-	if(!bIsNormalised)
-		axis /= lenaxis;
-
-	t_mat mat = rotation<t_mat, t_vec>(axis, angle, bIsNormalised);
+	t_mat mat = rotation<t_mat, t_vec>(axis, angle, true);
 	return mat;
 }
 
@@ -1520,7 +1525,7 @@ requires is_vec<t_vec>
 		create<t_vec>({0,0}),
 		create<t_vec>({1,0}),
 		create<t_vec>({1,1}),
-		create<t_vec>({0,1})
+		create<t_vec>({0,1}),
 	}};
 
 	return std::make_tuple(vertices, faces, normals, uvs);
