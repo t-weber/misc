@@ -443,7 +443,7 @@ requires is_vec<t_vec>
 	else
 	{
 		const auto len = norm<t_vec>(vecProj);
-		t_vec _vecProj = vecProj / len;
+		const t_vec _vecProj = vecProj / len;
 		return inner<t_vec>(vec, _vecProj) * _vecProj;
 	}
 }
@@ -1025,6 +1025,56 @@ requires is_vec<t_vec>
 	return std::make_tuple(lineOrg, lineDir, 1);
 }
 
+
+/**
+ * uv coordinates of a point inside a polygon defined by three vertices
+ */
+template<class t_vec>
+t_vec poly_uv(const t_vec& vert1, const t_vec& vert2, const t_vec& vert3,
+	const t_vec& uv1, const t_vec& uv2, const t_vec& uv3,
+	const t_vec& _pt)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	t_vec vec12 = vert2 - vert1;
+	t_vec vec13 = vert3 - vert1;
+
+	t_vec uv12 = uv2 - uv1;
+	t_vec uv13 = uv3 - uv1;
+
+
+	// ----------------------------------------------------
+	// TODO: find a better solution than orthonormalisation
+	const T len12 = norm<t_vec>(vec12);
+	const T len13 = norm<t_vec>(vec13);
+	const T lenuv12 = norm<t_vec>(uv12);
+	const T lenuv13 = norm<t_vec>(uv13);
+	auto vecBase = orthonorm_sys<std::vector, t_vec>({vec12, vec13});
+	auto uvBase = orthonorm_sys<std::vector, t_vec>({uv12, uv13});
+	vec12 = vecBase[0]*len12; vec13 = vecBase[1]*len13;
+	uv12 = uvBase[0]*lenuv12; uv13 = uvBase[1]*lenuv13;
+	// ----------------------------------------------------
+
+
+	const t_vec pt = _pt - vert1;
+
+	// project a point onto a vector and return the fraction along that vector
+	auto project_lam = [](const t_vec& vec, const t_vec& vecProj) -> T
+	{
+		const T len = norm<t_vec>(vecProj);
+		const t_vec _vecProj = vecProj / len;
+		T lam = inner<t_vec>(vec, _vecProj);
+		return lam / len;
+	};
+
+	T lam12 = project_lam(pt, vec12);
+	T lam13 = project_lam(pt, vec13);
+
+	// uv coordinates at specified point
+	const t_vec uv_pt = uv1 + lam12*uv12 + lam13*uv13;
+	return uv_pt;
+}
 // ----------------------------------------------------------------------------
 
 
@@ -1254,6 +1304,7 @@ requires is_vec<t_vec>
 			puv2 = &(*iterFaceUVIdx);
 		}
 
+		// iterate over face vertices
 		while(1)
 		{
 			std::advance(iterFaceVertIdx, 1);
@@ -1415,7 +1466,7 @@ requires is_vec<t_vec>
 
 
 /**
- * subdivides triangles (with specified iterations)
+ * subdivides triangles (with specified number of iterations)
  * input: [triangle vertices, normals, uvs]
  * returns [triangles, face normals, vertex uvs]
  */

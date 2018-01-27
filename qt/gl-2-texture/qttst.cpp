@@ -61,7 +61,7 @@ void GlWidget::initializeGL()
 
 		void main()
 		{
-			outcolor = texture2D(img, fragtexcoords.xy);
+			outcolor = texture(img, fragtexcoords.xy);
 			outcolor *= fragcolor;
 		})RAW";
 	// --------------------------------------------------------------------

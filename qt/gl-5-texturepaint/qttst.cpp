@@ -61,10 +61,17 @@ void GlWidget::initializeGL()
 		uniform sampler2D img;
 		in vec2 fragtexcoords;
 
+		// cursor position
+		uniform vec2 fragCurUV = vec2(0.25, 0.25);
+
 		void main()
 		{
-			outcolor = texture2D(img, fragtexcoords.xy);
+			outcolor = texture(img, fragtexcoords);
 			outcolor *= fragcolor;
+
+			// paint cursor position
+			if(length(fragtexcoords - fragCurUV) < 0.02)
+				outcolor = vec4(1,1,1,1);
 })RAW";
 	// --------------------------------------------------------------------
 
@@ -175,6 +182,7 @@ void GlWidget::initializeGL()
 		m_uniMatrixCam = m_pShaders->uniformLocation("cam");
 		m_uniMatrixProj = m_pShaders->uniformLocation("proj");
 		m_uniImg = m_pShaders->uniformLocation("img");
+		m_uniCurUV = m_pShaders->uniformLocation("fragCurUV");
 		m_attrVertex = m_pShaders->attributeLocation("vertex");
 		m_attrVertexNormal = m_pShaders->attributeLocation("normal");
 		m_attrVertexColor = m_pShaders->attributeLocation("vertexcolor");
@@ -298,6 +306,7 @@ void GlWidget::initializeGL()
 
 		m_vertices = std::move(std::get<0>(solid));
 		m_triangles = std::move(verts);
+		m_uvs = std::move(uvs);
 	}
 	LOGGLERR
 
@@ -375,6 +384,8 @@ void GlWidget::paintGL()
 		m_pShaders->setUniformValue(m_uniMatrixCam, m_matCam);
 		// texture
 		m_pShaders->setUniformValue(m_uniImg, 0);
+		// cursor
+		m_pShaders->setUniformValue(m_uniCurUV, m_curUV[0], m_curUV[1]);
 
 
 		// triangle geometry
@@ -504,13 +515,20 @@ void GlWidget::updatePicker()
 		auto [vecInters, bInters, lamInters] =
 			m::intersect_line_poly<t_vec3>(
 				t_vec3(org[0], org[1], org[2]), t_vec3(dir[0], dir[1], dir[2]), poly);
-		//if(bInters)
-		//	std::cout << "Intersection with polygon " << startidx/3 << std::endl;
 
 		if(bInters)
+		{
+			std::vector<t_vec3> polyuv{{ m_uvs[startidx+0], m_uvs[startidx+1], m_uvs[startidx+2] }};
+			auto uv = m::poly_uv<t_vec3>(poly[0], poly[1], poly[2], polyuv[0], polyuv[1], polyuv[2], vecInters);
+			m_curUV[0] = uv[0]; m_curUV[1] = uv[1];
+
+			//std::cout << "Intersection with polygon " << startidx/3 << ", uv: " << uv[0] << ", " << uv[1] << std::endl;
 			m_pcolorbuf->write(sizeof(sel[0])*startidx*4, sel, sizeof(sel));
+		}
 		else
+		{
 			m_pcolorbuf->write(sizeof(unsel[0])*startidx*4, unsel, sizeof(unsel));
+		}
 	}
 }
 // ----------------------------------------------------------------------------

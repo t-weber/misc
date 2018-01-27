@@ -97,7 +97,11 @@ private:
 	GLint m_uniMatrixProj = -1, m_uniMatrixCam = -1;
 	GLint m_uniImg = -1;
 
-	std::vector<t_vec3> m_vertices, m_triangles;
+	// cursor UV coordinates
+	GLint m_uniCurUV = -1;
+	GLfloat m_curUV[2] = {0., 0.};
+
+	std::vector<t_vec3> m_vertices, m_triangles, m_uvs;
 	std::vector<t_vec3> m_lines;
 
 	int m_iScreenDims[2] = { -1, -1 };
