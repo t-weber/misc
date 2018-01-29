@@ -408,6 +408,83 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 }
 
 
+
+// ----------------------------------------------------------------------------
+// with metric
+
+/**
+ * covariant metric tensor
+ * g_{i,j} = e_i * e_j
+ */
+template<class t_mat, class t_vec, template<class...> class t_cont=std::initializer_list>
+t_mat metric(const t_cont<t_vec>& base_co)
+requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
+{
+	const std::size_t N = base_co.size();
+
+	t_mat g_co;
+	if constexpr(is_dyn_mat<t_mat>)
+		g_co = t_mat(N, N);
+
+	auto iter_i = base_co.begin();
+	for(std::size_t i=0; i<N; ++i)
+	{
+		auto iter_j = base_co.begin();
+		for(std::size_t j=0; j<N; ++j)
+		{
+			g_co(i,j) = inner<t_vec>(*iter_i, *iter_j);
+			std::advance(iter_j, 1);
+		}
+		std::advance(iter_i, 1);
+	}
+
+	return g_co;
+}
+
+
+/**
+ * lower index using metric
+ */
+template<class t_mat, class t_vec>
+t_vec lower_index(const t_mat& metric_co, const t_vec& vec_contra)
+requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
+{
+	const std::size_t N = vec_contra.size();
+	t_vec vec_co = zero<t_vec>(N);
+
+	for(std::size_t i=0; i<N; ++i)
+		for(std::size_t j=0; j<N; ++j)
+			vec_co[j] += metric_co(i,j) * vec_contra[i];
+
+	return vec_co;
+}
+
+
+/**
+ * inner product using metric
+ */
+template<class t_mat, class t_vec>
+typename t_vec::value_type inner(const t_mat& metric_co, const t_vec& vec1_contra, const t_vec& vec2_contra)
+requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
+{
+	t_vec vec1_co = lower_index<t_mat, t_vec>(metric_co, vec1_contra);
+	return inner<t_vec>(vec1_co, vec2_contra);
+}
+
+
+/**
+ * 2-norm using metric
+ */
+template<class t_mat, class t_vec>
+typename t_vec::value_type norm(const t_mat& metric_co, const t_vec& vec_contra)
+requires is_basic_vec<t_vec>
+{
+	return std::sqrt(inner<t_mat, t_vec>(metric_co, vec_contra, vec_contra));
+}
+// ----------------------------------------------------------------------------
+
+
+
 /**
  * matrix to project onto vector: P = |v><v|
  * from: |x'> = <v|x> * |v> = |v><v|x> = |v><v| * |x>

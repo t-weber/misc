@@ -216,6 +216,22 @@ void vecmat_tsts()
 	std::cout << QR(1,0) << " " << QR(1,1) << " " << QR(1,2) << "\n";
 	std::cout << QR(2,0) << " " << QR(2,1) << " " << QR(2,2) << "\n";
 	std::cout << std::boolalpha << equals<t_mat>(matOrg, QR, 0.01) << "\n";
+
+
+	std::cout << "\nmetric\n";
+	t_mat g = metric<t_mat, t_vec>
+	({
+		create<t_vec>({1, 1, 0}),
+		create<t_vec>({1, -1, 0}),
+		create<t_vec>({0, 0, 1}),
+	});
+	std::cout << g(0,0) << " " << g(0,1) << " " << g(0,2) << "\n";
+	std::cout << g(1,0) << " " << g(1,1) << " " << g(1,2) << "\n";
+	std::cout << g(2,0) << " " << g(2,1) << " " << g(2,2) << "\n";
+	t_vec vecm1 = create<t_vec>({1, 1, 0});
+	t_vec vecm2 = create<t_vec>({1, -1, 0});
+	std::cout << "angle: " << std::acos(inner<t_mat, t_vec>(g, vecm1, vecm2)
+		/ (norm<t_mat, t_vec>(g, vecm1) * norm<t_mat, t_vec>(g, vecm2))) / M_PI*180. << "\n";
 }
 
 
