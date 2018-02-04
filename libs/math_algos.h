@@ -279,7 +279,7 @@ requires is_mat<t_mat>
  */
 template<class t_mat, class t_vec, template<class...> class t_cont_outer = std::initializer_list>
 t_mat create(const t_cont_outer<t_vec>& lst, bool bRow = 0)
-requires is_mat<t_mat>
+requires is_mat<t_mat> && is_basic_vec<t_vec>
 {
 	const std::size_t iCols = lst.size();
 	const std::size_t iRows = lst.begin()->size();
@@ -417,19 +417,19 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
  * g_{i,j} = e_i * e_j
  */
 template<class t_mat, class t_vec, template<class...> class t_cont=std::initializer_list>
-t_mat metric(const t_cont<t_vec>& base_co)
+t_mat metric(const t_cont<t_vec>& basis_co)
 requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 {
-	const std::size_t N = base_co.size();
+	const std::size_t N = basis_co.size();
 
 	t_mat g_co;
 	if constexpr(is_dyn_mat<t_mat>)
 		g_co = t_mat(N, N);
 
-	auto iter_i = base_co.begin();
+	auto iter_i = basis_co.begin();
 	for(std::size_t i=0; i<N; ++i)
 	{
-		auto iter_j = base_co.begin();
+		auto iter_j = basis_co.begin();
 		for(std::size_t j=0; j<N; ++j)
 		{
 			g_co(i,j) = inner<t_vec>(*iter_i, *iter_j);
@@ -454,9 +454,27 @@ requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 
 	for(std::size_t i=0; i<N; ++i)
 		for(std::size_t j=0; j<N; ++j)
-			vec_co[j] += metric_co(i,j) * vec_contra[i];
+			vec_co[i] += metric_co(i,j) * vec_contra[j];
 
 	return vec_co;
+}
+
+
+/**
+ * raise index using metric
+ */
+template<class t_mat, class t_vec>
+t_vec raise_index(const t_mat& metric_contra, const t_vec& vec_co)
+requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
+{
+	const std::size_t N = vec_co.size();
+	t_vec vec_contra = zero<t_vec>(N);
+
+	for(std::size_t i=0; i<N; ++i)
+		for(std::size_t j=0; j<N; ++j)
+			vec_contra[i] += metric_contra(i,j) * vec_co[j];
+
+	return vec_contra;
 }
 
 
@@ -467,8 +485,8 @@ template<class t_mat, class t_vec>
 typename t_vec::value_type inner(const t_mat& metric_co, const t_vec& vec1_contra, const t_vec& vec2_contra)
 requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 {
-	t_vec vec1_co = lower_index<t_mat, t_vec>(metric_co, vec1_contra);
-	return inner<t_vec>(vec1_co, vec2_contra);
+	t_vec vec2_co = lower_index<t_mat, t_vec>(metric_co, vec2_contra);
+	return inner<t_vec>(vec1_contra, vec2_co);
 }
 
 
@@ -678,7 +696,7 @@ requires is_vec<t_vec>
 
 
 /**
- * find orthonormal substitute base for vector space (Gram-Schmidt algo)
+ * find orthonormal substitute basis for vector space (Gram-Schmidt algo)
  * get orthogonal projections: |i'> = (1 - sum_{j<i} |j><j|) |i>
  */
 template<template<class...> class t_cont, class t_vec>
@@ -692,7 +710,7 @@ requires is_vec<t_vec>
 	{
 		t_vec vecOrthoProj = sys[i];
 
-		// subtract projections to other base vectors
+		// subtract projections to other basis vectors
 		for(std::size_t j=0; j<newsys.size(); ++j)
 			vecOrthoProj -= project<t_vec>(sys[i], newsys[j], true);
 
@@ -1107,7 +1125,7 @@ requires is_vec<t_vec>
  * uv coordinates of a point inside a polygon defined by three vertices
  */
 template<class t_vec>
-t_vec poly_uv(const t_vec& vert1, const t_vec& vert2, const t_vec& vert3,
+t_vec poly_uv_ortho(const t_vec& vert1, const t_vec& vert2, const t_vec& vert3,
 	const t_vec& uv1, const t_vec& uv2, const t_vec& uv3,
 	const t_vec& _pt)
 requires is_vec<t_vec>
@@ -1122,15 +1140,15 @@ requires is_vec<t_vec>
 
 
 	// ----------------------------------------------------
-	// TODO: find a better solution than orthonormalisation
+	// orthonormalisation
 	const T len12 = norm<t_vec>(vec12);
 	const T len13 = norm<t_vec>(vec13);
 	const T lenuv12 = norm<t_vec>(uv12);
 	const T lenuv13 = norm<t_vec>(uv13);
-	auto vecBase = orthonorm_sys<std::vector, t_vec>({vec12, vec13});
-	auto uvBase = orthonorm_sys<std::vector, t_vec>({uv12, uv13});
-	vec12 = vecBase[0]*len12; vec13 = vecBase[1]*len13;
-	uv12 = uvBase[0]*lenuv12; uv13 = uvBase[1]*lenuv13;
+	auto vecBasis = orthonorm_sys<std::vector, t_vec>({vec12, vec13});
+	auto uvBasis = orthonorm_sys<std::vector, t_vec>({uv12, uv13});
+	vec12 = vecBasis[0]*len12; vec13 = vecBasis[1]*len13;
+	uv12 = uvBasis[0]*lenuv12; uv13 = uvBasis[1]*lenuv13;
 	// ----------------------------------------------------
 
 
@@ -1151,6 +1169,45 @@ requires is_vec<t_vec>
 	// uv coordinates at specified point
 	const t_vec uv_pt = uv1 + lam12*uv12 + lam13*uv13;
 	return uv_pt;
+}
+
+
+/**
+ * uv coordinates of a point inside a polygon defined by three vertices
+ * (more general version than poly_uv_ortho)
+ */
+template<class t_mat, class t_vec>
+t_vec poly_uv(const t_vec& vert1, const t_vec& vert2, const t_vec& vert3,
+	const t_vec& uv1, const t_vec& uv2, const t_vec& uv3,
+	const t_vec& _pt)
+requires is_mat<t_mat> && is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	t_vec vec12 = vert2 - vert1;
+	t_vec vec13 = vert3 - vert1;
+	t_vec vecnorm = cross<t_vec>({vec12, vec13});
+
+	// basis
+	const t_mat basis = create<t_mat, t_vec>({vec12, vec13, vecnorm}, false);
+
+	// reciprocal basis, RECI = REAL^(-T)
+	const auto [basisInv, bOk] = inv<t_mat>(basis);
+	if(!bOk) return zero<t_vec>(uv1.size());
+
+	vec12 = row<t_mat, t_vec>(basisInv, 0);
+	vec13 = row<t_mat, t_vec>(basisInv, 1);
+
+	t_vec pt = _pt - vert1;		// real pt
+	pt = basisInv * pt;			// reciprocal pt
+
+	// uv coordinates at specified point
+	t_vec uv12 = uv2 - uv1;
+	t_vec uv13 = uv3 - uv1;
+
+	// pt has components in common reciprocal basis
+	// assumes that both vector and uv coordinates have the same reciprocal basis
+	return uv1 + pt[0]*uv12 + pt[1]*uv13;
 }
 // ----------------------------------------------------------------------------
 

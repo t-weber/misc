@@ -8,6 +8,10 @@
  *  * http://doc.qt.io/qt-5/qopenglwidget.html#details
  *  * http://doc.qt.io/qt-5/qopengltexture.html
  */
+
+#include <locale>
+#include <iostream>
+
 #include "qttst.h"
 
 #include <QApplication>
@@ -16,9 +20,6 @@
 #include <QOpenGLFunctions>
 #include <QSurfaceFormat>
 #include <QPainter>
-
-#include <locale>
-#include <iostream>
 
 #include <boost/scope_exit.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -519,7 +520,7 @@ void GlWidget::updatePicker()
 		if(bInters)
 		{
 			std::vector<t_vec3> polyuv{{ m_uvs[startidx+0], m_uvs[startidx+1], m_uvs[startidx+2] }};
-			auto uv = m::poly_uv<t_vec3>(poly[0], poly[1], poly[2], polyuv[0], polyuv[1], polyuv[2], vecInters);
+			auto uv = m::poly_uv<t_mat, t_vec3>(poly[0], poly[1], poly[2], polyuv[0], polyuv[1], polyuv[2], vecInters);
 			m_curUV[0] = uv[0]; m_curUV[1] = uv[1];
 
 			//std::cout << "Intersection with polygon " << startidx/3 << ", uv: " << uv[0] << ", " << uv[1] << std::endl;
