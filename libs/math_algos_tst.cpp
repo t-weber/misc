@@ -232,6 +232,29 @@ void vecmat_tsts()
 	t_vec vecm2 = create<t_vec>({1, -1, 0});
 	std::cout << "angle: " << std::acos(inner<t_mat, t_vec>(g, vecm1, vecm2)
 		/ (norm<t_mat, t_vec>(g, vecm1) * norm<t_mat, t_vec>(g, vecm2))) / M_PI*180. << "\n";
+
+
+	std::cout << "\nreal -> recip\n";
+	auto realbase = std::vector<t_vec>
+	{{
+		create<t_vec>({1, 2, 0}),
+		create<t_vec>({1, -1, 0}),
+		create<t_vec>({0, 0, 5}),
+	}};
+	auto recipbase = recip<t_mat, t_vec, std::vector, std::vector>(realbase);
+	for (const auto& reci : recipbase)
+		std::cout << "vec = " << reci[0] << " " << reci[1] << " " << reci[2] << "\n";
+	std::cout << "have to be 1: "
+		<< inner<t_vec>(realbase[0], recipbase[0]) << ", "
+		<< inner<t_vec>(realbase[1], recipbase[1]) << ", "
+		<< inner<t_vec>(realbase[2], recipbase[2]) << "\n";
+	std::cout << "have to be 0: "
+		<< inner<t_vec>(realbase[0], recipbase[1]) << ", "
+		<< inner<t_vec>(realbase[0], recipbase[2]) << ", "
+		<< inner<t_vec>(realbase[1], recipbase[0]) << ", "
+		<< inner<t_vec>(realbase[1], recipbase[2]) << ", "
+		<< inner<t_vec>(realbase[2], recipbase[0]) << ", "
+		<< inner<t_vec>(realbase[2], recipbase[1]) << "\n";
 }
 
 

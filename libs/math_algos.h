@@ -278,7 +278,7 @@ requires is_mat<t_mat>
  * create matrix from column (or row) vectors
  */
 template<class t_mat, class t_vec, template<class...> class t_cont_outer = std::initializer_list>
-t_mat create(const t_cont_outer<t_vec>& lst, bool bRow = 0)
+t_mat create(const t_cont_outer<t_vec>& lst, bool bRow = false)
 requires is_mat<t_mat> && is_basic_vec<t_vec>
 {
 	const std::size_t iCols = lst.size();
@@ -870,6 +870,31 @@ requires is_mat<t_mat>
 
 
 /**
+ * gets reciprocal basis vectors from real basis vectors (and vice versa)
+ * c: multiplicative constant (c=2*pi for physical lattices, c=1 for mathematics)
+ */
+template<class t_mat, class t_vec,
+	template<class...> class t_cont_in = std::initializer_list,
+	template<class...> class t_cont_out = std::vector>
+t_cont_out<t_vec> recip(const t_cont_in<t_vec>& lstReal, typename t_vec::value_type c=1)
+requires is_mat<t_mat> && is_basic_vec<t_vec>
+{
+	const t_mat basis = create<t_mat, t_vec, t_cont_in>(lstReal);
+	auto [basis_inv, bOk] = inv<t_mat>(basis);
+	basis_inv *= c;
+
+	t_cont_out<t_vec> lstRecip;
+	for(std::size_t currow=0; currow<basis_inv.size1(); ++currow)
+	{
+		const t_vec rowvec = row<t_mat, t_vec>(basis_inv, currow);
+		lstRecip.emplace_back(std::move(rowvec));
+	}
+
+	return lstRecip;
+}
+
+
+/**
  * general n-dim cross product using determinant definition
  */
 template<class t_vec, template<class...> class t_cont = std::initializer_list>
@@ -1194,9 +1219,6 @@ requires is_mat<t_mat> && is_vec<t_vec>
 	// reciprocal basis, RECI = REAL^(-T)
 	const auto [basisInv, bOk] = inv<t_mat>(basis);
 	if(!bOk) return zero<t_vec>(uv1.size());
-
-	vec12 = row<t_mat, t_vec>(basisInv, 0);
-	vec13 = row<t_mat, t_vec>(basisInv, 1);
 
 	t_vec pt = _pt - vert1;		// real pt
 	pt = basisInv * pt;			// reciprocal pt

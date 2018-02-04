@@ -348,6 +348,29 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 
 /**
+ * matrix *= scalar
+ */
+template<class t_mat>
+t_mat& operator*=(t_mat& mat1, typename t_mat::value_type d)
+requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
+{
+	mat1 = mat1 * d;
+	return mat1;
+}
+
+/**
+ * matrix /= scalar
+ */
+template<class t_mat>
+t_mat& operator/=(t_mat& mat1, typename t_mat::value_type d)
+requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
+{
+	mat1 = mat1 / d;
+	return mat1;
+}
+
+
+/**
  * operator <<
  */
 template<class t_mat>
