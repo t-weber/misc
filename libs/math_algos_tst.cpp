@@ -94,7 +94,7 @@ void vecmat_tsts()
 	std::cout << "\n";
 
 
-	auto newsys = orthonorm_sys<std::vector, t_vec>({vec1, vec2, vec3});
+	auto newsys = orthonorm_sys<t_vec>({vec1, vec2, vec3});
 	for(const auto& vec : newsys)
 		std::cout << vec[0] << " " << vec[1] << " " << vec[2] << ", length: " << norm<t_vec>(vec) << "\n";
 	std::cout << "v0 * v1 = " << inner<t_vec>(newsys[0], newsys[1]) << "\n";

@@ -520,6 +520,7 @@ void GlWidget::updatePicker()
 		if(bInters)
 		{
 			std::vector<t_vec3> polyuv{{ m_uvs[startidx+0], m_uvs[startidx+1], m_uvs[startidx+2] }};
+			//auto uv = m::poly_uv_ortho<t_vec3>(poly[0], poly[1], poly[2], polyuv[0], polyuv[1], polyuv[2], vecInters);
 			auto uv = m::poly_uv<t_mat, t_vec3>(poly[0], poly[1], poly[2], polyuv[0], polyuv[1], polyuv[2], vecInters);
 			m_curUV[0] = uv[0]; m_curUV[1] = uv[1];
 

@@ -564,7 +564,7 @@ requires is_vec<t_vec>
 
 
 /**
- * matrix to project onto plane perpendicular to vector: P = 1-|v><v|
+ * matrix to project onto orthogonal complement (plane perpendicular to vector): P = 1-|v><v|
  * from completeness relation: 1 = sum_i |v_i><v_i| = |x><x| + |y><y| + |z><z|
  */
 template<class t_mat, class t_vec>
@@ -697,26 +697,28 @@ requires is_vec<t_vec>
 
 /**
  * find orthonormal substitute basis for vector space (Gram-Schmidt algo)
- * get orthogonal projections: |i'> = (1 - sum_{j<i} |j><j|) |i>
+ * remove orthogonal projections to all other base vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
  */
-template<template<class...> class t_cont, class t_vec>
-t_cont<t_vec> orthonorm_sys(const t_cont<t_vec>& sys)
+template<class t_vec,
+	template<class...> class t_cont_in = std::initializer_list,
+	template<class...> class t_cont_out = std::vector>
+t_cont_out<t_vec> orthonorm_sys(const t_cont_in<t_vec>& sys)
 requires is_vec<t_vec>
 {
-	const std::size_t N = sys.size();
-	t_cont<t_vec> newsys;
+	t_cont_out<t_vec> newsys;
 
-	for(std::size_t i=0; i<N; ++i)
+	const std::size_t N = sys.size();
+	for(const t_vec& vecSys : sys)
 	{
-		t_vec vecOrthoProj = sys[i];
+		t_vec vecOrthoProj = vecSys;
 
 		// subtract projections to other basis vectors
-		for(std::size_t j=0; j<newsys.size(); ++j)
-			vecOrthoProj -= project<t_vec>(sys[i], newsys[j], true);
+		for(const t_vec& vecNewSys : newsys)
+			vecOrthoProj -= project<t_vec>(vecSys, vecNewSys, true);
 
 		// normalise
 		vecOrthoProj /= norm<t_vec>(vecOrthoProj);
-		newsys.push_back(vecOrthoProj);
+		newsys.emplace_back(std::move(vecOrthoProj));
 	}
 
 	return newsys;
@@ -870,8 +872,20 @@ requires is_mat<t_mat>
 
 
 /**
- * gets reciprocal basis vectors from real basis vectors (and vice versa)
+ * gets reciprocal basis vectors |b_i> from real basis vectors |a_i> (and vice versa)
  * c: multiplicative constant (c=2*pi for physical lattices, c=1 for mathematics)
+ *
+ * Def.: <b_i | a_j> = c * delta(i,j)  =>
+ *
+ * e.g. 2d case:
+ *                   ( a_1x  a_2x )
+ *                   ( a_1y  a_2y )
+ *
+ * ( b_1x  b_1y )    (    1     0 )
+ * ( b_2x  b_2y )    (    0     1 )
+ *
+ * B^t * A = I
+ * A = B^(-t)
  */
 template<class t_mat, class t_vec,
 	template<class...> class t_cont_in = std::initializer_list,
@@ -1170,8 +1184,8 @@ requires is_vec<t_vec>
 	const T len13 = norm<t_vec>(vec13);
 	const T lenuv12 = norm<t_vec>(uv12);
 	const T lenuv13 = norm<t_vec>(uv13);
-	auto vecBasis = orthonorm_sys<std::vector, t_vec>({vec12, vec13});
-	auto uvBasis = orthonorm_sys<std::vector, t_vec>({uv12, uv13});
+	auto vecBasis = orthonorm_sys<t_vec, std::initializer_list, std::vector>({vec12, vec13});
+	auto uvBasis = orthonorm_sys<t_vec, std::initializer_list, std::vector>({uv12, uv13});
 	vec12 = vecBasis[0]*len12; vec13 = vecBasis[1]*len13;
 	uv12 = uvBasis[0]*lenuv12; uv13 = uvBasis[1]*lenuv13;
 	// ----------------------------------------------------
