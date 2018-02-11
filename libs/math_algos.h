@@ -849,7 +849,7 @@ requires is_mat<t_mat>
 	if(equals<T>(fullDet, 0))
 	{
 		//std::cerr << "det == 0" << std::endl;
-		return std::make_tuple(t_mat(), false);	
+		return std::make_tuple(t_mat(), false);
 	}
 
 	t_mat matInv;
@@ -962,7 +962,7 @@ requires is_vec<t_vec>
 	{
 		const T org_n = inner<t_vec>(lineOrg, planeNorm);
 		// line on plane?
-		if(equals<T>(org_n, plane_d))		
+		if(equals<T>(org_n, plane_d))
 			return std::make_tuple(t_vec(), 2, T(0));
 		// no intersection
 		return std::make_tuple(t_vec(), 0, T(0));
@@ -1061,7 +1061,7 @@ requires is_vec<t_vec>
 /**
  * intersection or closest points of lines |org1> + lam1*|dir1> and |org2> + lam2*|dir2>
  * returns [nearest position 1, nearest position 2, dist, valid?, line parameter 1, line parameter 2]
- * 
+ *
  * |org1> + lam1*|dir1>  =  |org2> + lam2*|dir2>
  * |org1> - |org2>  =  lam2*|dir2> - lam1*|dir1>
  * |org1> - |org2>  =  (dir2 | -dir1) * |lam2 lam1>
@@ -1069,7 +1069,7 @@ requires is_vec<t_vec>
  * |lam2 lam1> = ((dir2 | -dir1)^T * (dir2 | -dir1))^(-1) * (dir2 | -dir1)^T * (|org1> - |org2>)
  */
 template<class t_vec>
-std::tuple<t_vec, t_vec, bool, typename t_vec::value_type, typename t_vec::value_type, typename t_vec::value_type> 
+std::tuple<t_vec, t_vec, bool, typename t_vec::value_type, typename t_vec::value_type, typename t_vec::value_type>
 intersect_line_line(
 	const t_vec& line1Org, const t_vec& line1Dir,
 	const t_vec& line2Org, const t_vec& line2Dir)
@@ -1125,12 +1125,12 @@ requires is_vec<t_vec>
 	const std::size_t dim = plane1Norm.size();
 
 	/*
-	// alternate, direct calculation (TODO): 
+	// alternate, direct calculation (TODO):
 	// (n1)               ( d1 )
 	// (n2) * (x,y,z)^T = ( d2 )
 	//
 	// N x = d  ->  R x = Q^T d  ->  back-substitute
-	
+
 	const t_mat N = create<t_mat, t_vec>({plane1Norm, plane2Norm}, true);
 	const auto [Q, R] = qr<t_mat, t_vec>(N);
 
@@ -1250,7 +1250,6 @@ requires is_mat<t_mat> && is_vec<t_vec>
 
 
 
-
 // ----------------------------------------------------------------------------
 // 3-dim algos
 // ----------------------------------------------------------------------------
@@ -1302,7 +1301,7 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 
 
 /**
- * matrix to rotate around an axis
+ * SO(3) matrix to rotate around an axis
  */
 template<class t_mat, class t_vec>
 t_mat rotation(const t_vec& axis, const typename t_vec::value_type angle, bool bIsNormalised=1)
@@ -1987,7 +1986,7 @@ requires is_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 /**
- * project a homogeneous vector to screen coordinates 
+ * project a homogeneous vector to screen coordinates
  * returns [vecPersp, vecScreen]
  */
 template<class t_mat, class t_vec>
@@ -2086,7 +2085,7 @@ requires is_mat<t_mat>
 		c*ratio, 	0., 	0., 				0.,
 		0, 			c, 		0., 				0.,
 		0.,			0.,		zs*(n0+f)/(n-f), 	sc*n*f/(n-f),
-		0.,			0.,		-zs,				0. 
+		0.,			0.,		-zs,				0.
 	});
 }
 
@@ -2106,11 +2105,97 @@ requires is_mat<t_mat>
 		T(0.5)*w, 	0., 		0., 			T(0.5)*w,
 		0, 			T(0.5)*h, 	0., 			T(0.5)*h,
 		0.,			0.,			T(0.5)*(f-n), 	T(0.5)*(f+n),
-		0.,			0.,			0.,				1. 
+		0.,			0.,			0.,				1.
 	});
 }
 
 // ----------------------------------------------------------------------------
+
+
+
+
+
+// ----------------------------------------------------------------------------
+// complex algos
+// ----------------------------------------------------------------------------
+
+/**
+ * SU(2) generators, pauli matrices sig_i = 2*S_i
+ */
+template<class t_mat>
+const t_mat& su2_matrix(std::size_t which)
+requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
+{
+	using t_cplx = typename t_mat::value_type;
+	const t_cplx c0(0,0);
+	const t_cplx c1(1,0);
+	const t_cplx cI(0,1);
+
+	static const t_mat mat[] =
+	{
+		create<t_mat>({{c0, c1}, { c1,  c0}}),	// x
+		create<t_mat>({{c0, cI}, {-cI,  c0}}),	// y
+		create<t_mat>({{c1, c0}, { c0, -c1}}),	// z
+	};
+
+	return mat[which];
+}
+
+
+/**
+ * SU(2) ladders
+ */
+template<class t_mat>
+const t_mat& su2_ladder(std::size_t which)
+requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
+{
+	using t_cplx = typename t_mat::value_type;
+	const t_cplx cI(0,1);
+	const t_cplx c05(0.5, 0);
+
+	static const t_mat mat[] =
+	{
+		c05*su2_matrix<t_mat>(0) + c05*cI*su2_matrix<t_mat>(1),	// up
+		c05*su2_matrix<t_mat>(0) - c05*cI*su2_matrix<t_mat>(1),	// down
+	};
+
+	return mat[which];
+}
+
+
+/**
+ * SU(3) generators, gell-mann matrices
+ * see: https://de.wikipedia.org/wiki/Gell-Mann-Matrizen
+ */
+template<class t_mat>
+const t_mat& su3_matrix(std::size_t which)
+requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
+{
+	using t_cplx = typename t_mat::value_type;
+	using t_real = typename t_cplx::value_type;
+	const t_cplx c0(0,0);
+	const t_cplx c1(1,0);
+	const t_cplx c2(2,0);
+	const t_cplx cI(0,1);
+	const t_real s3 = std::sqrt(3.);
+
+	static const t_mat mat[] =
+	{
+		create<t_mat>({{c0,c1,c0}, {c1,c0,c0}, {c0,c0,c0}}),			// 1
+		create<t_mat>({{c0,cI,c0}, {-cI,c0,c0}, {c0,c0,c0}}),			// 2
+		create<t_mat>({{c1,c0,c0}, {c0,-c1,c0}, {c0,c0,c0}}),			// 3
+		create<t_mat>({{c0,c0,c1}, {c0,c0,c0}, {c1,c0,c0}}),			// 4
+		create<t_mat>({{c0,c0,cI}, {c0,c0,c0}, {-cI,c0,c0}}),			// 5
+		create<t_mat>({{c0,c0,c0}, {c0,c0,c1}, {c0,c1,c0}}),			// 6
+		create<t_mat>({{c0,c0,c0}, {c0,c0,cI}, {c0,-cI,c0}}),			// 7
+		create<t_mat>({{c1/s3,c0,c0}, {c0,c1/s3,c0}, {c0,c0,-c2/s3*c1}}),	// 8
+	};
+
+	return mat[which];
+}
+
+// ----------------------------------------------------------------------------
+
 
 }
 #endif

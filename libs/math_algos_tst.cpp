@@ -47,7 +47,7 @@ template<class t_vec, class t_mat>
 void vecmat_tsts()
 {
 	using t_real = typename t_vec::value_type;
-	std::cout << "Using " 
+	std::cout << "Using "
 		<< "t_vec = " << ty::type_id_with_cvr<t_vec>().pretty_name() << ", "
 		<< "t_mat = " << ty::type_id_with_cvr<t_mat>().pretty_name() << "\n";
 
@@ -62,8 +62,8 @@ void vecmat_tsts()
 
 	t_vec cross1 = cross<t_vec>(vec1, vec2);
 	t_vec cross2 = cross<t_vec>({vec1, vec2});
-	std::cout << "cross: " 
-		<< cross1[0] << ", " << cross1[1] << ", " << cross1[2] << ";  "	
+	std::cout << "cross: "
+		<< cross1[0] << ", " << cross1[1] << ", " << cross1[2] << ";  "
 		<< cross2[0] << ", " << cross2[1] << ", " << cross2[2] << "\n";
 
 	t_vec vec3 = zero<t_vec>(3);
@@ -153,7 +153,7 @@ void vecmat_tsts()
 		<< ", dist: " << lineDist << "\n";
 
 	std::cout << "dist pt-line: " << norm<t_vec>(vecPos-vecLineProj) << "\n";
-	std::cout << "dist pt-line (direct): " << 
+	std::cout << "dist pt-line (direct): " <<
 		norm<t_vec>(cross<t_vec>(vecPos - lineOrigin, lineDir)) / norm<t_vec>(lineDir)
 		<< "\n";
 
@@ -173,7 +173,7 @@ void vecmat_tsts()
 
 	std::cout << "\nintersect_line_plane\n";
 	auto [vecInters, bInters, lamInters] =
-		intersect_line_plane<t_vec>(create<t_vec>({1,3,-5}), create<t_vec>({0,0,1}), 
+		intersect_line_plane<t_vec>(create<t_vec>({1,3,-5}), create<t_vec>({0,0,1}),
 			create<t_vec>({0,0,1}), 10);
 	std::cout << std::boolalpha << bInters << ", " << vecInters[0] << " " << vecInters[1] << " " << vecInters[2] << "\n";
 
@@ -207,7 +207,7 @@ void vecmat_tsts()
 	auto [Q, R] = qr<t_mat, t_vec>(matOrg);
 	std::cout << Q(0,0) << " " << Q(0,1) << " " << Q(0,2) << "\n";
 	std::cout << Q(1,0) << " " << Q(1,1) << " " << Q(1,2) << "\n";
-	std::cout << Q(2,0) << " " << Q(2,1) << " " << Q(2,2) << "\n";	
+	std::cout << Q(2,0) << " " << Q(2,1) << " " << Q(2,2) << "\n";
 	std::cout << R(0,0) << " " << R(0,1) << " " << R(0,2) << "\n";
 	std::cout << R(1,0) << " " << R(1,1) << " " << R(1,2) << "\n";
 	std::cout << R(2,0) << " " << R(2,1) << " " << R(2,2) << "\n";
@@ -333,6 +333,20 @@ void vecmat_tsts_nonsquare()
 }
 
 
+template<class t_vec, class t_mat>
+void complex_tsts()
+{
+	{
+		std::cout << "\nSU(n)\n";
+		t_vec vec = create<t_vec>({0, 1});
+		t_mat mat = su2_ladder<t_mat>(0);
+		std::cout << mat*vec << "\n";
+
+		t_mat mat2 = su3_matrix<t_mat>(0);
+	}
+}
+
+
 int main()
 {
 	constexpr bool bUseSTL = 1;
@@ -355,7 +369,7 @@ int main()
 		t_vec vec3 = zero<t_vec>(3);
 		t_mat mat1 = outer<t_mat, t_vec>(vec1, vec2);
 		std::cout << mat1 << "\n";
-	
+
 		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
@@ -426,12 +440,16 @@ int main()
 	if constexpr(bUseUblas)
 	{
 		using t_real = double;
+		using t_cplx = std::complex<t_real>;
 		using t_vec = ublas::vector<t_real>;
 		using t_mat = ublas::matrix<t_real>;
+		using t_vec_cplx = ublas::vector<t_cplx>;
+		using t_mat_cplx = ublas::matrix<t_cplx>;
 
 		vecmat_tsts<t_vec, t_mat>();
 		vecmat_tsts_hom<t_vec, t_mat>();
 		vecmat_tsts_nonsquare<t_vec, t_mat>();
+		complex_tsts<t_vec_cplx, t_mat_cplx>();
 
 		create_cube<t_vec, std::vector>(1.);
 
@@ -442,14 +460,18 @@ int main()
 
 	// using internal classes
 	if constexpr(bUseInternals)
-	{	
+	{
 		using t_real = double;
+		using t_cplx = std::complex<t_real>;
 		using t_vec = std::vector<t_real>;
 		using t_mat = mat<t_real, std::vector>;
+		using t_vec_cplx = std::vector<t_cplx>;
+		using t_mat_cplx = mat<t_cplx, std::vector>;
 
 		vecmat_tsts<t_vec, t_mat>();
 		vecmat_tsts_hom<t_vec, t_mat>();
 		vecmat_tsts_nonsquare<t_vec, t_mat>();
+		complex_tsts<t_vec_cplx, t_mat_cplx>();
 
 		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
