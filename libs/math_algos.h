@@ -12,6 +12,7 @@
 //#include "math_conts.h"
 
 #include <cmath>
+#include <complex>
 #include <tuple>
 #include <vector>
 #include <limits>
@@ -653,6 +654,7 @@ requires is_mat<t_mat> && is_vec<t_vec>
 
 /**
  * project vector vec onto plane through the origin and perpendicular to vector vecNorm
+ * (e.g. used to calculate magnetic interaction vector M_perp)
  */
 template<class t_vec>
 t_vec ortho_project(const t_vec& vec, const t_vec& vecNorm, bool bIsNormalised = true)
@@ -2193,6 +2195,39 @@ requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
 
 	return mat[which];
 }
+
+
+/**
+ * general structure factor calculation
+ * e.g. type T as vector (complex number) for magnetic (nuclear) structure factor
+ */
+template<class t_vec, class T = t_vec, template<class...> class t_cont = std::vector,
+	class t_cplx = std::complex<double>>
+T structure_factor(const t_cont<T>& Ms_or_bs, const t_cont<t_vec>& Rs, const t_vec& Q)
+requires is_basic_vec<t_vec>
+{
+	const t_cplx cI(0,1);
+
+	T F;
+	if constexpr(is_vec<T>)
+		F = zero<T>(Rs.begin()->size());	// always 3 dims...
+	else /*if constexpr(is_complex<T>)*/
+		F = T(0);
+
+	auto iterM_or_b = Ms_or_bs.begin();
+	auto iterR = Rs.begin();
+
+	while(iterM_or_b != Ms_or_bs.end() && iterR != Rs.end())
+	{
+		F += (*iterM_or_b) * std::exp(-cI * inner<t_vec>(Q, *iterR));
+
+		std::advance(iterM_or_b, 1);
+		std::advance(iterR, 1);
+	}
+
+	return F;
+}
+
 
 // ----------------------------------------------------------------------------
 

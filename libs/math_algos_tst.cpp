@@ -336,6 +336,8 @@ void vecmat_tsts_nonsquare()
 template<class t_vec, class t_mat>
 void complex_tsts()
 {
+	using t_cplx = typename t_vec::value_type;
+
 	{
 		std::cout << "\nSU(n)\n";
 		t_vec vec = create<t_vec>({0, 1});
@@ -343,6 +345,25 @@ void complex_tsts()
 		std::cout << mat*vec << "\n";
 
 		t_mat mat2 = su3_matrix<t_mat>(0);
+	}
+
+
+	{
+		auto Fm = structure_factor<t_vec, t_vec/*_cplx*/>(
+			/*Ms*/ { create<t_vec/*_cplx*/>({1,0,0}), create<t_vec/*_cplx*/>({-1,0,0}) },
+			/*Rs*/ { create<t_vec>({0,0,0}), create<t_vec>({0.5,0.5,0.5}) },
+			/*Q*/ create<t_vec>({1,1,1})
+		);
+
+		auto Fn = structure_factor<t_vec, t_cplx>(
+			/*bs*/ { t_cplx(1.), t_cplx(-1.) },
+			/*Rs*/ { create<t_vec>({0,0,0}), create<t_vec>({0.5,0.5,0.5}) },
+			/*Q*/ create<t_vec>({1,1,1})
+		);
+
+		std::cout << "\nStructure factors\n";
+		std::cout << "Fm = " << Fm[0] << ", " << Fm[1] << ", " << Fm[2] << "\n";
+		std::cout << "Fn = " << Fn << "\n";
 	}
 }
 
@@ -476,6 +497,7 @@ int main()
 		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
+
 
 	return 0;
 }
