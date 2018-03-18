@@ -2206,7 +2206,9 @@ template<class t_vec, class T = t_vec, template<class...> class t_cont = std::ve
 T structure_factor(const t_cont<T>& Ms_or_bs, const t_cont<t_vec>& Rs, const t_vec& Q)
 requires is_basic_vec<t_vec>
 {
+	using t_real = typename t_cplx::value_type;
 	const t_cplx cI(0,1);
+	const t_real twopi = pi<t_real> * t_real(2);
 
 	T F;
 	if constexpr(is_vec<T>)
@@ -2219,9 +2221,14 @@ requires is_basic_vec<t_vec>
 
 	while(iterM_or_b != Ms_or_bs.end() && iterR != Rs.end())
 	{
-		F += (*iterM_or_b) * std::exp(-cI * inner<t_vec>(Q, *iterR));
+		F += (*iterM_or_b) * std::exp(-cI * twopi * inner<t_vec>(Q, *iterR));
 
-		std::advance(iterM_or_b, 1);
+		// next M or b if available (otherwise keep current)
+		auto iterM_or_b_next = std::next(iterM_or_b, 1);
+		if(iterM_or_b_next != Ms_or_bs.end())
+			iterM_or_b = iterM_or_b_next;
+
+		// next atom position
 		std::advance(iterR, 1);
 	}
 
