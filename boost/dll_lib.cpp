@@ -2,7 +2,7 @@
  * dll tests and snippets
  * @author Tobias Weber
  * @date 9-dec-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * g++ -shared -fPIC -o dll_lib.so dll_lib.cpp -std=c++17
  *

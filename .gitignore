@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+
+# External dependencies
+qcustomplot.cpp
+qcustomplot.h
+

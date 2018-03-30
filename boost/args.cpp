@@ -2,7 +2,7 @@
  * command line args tests
  * @author Tobias Weber
  * @date 19-nov-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * References:
  *  * http://www.boost.org/doc/libs/1_65_1/doc/html/program_options.html

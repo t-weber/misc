@@ -2,7 +2,7 @@
  * concepts test (using static and dynamic constructors)
  * @author Tobias Weber
  * @date dec-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * enabled concepts:
  * g++ -o concepts3 concepts3.cpp -std=c++17 -fconcepts

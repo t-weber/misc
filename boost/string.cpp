@@ -2,7 +2,7 @@
  * boost string tests
  * @author Tobias Weber
  * @date 18-mar-18
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * References:
  *  * https://github.com/boostorg/algorithm/tree/develop/string/example

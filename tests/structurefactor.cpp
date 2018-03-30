@@ -2,7 +2,7 @@
  * structure factor calculation test
  * @author Tobias Weber
  * @date 18-mar-18
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * g++ -o structurefactor structurefactor.cpp -std=c++17 -fconcepts
  */

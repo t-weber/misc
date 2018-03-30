@@ -2,7 +2,7 @@
  * concepts and adapters for math classes
  * @author Tobias Weber
  * @date dec-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  */
 
 #ifndef __MATH_CONCEPTS_H__

@@ -2,7 +2,7 @@
  * GIL tests
  * @author Tobias Weber
  * @date 16-dec-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * References:
  *  * https://github.com/boostorg/gil/tree/develop/example

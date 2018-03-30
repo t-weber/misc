@@ -2,7 +2,7 @@
  * container-agnostic math algorithms
  * @author Tobias Weber
  * @date dec-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  */
 
 #ifndef __MATH_ALGOS_H__

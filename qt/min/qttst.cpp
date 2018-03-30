@@ -2,7 +2,7 @@
  * minimal qt example
  * @author Tobias Weber
  * @date Nov-2017
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.GPL' file
  */
 
 #include "qttst.h"

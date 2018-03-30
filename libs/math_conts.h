@@ -2,7 +2,7 @@
  * containers and operators for use with math algorithms
  * @author Tobias Weber
  * @date jan-18
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  */
 
 #ifndef __MATH_CONTS_H__

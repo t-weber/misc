@@ -2,7 +2,7 @@
  * dll tests and snippets
  * @author Tobias Weber
  * @date 9-dec-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * g++ -o dll_prog dll_prog.cpp -std=c++17 -lboost_filesystem -lboost_system -ldl
  *

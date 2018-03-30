@@ -2,7 +2,7 @@
  * iostreams tests and snippets
  * @author Tobias Weber
  * @date 19-nov-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * References:
  *  * http://www.boost.org/doc/libs/1_65_1/libs/iostreams/doc/index.html

@@ -2,7 +2,7 @@
  * geometry tests and snippets
  * @author Tobias Weber
  * @date 24-nov-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * References:
  *  * http://www.boost.org/doc/libs/1_65_1/libs/geometry/doc/html/index.html

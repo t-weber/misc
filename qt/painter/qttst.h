@@ -2,7 +2,7 @@
  * qt non-gl painter example
  * @author Tobias Weber
  * @date Nov-2017
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.GPL' file
  */
 
 #ifndef __QTTST_H__

@@ -2,7 +2,7 @@
  * graph tests using Grenoble tram system
  * @author Tobias Weber
  * @date 03-dec-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * References:
  *  * https://github.com/boostorg/graph/tree/develop/example

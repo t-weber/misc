@@ -2,7 +2,7 @@
  * concepts test
  * @author Tobias Weber
  * @date dec-17
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.EUPL' file
  *
  * enabled concepts:
  * g++ -o concepts2 concepts2.cpp -std=c++17 -fconcepts

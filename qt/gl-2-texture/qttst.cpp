@@ -2,7 +2,7 @@
  * minimal qt gl example
  * @author Tobias Weber
  * @date Nov-2017
- * @license: see 'LICENSE' file
+ * @license: see 'LICENSE.GPL' file
  *
  * References:
  *  * http://doc.qt.io/qt-5/qopenglwidget.html#details
