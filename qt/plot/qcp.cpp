@@ -58,7 +58,7 @@ PltDlg::PltDlg(QWidget* pParent) : QDialog{pParent}
 	auto pErr = new QCPErrorBars(m_pPlot->xAxis, m_pPlot->yAxis);
 	pErr->setData(yerr);
 	pErr->setDataPlottable(pGraph);
-	
+
 	m_pPlot->xAxis->setRange(*xmin-*xmax/10., *xmax+*xmax/10.);
 	m_pPlot->yAxis->setRange(*ymin-*ymax/10., *ymax+*ymax/10.);
 
