@@ -8,28 +8,23 @@
 #ifndef __QTTST_H__
 #define __QTTST_H__
 
-
 // ----------------------------------------------------------------------------
-// GL versions
-/*#include <QOpenGLFunctions>
-using qgl_funcs = QOpenGLFunctions;
-#define _GL_MAJ_VER -1
-#define _GL_MIN_VER -1*/
+// GL version to use
+#if !defined(_GL_MAJ_VER) || !defined(_GL_MIN_VER)
+	#define _GL_MAJ_VER 3
+	#define _GL_MIN_VER 3
+#endif
 
-#include <QOpenGLFunctions_3_3_Core>
-using qgl_funcs = QOpenGLFunctions_3_3_Core;
-#define _GL_MAJ_VER 3
-#define _GL_MIN_VER 3
+// include GL functions
+#define _GL_INC_IMPL(MAJ, MIN) <QOpenGLFunctions_ ## MAJ ## _ ## MIN ## _Core>
+#define _GL_INC(MAJ, MIN) _GL_INC_IMPL(MAJ, MIN)
+#include _GL_INC(_GL_MAJ_VER, _GL_MIN_VER)
 
-/*#include <QOpenGLFunctions_4_5_Core>
-using qgl_funcs = QOpenGLFunctions_4_5_Core;
-#define _GL_MAJ_VER 4
-#define _GL_MIN_VER 5*/
+// GL functions typedef
+#define _GL_FUNC_IMPL(MAJ, MIN) QOpenGLFunctions_ ## MAJ ## _ ## MIN ## _Core
+#define _GL_FUNC(MAJ, MIN) _GL_FUNC_IMPL(MAJ, MIN)
+using qgl_funcs = _GL_FUNC(_GL_MAJ_VER, _GL_MIN_VER);
 // ----------------------------------------------------------------------------
-
-#include <QDialog>
-#include <QTimer>
-#include <QMouseEvent>
 
 #include <QOpenGLShaderProgram>
 #include <QOpenGLBuffer>
@@ -39,6 +34,10 @@ using qgl_funcs = QOpenGLFunctions_4_5_Core;
 #include <QMatrix4x4>
 #include <QVector4D>
 #include <QVector3D>
+
+#include <QDialog>
+#include <QTimer>
+#include <QMouseEvent>
 
 #include <memory>
 #include <chrono>
