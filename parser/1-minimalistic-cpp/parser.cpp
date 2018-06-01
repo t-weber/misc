@@ -13,6 +13,24 @@
 
 
 /**
+ * Lexer error output
+ */
+void yy::Lexer::LexerError(const char* err)
+{
+	std::cerr << "Lexer error: " << err << std::endl;
+}
+
+
+/**
+ * Lexer message
+ */
+void yy::Lexer::LexerOutput(const char* str, int len)
+{
+	std::cerr << "Lexer output: " << str << std::endl;
+}
+
+
+/**
  * Parser error output
  */
 void yy::Parser::error(const std::string& err)
@@ -24,7 +42,7 @@ void yy::Parser::error(const std::string& err)
 /**
  * call lexer from parser
  */
-extern yy::Parser::symbol_type yylex(ParserContext &context)
+extern yy::Parser::symbol_type yylex(yy::ParserContext &context)
 {
 	return context.GetLexer().yylex(context);
 }
@@ -32,7 +50,7 @@ extern yy::Parser::symbol_type yylex(ParserContext &context)
 
 int main()
 {
-	ParserContext ctx;
+	yy::ParserContext ctx;
 	yy::Parser parser(ctx);
 	return parser.parse();
 }

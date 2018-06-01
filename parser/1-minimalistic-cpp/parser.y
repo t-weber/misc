@@ -28,12 +28,15 @@
 // (forward) declarations for parser_defs.h
 %code requires
 {
-	class ParserContext;
+	namespace yy
+	{
+		class ParserContext;
+	}
 }
 
 
 // parameter to use for parser and yylex
-%param { ParserContext &context }
+%param { yy::ParserContext &context }
 
 
 // terminal symbols

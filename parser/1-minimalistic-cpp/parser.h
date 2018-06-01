@@ -29,34 +29,37 @@ namespace yy
 		Lexer(std::istream& istr) : yyFlexLexer(istr, std::cerr) {}
 		virtual ~Lexer() = default;
 
-		virtual Parser::symbol_type yylex(ParserContext &context) /*override*/;
+		virtual yy::Parser::symbol_type yylex(yy::ParserContext &context) /*override*/;
+
+		virtual void LexerOutput(const char* str, int len) override;
+		virtual void LexerError(const char* err) override;
+	};
+
+
+	/**
+ 	* holds parser state
+ 	*/
+	class ParserContext
+	{
+	private:
+		yy::Lexer m_lex;
+
+	public:
+		yy::Lexer& GetLexer() { return m_lex; }
 	};
 }
 
 
-/**
- * holds parser state
- */
-class ParserContext
-{
-private:
-	yy::Lexer m_lex;
-
-public:
-	yy::Lexer& GetLexer() { return m_lex; }
-};
-
-
 // yylex definition for lexer
 #undef YY_DECL
-#define YY_DECL yy::Parser::symbol_type yy::Lexer::yylex(ParserContext &context)
+#define YY_DECL yy::Parser::symbol_type yy::Lexer::yylex(yy::ParserContext &context)
 
 // yylex function which the parser calls
-extern yy::Parser::symbol_type yylex(ParserContext &context);
+extern yy::Parser::symbol_type yylex(yy::ParserContext &context);
 
 
-// unused
-#define yyterminate() /**/
+// stop parsing
+#define yyterminate() { return yy::Parser::by_type::kind_type(0); }
 
 
 #endif
