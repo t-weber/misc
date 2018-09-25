@@ -50,12 +50,21 @@ std::array<int, 3>& arr2()
 
 // ----------------------------------------------------------------------------
 // constant expressions
-void modify(auto& a)
+constexpr void modify(auto& a)
 {
 	if constexpr(std::is_same_v<decltype(a), int&>)
 		++a;
 	else
 		--a;
+}
+
+
+// constexpr loop using fold expressions
+template</*class Func,*/ std::size_t ...seq>
+constexpr void constexpr_loop(const std::index_sequence<seq...>&, /*Func*/auto func)
+{
+	// a sequence of function calls
+	( (func(seq)), ... );
 }
 // ----------------------------------------------------------------------------
 
@@ -145,6 +154,22 @@ int main()
 		modify(x);
 		modify(y);
 		print(x, " ", y);
+	}
+
+
+	// compile-time loop unrolling
+	{
+		std::vector<std::string> vecStr{{"0", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"}};
+		std::vector<std::string> vec;
+		auto seq = std::index_sequence<0, 3, 5, 7, 9>();
+		//auto seq = std::make_index_sequence<11>();
+		constexpr_loop(seq, [&vec, &vecStr](std::size_t idx) -> void
+		{
+			vec.push_back(vecStr[idx]);
+		});
+
+		for(const auto& idx : vec) std::cout << idx << ", ";
+		std::cout << std::endl;
 	}
 	// --------------------------------------------------------------------
 
