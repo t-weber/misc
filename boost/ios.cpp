@@ -8,7 +8,7 @@
  *  * http://www.boost.org/doc/libs/1_65_1/libs/iostreams/doc/index.html
  *  * https://github.com/boostorg/iostreams/tree/develop/example
  *
- * gcc -o ios ios.cpp -std=c++17 -lstdc++ -lboost_iostreams
+ * g++ -o ios ios.cpp -std=c++17 -lboost_iostreams
  */
 
 #include <iostream>
@@ -73,9 +73,13 @@ int main()
 
 	// mapped file
 	{
-		ios::mapped_file_source file("ios.cpp");
-		std::cout << "mappled file size: " << file.size() << "\n";
-		std::cout << file.data() << std::endl;
+		int align = ios::mapped_file_source::alignment();
+		std::cout << "Mem alignment size: " << align << std::endl;
+		ios::mapped_file_source file("ios.cpp", 16 /*len*/, 0*align /*offs*/);
+		std::cout << "mapped file size: " << file.size() << "\n";
+		//std::cout << file.data() << std::endl;
+		for(char c : file) std::cout << c;
+		std::cout << std::endl;
 	}
 
 
