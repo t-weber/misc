@@ -8,8 +8,15 @@
  *  * https://www.boost.org/doc/libs/1_68_0/libs/numeric/odeint/doc/html/boost_numeric_odeint/tutorial.html
  *  * https://github.com/boostorg/odeint/tree/develop/examples
  *  * https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods
+ *  * https://en.wikipedia.org/wiki/Euler_method
  *
  * g++ -std=c++17 -o ode ode.cpp
+ *
+ * higher order ODE to system:
+ *  a*f'' + b*f' + c*f = 0
+ *  subst: g0 = f,  g1 = f';
+ *  system: ( i) g0' [= f'] = g1
+ *          (ii) g1' [= f'' = -b/a*f' - c/a*f] = -b/a*g1 - c/a*g0
  */
 
 #include <iostream>
@@ -115,7 +122,24 @@ int main()
 	}
 
 	{
-		std::cout << "\nAnalytical" << std::endl;
+		std::cout << "\nmanual Euler" << std::endl;
+		qp[0] = qp[1] = 0;
+
+		// dq/dt = g*t
+		auto qdiff = [](t_real t, t_real q) -> t_real
+		{
+			return g*t;
+		};
+
+		t_real q = qp[0];
+		for(t_real t=t_start; t<t_end-t_step; t+=t_step)
+			q += t_step*qdiff(t, q);
+
+		std::cout << "final: q=" << q << std::endl;
+	}
+
+	{
+		std::cout << "\nanalytical" << std::endl;
 		t_real p = g * (t_end-t_start);
 		t_real q = g/2. * std::pow(t_end-t_start, 2.);
 		std::cout << "final: q=" << q << ", p=" << p << std::endl;
