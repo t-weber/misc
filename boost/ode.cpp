@@ -50,7 +50,7 @@ void falling(t_stepper&& stepper, t_phase& qp, t_real t_start, t_real t_end, t_r
 }
 
 
-int main()
+void falling_tst()
 {
 	const t_real t_start = 0.;
 	const t_real t_end = 5.;
@@ -144,6 +144,43 @@ int main()
 		t_real q = g/2. * std::pow(t_end-t_start, 2.);
 		std::cout << "final: q=" << q << ", p=" << p << std::endl;
 	}
+}
+
+
+/**
+ * comparison to "ode.py"
+ */
+void ode_tst()
+{
+	const t_real t_start = 0.;
+	const t_real t_end = 5.;
+	const t_real t_step = 0.001;
+
+	t_real a = 1.23;
+	t_real b = -4.56;
+	t_real c = 7.89;
+
+	t_phase q{{ -0.4658 }};
+
+	ode::integrate_const(ode::runge_kutta4<t_phase>(),
+	[a,b,c](const t_phase& q, t_phase& q_diff, t_real t) -> void
+	{
+		q_diff[0] = a*q[0] + b*t + c*t*t;
+	}, q, t_start, t_end, t_step/*,
+	[](const t_phase& q, t_real t) -> void
+	{
+		std::cout << "step: t=" << t << ", q=" << q[0] << std::endl;
+	}*/);
+
+	std::cout << "q = "  << q[0] << std::endl;
+}
+
+
+int main()
+{
+	falling_tst();
+	std::cout << "\n------------------------------------------------------------\n" << std::endl;
+	ode_tst();
 
 	return 0;
 }

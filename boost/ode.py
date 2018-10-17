@@ -23,7 +23,7 @@ def y(x):
 
 
 def euler(x_start, x_end, x_step, y_start):
-	x_range = x_end-x_step - x_start
+	x_range = x_end - x_start
 	xs = np.linspace(x_start, x_end-x_step, int(x_range/x_step))
 	y = y_start
 
@@ -41,7 +41,7 @@ def runge(x_start, x_end, x_step, y_start):
 		k4 = x_step * dydx(y+k3, x+x_step)
 		return [k1, k2, k3, k4]
 
-	x_range = x_end-x_step - x_start
+	x_range = x_end - x_start
 	xs = np.linspace(x_start, x_end-x_step, int(x_range/x_step))
 	y = y_start
 

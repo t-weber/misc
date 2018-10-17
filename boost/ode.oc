@@ -30,7 +30,7 @@ endfunction
 
 
 function y = euler(x_start, x_end, x_step, y_start)
-	x_range = x_end-x_step - x_start;
+	x_range = x_end - x_start;
 	xs = linspace(x_start, x_end-x_step, int32(x_range/x_step));
 	y = y_start;
 
@@ -43,7 +43,7 @@ endfunction
 
 
 function y = runge(x_start, x_end, x_step, y_start)
-	x_range = x_end-x_step - x_start;
+	x_range = x_end - x_start;
 	xs = linspace(x_start, x_end-x_step, int32(x_range/x_step));
 	y = y_start;
 
