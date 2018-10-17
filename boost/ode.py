@@ -8,19 +8,23 @@
 import numpy as np
 
 
-# ODE: y' = 1*y + 2*x
+# ODE: y'(x) = a*y(x) + b*x + c*x^2
+a = 1.23
+b = -4.56
+c = 7.89
 def dydx(y, x):
-	return 1.*y + 2.*x
+	return a*y + b*x + c*x**2.
 
 
 # analytical integral, for checking
+int_c = 5.
 def y(x):
-	c = 5.
-	return c*np.exp(x) - 2.*x - 2.
+	return int_c*np.exp(a*x) - c/a*x**2. - b/a*x - 2.*c/a**2.*x - b/a**2. - 2.*c/a**3.
 
 
 def euler(x_start, x_end, x_step, y_start):
-	xs = np.linspace(x_start, x_end-x_step, int(np.round((x_end-x_start)/x_step)))
+	x_range = x_end-x_step - x_start
+	xs = np.linspace(x_start, x_end-x_step, int(x_range/x_step))
 	y = y_start
 
 	for x in xs:
@@ -37,7 +41,8 @@ def runge(x_start, x_end, x_step, y_start):
 		k4 = x_step * dydx(y+k3, x+x_step)
 		return [k1, k2, k3, k4]
 
-	xs = np.linspace(x_start, x_end-x_step, int(np.round((x_end-x_start)/x_step)))
+	x_range = x_end-x_step - x_start
+	xs = np.linspace(x_start, x_end-x_step, int(x_range/x_step))
 	y = y_start
 
 	for x in xs:
@@ -49,9 +54,9 @@ def runge(x_start, x_end, x_step, y_start):
 
 
 x_start = 0.
-x_end = 7.
+x_end = 5.
 x_step = 0.001
-y_start = 3.
+y_start = y(x_start)
 
 
 y_euler = euler(x_start, x_end, x_step, y_start)

@@ -1,0 +1,78 @@
+#
+# ode test
+# @author tweber
+# @date oct-18
+# @license: see 'LICENSE.EUPL' file
+#
+
+
+#
+# ODE: y'(x) = a*y(x) + b*x + c*x^2
+#
+global a = 1.23;
+global b = -4.56;
+global c = 7.89;
+function dydx = dydx(y, x)
+	global a b c
+	dydx = a*y + b*x + c*x.^2.;
+endfunction
+
+
+#
+# analytical integral, for checking
+#
+global int_c = 5.;
+function y = y(x)
+	global int_c a b c
+	y = int_c*exp(a*x) - c/a*x.^2. - b/a*x - 2.*c/a.^2.*x - b/a.^2. - 2.*c/a.^3.;
+endfunction
+
+
+
+function y = euler(x_start, x_end, x_step, y_start)
+	x_range = x_end-x_step - x_start;
+	xs = linspace(x_start, x_end-x_step, int32(x_range/x_step));
+	y = y_start;
+
+	for x = xs
+		y += x_step*dydx(y, x);
+	endfor
+	y;
+endfunction
+
+
+
+function y = runge(x_start, x_end, x_step, y_start)
+	x_range = x_end-x_step - x_start;
+	xs = linspace(x_start, x_end-x_step, int32(x_range/x_step));
+	y = y_start;
+
+	for x = xs
+		k1 = x_step * dydx(y, x);
+		k2 = x_step * dydx(y+k1*0.5, x+x_step*0.5);
+		k3 = x_step * dydx(y+k2*0.5, x+x_step*0.5);
+		k4 = x_step * dydx(y+k3, x+x_step);
+
+		y += (k1 + 2.*k2 + 2.*k3 + k4) / 6.;
+	endfor
+	y;
+endfunction
+
+
+
+
+x_start = 0.;
+x_end = 5.;
+x_step = 0.001;
+y_start = y(x_start);
+
+printf("x_start = %.6g, x_end = %.6g, x_step = %.6g, y_start = %.6g\n", x_start, x_end, x_step, y_start);
+
+y_euler = euler(x_start, x_end, x_step, y_start);
+printf("Euler: y = %.6g\n", y_euler);
+
+y_runge = runge(x_start, x_end, x_step, y_start);
+printf("Runge: y = %.6g\n", y_runge)
+
+y_ana = y(x_end)-y(x_start);
+printf("Analytical: y = %.6g\n", y_ana);
