@@ -8,9 +8,17 @@
 #ifndef __MATH_CONTS_H__
 #define __MATH_CONTS_H__
 
-#include "math_concepts.h"
+#include <boost/algorithm/string.hpp>
 #include <cassert>
 #include <vector>
+#include <iostream>
+#include <iomanip>
+#include "math_concepts.h"
+
+
+// separator tokens
+#define COLSEP ';'
+#define ROWSEP '|'
 
 
 namespace m {
@@ -130,7 +138,8 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
  */
 template<class t_vec>
 t_vec operator*(typename t_vec::value_type d, const t_vec& vec)
-requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
+requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec> 
+	//&& !m::is_basic_mat<typename t_vec::value_type>	// hack!
 {
 	return vec * d;
 }
@@ -207,10 +216,39 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 	{
 		ostr << vec[i];
 		if(i < N-1)
-			ostr << ", ";
+			ostr << COLSEP << " ";
 	}
 
 	return ostr;
+}
+
+
+/**
+ * operator >>
+ */
+template<class t_vec>
+std::istream& operator>>(std::istream& istr, t_vec& vec)
+requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
+{
+	vec.clear();
+
+	std::string str;
+	std::getline(istr, str);
+
+	std::vector<std::string> vecstr;
+	boost::split(vecstr, str, [](auto c)->bool { return c==COLSEP; }, boost::token_compress_on);
+
+	for(auto& tok : vecstr)
+	{
+		boost::trim(tok);
+		std::istringstream istr(tok);
+
+		typename t_vec::value_type c{};
+		istr >> c;
+		vec.emplace_back(std::move(c));
+	}
+
+	return istr;
 }
 // ----------------------------------------------------------------------------
 
@@ -386,11 +424,36 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 		{
 			ostr << mat(row, col);
 			if(col < COLS-1)
-				ostr << ", ";
+				ostr << COLSEP << " ";
 		}
 
 		if(row < ROWS-1)
-			ostr << "; ";
+			ostr << ROWSEP << " ";
+	}
+
+	return ostr;
+}
+
+
+/**
+ * prints matrix in nicely formatted form
+ */
+template<class t_mat>
+std::ostream& niceprint(std::ostream& ostr, const t_mat& mat)
+requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
+{
+	const std::size_t ROWS = mat.size1();
+	const std::size_t COLS = mat.size2();
+
+	for(std::size_t i=0; i<ROWS; ++i)
+	{
+		ostr << "(";
+		for(std::size_t j=0; j<COLS; ++j)
+			ostr << std::setw(ostr.precision()*1.5) << std::right << mat(i,j);
+		ostr << ")";
+
+		if(i < ROWS-1)
+			ostr << "\n";
 	}
 
 	return ostr;
@@ -421,9 +484,12 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 	for(std::size_t row=0; row<mat.size1(); ++row)
 	{
-		vecRet[row] = 0;
+		vecRet[row] = typename t_vec::value_type{/*0*/};
 		for(std::size_t col=0; col<mat.size2(); ++col)
-			vecRet[row] += mat(row, col) * vec[col];
+		{
+			auto elem = mat(row, col) * vec[col];
+			vecRet[row] = vecRet[row] + elem;
+		}
 	}
 
 	return vecRet;

@@ -2,7 +2,7 @@
  * container-agnostic math algorithms
  * @author Tobias Weber
  * @date dec-17
- * @license: see 'LICENSE.EUPL' file
+ * @license see 'LICENSE.EUPL' file
  */
 
 #ifndef __MATH_ALGOS_H__
@@ -16,6 +16,10 @@
 #include <tuple>
 #include <vector>
 #include <limits>
+#include <algorithm>
+#include <numeric>
+//#include <iostream>
+
 
 namespace m {
 
@@ -38,6 +42,18 @@ requires is_scalar<T>
 }
 
 /**
+ * are two complex numbers equal within an epsilon range?
+ */
+template<class T>
+bool equals(const T& t1, const T& t2,
+	typename T::value_type eps = std::numeric_limits<typename T::value_type>::epsilon())
+requires is_complex<T>
+{
+	return (std::abs(t1.real() - t2.real()) <= eps) &&
+		(std::abs(t1.imag() - t2.imag()) <= eps);
+}
+
+/**
  * are two vectors equal within an epsilon range?
  */
 template<class t_vec>
@@ -47,13 +63,23 @@ requires is_basic_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
 
+	// size has to be equal
 	if(vec1.size() != vec2.size())
 		return false;
 
+	// check each element
 	for(std::size_t i=0; i<vec1.size(); ++i)
 	{
-		if(!equals<T>(vec1[i], vec2[i], eps))
-			return false;
+		if constexpr(is_complex<decltype(eps)>)
+		{
+			if(!equals<T>(vec1[i], vec2[i], eps.real()))
+				return false;
+		}
+		else
+		{
+			if(!equals<T>(vec1[i], vec2[i], eps))
+				return false;
+		}
 	}
 
 	return true;
@@ -86,10 +112,10 @@ requires is_mat<t_mat>
 
 
 /**
- * set submatrix to unity
+ * set submatrix to unit
  */
 template<class t_mat>
-void unity(t_mat& mat, std::size_t rows_begin, std::size_t cols_begin, std::size_t rows_end, std::size_t cols_end)
+void unit(t_mat& mat, std::size_t rows_begin, std::size_t cols_begin, std::size_t rows_end, std::size_t cols_end)
 requires is_mat<t_mat>
 {
 	for(std::size_t i=rows_begin; i<rows_end; ++i)
@@ -102,14 +128,14 @@ requires is_mat<t_mat>
  * unit matrix
  */
 template<class t_mat>
-t_mat unity(std::size_t N1, std::size_t N2)
+t_mat unit(std::size_t N1, std::size_t N2)
 requires is_mat<t_mat>
 {
 	t_mat mat;
 	if constexpr(is_dyn_mat<t_mat>)
 		mat = t_mat(N1, N2);
 
-	unity<t_mat>(mat, 0,0, mat.size1(),mat.size2());
+	unit<t_mat>(mat, 0,0, mat.size1(),mat.size2());
 	return mat;
 }
 
@@ -118,10 +144,10 @@ requires is_mat<t_mat>
  * unit matrix
  */
 template<class t_mat>
-t_mat unity(std::size_t N=0)
+t_mat unit(std::size_t N=0)
 requires is_mat<t_mat>
 {
-	return unity<t_mat>(N,N);
+	return unit<t_mat>(N,N);
 }
 
 
@@ -245,7 +271,7 @@ requires is_basic_vec<t_vec>
 
 
 /**
- * create matrix from nested initializer_lists in columns[rows] order
+ * create matrix from nested initializer_lists in columns/rows order
  */
 template<class t_mat,
 	template<class...> class t_cont_outer = std::initializer_list,
@@ -256,7 +282,7 @@ requires is_mat<t_mat>
 	const std::size_t iCols = lst.size();
 	const std::size_t iRows = lst.begin()->size();
 
-	t_mat mat = unity<t_mat>(iRows, iCols);
+	t_mat mat = unit<t_mat>(iRows, iCols);
 
 	auto iterCol = lst.begin();
 	for(std::size_t iCol=0; iCol<iCols; ++iCol)
@@ -285,7 +311,7 @@ requires is_mat<t_mat> && is_basic_vec<t_vec>
 	const std::size_t iCols = lst.size();
 	const std::size_t iRows = lst.begin()->size();
 
-	t_mat mat = unity<t_mat>(iRows, iCols);
+	t_mat mat = unit<t_mat>(iRows, iCols);
 
 	auto iterCol = lst.begin();
 	for(std::size_t iCol=0; iCol<iCols; ++iCol)
@@ -309,7 +335,7 @@ requires is_mat<t_mat>
 {
 	const std::size_t N = std::sqrt(lst.size());
 
-	t_mat mat = unity<t_mat>(N, N);
+	t_mat mat = unit<t_mat>(N, N);
 
 	auto iter = lst.begin();
 	for(std::size_t iRow=0; iRow<N; ++iRow)
@@ -361,7 +387,7 @@ requires is_mat<t_mat> && is_basic_vec<t_vec>
 
 
 /**
- * inner product
+ * inner product <vec1|vec2>
  */
 template<class t_vec>
 typename t_vec::value_type inner(const t_vec& vec1, const t_vec& vec2)
@@ -370,7 +396,44 @@ requires is_basic_vec<t_vec>
 	typename t_vec::value_type val(0);
 
 	for(std::size_t i=0; i<vec1.size(); ++i)
-		val += vec1[i]*vec2[i];
+	{
+		if constexpr(is_complex<typename t_vec::value_type>)
+			val += std::conj(vec1[i]) * vec2[i];
+		else
+			val += vec1[i] * vec2[i];
+	}
+
+	return val;
+}
+
+
+/**
+ * inner product between two vectors of different type
+ */
+template<class t_vec1, class t_vec2>
+typename t_vec1::value_type inner(const t_vec1& vec1, const t_vec2& vec2)
+requires is_basic_vec<t_vec1> && is_basic_vec<t_vec2>
+{
+	if(vec1.size()==0 || vec2.size()==0)
+		return typename t_vec1::value_type{};
+
+	// first element
+	auto val = vec1[0]*vec2[0];
+
+	// remaining elements
+	for(std::size_t i=1; i<std::min(vec1.size(), vec2.size()); ++i)
+	{
+		if constexpr(is_complex<typename t_vec1::value_type>)
+		{
+			auto prod = std::conj(vec1[i]) * vec2[i];
+			val = val + prod;
+		}
+		else
+		{
+			auto prod = vec1[i]*vec2[i];
+			val = val + prod;
+		}
+	}
 
 	return val;
 }
@@ -403,7 +466,12 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 
 	for(std::size_t n1=0; n1<N1; ++n1)
 		for(std::size_t n2=0; n2<N2; ++n2)
-			mat(n1, n2) = vec1[n1]*vec2[n2];
+		{
+			if constexpr(is_complex<typename t_vec::value_type>)
+				mat(n1, n2) = std::conj(vec1[n1]) * vec2[n2];
+			else
+				mat(n1, n2) = vec1[n1]*vec2[n2];
+		}
 
 	return mat;
 }
@@ -546,6 +614,28 @@ requires is_vec<t_vec>
 
 
 /**
+ * project vector vec onto another vector vecProj
+ * don't multiply with direction vector
+ */
+template<class t_vec>
+typename t_vec::value_type
+project_scalar(const t_vec& vec, const t_vec& vecProj, bool bIsNormalised = true)
+requires is_vec<t_vec>
+{
+	if(bIsNormalised)
+	{
+		return inner<t_vec>(vec, vecProj);
+	}
+	else
+	{
+		const auto len = norm<t_vec>(vecProj);
+		const t_vec _vecProj = vecProj / len;
+		return inner<t_vec>(vec, _vecProj);
+	}
+}
+
+
+/**
  * project vector vec onto the line lineOrigin + lam*lineDir
  * shift line to go through origin, calculate projection and shift back
  * returns [closest point, distance]
@@ -573,7 +663,7 @@ t_mat ortho_projector(const t_vec& vec, bool bIsNormalised = true)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	const std::size_t iSize = vec.size();
-	return unity<t_mat>(iSize) -
+	return unit<t_mat>(iSize) -
 		projector<t_mat, t_vec>(vec, bIsNormalised);
 }
 
@@ -589,7 +679,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	using T = typename t_vec::value_type;
 	const std::size_t iSize = vec.size();
 
-	return unity<t_mat>(iSize) -
+	return unit<t_mat>(iSize) -
 		T(2)*projector<t_mat, t_vec>(vec, bIsNormalised);
 }
 
@@ -618,7 +708,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 	// nothing to do -> return unit matrix
 	if(equals_0<t_vec>(vecOp))
-		return unity<t_mat>(vecOp.size(), vecOp.size());
+		return unit<t_mat>(vecOp.size(), vecOp.size());
 
 	return ortho_mirror_op<t_mat, t_vec>(vecOp, false);
 }
@@ -638,7 +728,7 @@ requires is_mat<t_mat> && is_vec<t_vec>
 	const std::size_t N = std::min(cols, rows);
 
 	t_mat R = mat;
-	t_mat Q = unity<t_mat>(N, N);
+	t_mat Q = unit<t_mat>(N, N);
 
 	for(std::size_t icol=0; icol<N-1; ++icol)
 	{
@@ -830,6 +920,24 @@ requires is_mat<t_mat>
 
 
 /**
+ * trace
+ */
+template<class t_mat>
+typename t_mat::value_type trace(const t_mat& mat)
+requires is_mat<t_mat>
+{
+	using T = typename t_mat::value_type;
+	T _tr = T(0);
+
+	std::size_t N = std::min(mat.size1(), mat.size2());
+	for(std::size_t i=0; i<N; ++i)
+		_tr += mat(i,i);
+
+	return _tr;
+}
+
+
+/**
  * inverted matrix
  */
 template<class t_mat>
@@ -979,9 +1087,43 @@ requires is_vec<t_vec>
 
 
 /**
+ * intersection of a sphere  and a line |org> + lam*|dir>
+ * returns vector of intersections
+ * insert |x> = |org> + lam*|dir> in sphere equation <x-mid | x-mid> = r^2
+ * For solution, see: https://en.wikipedia.org/wiki/Line%E2%80%93sphere_intersection
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+t_cont<t_vec>
+intersect_line_sphere(
+	const t_vec& lineOrg, const t_vec& lineDir,
+	const t_vec& sphereOrg, typename t_vec::value_type sphereRad,
+	bool bLineDirIsNormalised = false)
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	auto vecDiff = sphereOrg-lineOrg;
+	auto proj = project_scalar<t_vec>(vecDiff, lineDir, bLineDirIsNormalised);
+	auto rt = proj*proj + sphereRad*sphereRad - inner<t_vec>(vecDiff, vecDiff);
+
+	// no intersection
+	if(rt < T(0)) return t_cont<t_vec>{};
+
+	// one intersection
+	if(equals(rt, T(0))) return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
+
+	// two intersections
+	auto val = std::sqrt(rt);
+	auto lam1 = proj + val;
+	auto lam2 = proj - val;
+	return t_cont<t_vec>{{ lineOrg + lam1*lineDir, lineOrg + lam2*lineDir }};
+}
+
+
+/**
  * average vector or matrix
  */
-template<class ty, template<class ...> class t_cont = std::vector>
+template<class ty, template<class...> class t_cont = std::vector>
 ty avg(const t_cont<ty>& vecs)
 requires is_vec<ty> || is_mat<ty>
 {
@@ -1057,6 +1199,28 @@ requires is_vec<t_vec>
 
 	// intersects with polygon
 	return std::make_tuple(vec, true, lam);
+}
+
+
+/**
+ * intersection of a polygon (transformed with a matrix) and a line
+ * returns [position of intersection, intersects?, line parameter lambda]
+ */
+template<class t_vec, class t_mat, template<class ...> class t_cont = std::vector>
+std::tuple<t_vec, bool, typename t_vec::value_type>
+intersect_line_poly(
+	const t_vec& lineOrg, const t_vec& lineDir,
+	const t_cont<t_vec>& _poly, const t_mat& mat)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	auto poly = _poly;
+
+	// transform each vertex of the polygon
+	// TODO: check for homogeneous coordinates!
+	for(t_vec& vec : poly)
+		vec = mat * vec;
+
+	return intersect_line_poly<t_vec, t_cont>(lineOrg, lineDir, poly);
 }
 
 
@@ -1292,7 +1456,7 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 
 	// if static matrix is larger than 3x3 (e.g. for homogeneous coordinates), initialise as identity
 	if(mat.size1() > 3 || mat.size2() > 3)
-		mat = unity<t_mat>(mat.size1(), mat.size2());
+		mat = unit<t_mat>(mat.size1(), mat.size2());
 
 	mat(0,0) = 0; 		mat(0,1) = -vec[2]; 	mat(0,2) = vec[1];
 	mat(1,0) = vec[2]; 	mat(1,1) = 0; 			mat(1,2) = -vec[0];
@@ -1342,7 +1506,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	t_mat matProj = matProj1 + matProj2 + matProj3;
 
 	// if matrix is larger than 3x3 (e.g. for homogeneous cooridnates), fill up with identity
-	unity<t_mat>(matProj, 3,3, matProj.size1(), matProj.size2());
+	unit<t_mat>(matProj, 3,3, matProj.size1(), matProj.size2());
 	return matProj;
 }
 
@@ -1355,19 +1519,30 @@ t_mat rotation(const t_vec& vec1, const t_vec& vec2)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	using t_real = typename t_vec::value_type;
+	constexpr t_real eps = 1e-6;
 
 	// rotation axis
 	t_vec axis = cross<t_vec>({ vec1, vec2 });
 	const t_real lenaxis = norm<t_vec>(axis);
 
-	// collinear vectors?
-	if(equals<t_real>(std::fmod(lenaxis, pi<t_real>), 0))
-		return unity<t_mat>(vec1.size());
-
 	// rotation angle
 	const t_real angle = std::atan2(lenaxis, inner<t_vec>(vec1, vec2));
-	axis /= lenaxis;
+	//std::cout << angle << " " << std::fmod(angle, pi<t_real>) << std::endl;
 
+	// collinear vectors?
+	if(equals<t_real>(angle, 0, eps))
+		return unit<t_mat>(vec1.size());
+	// antiparallel vectors?
+	if(equals<t_real>(std::abs(angle), pi<t_real>, eps))
+	{
+		t_mat mat = -unit<t_mat>(vec1.size());
+		// e.g. homogeneous coordinates -> only have -1 on the first 3 diagonal elements
+		for(std::size_t i=3; i<std::min(mat.size1(), mat.size2()); ++i)
+			mat(i,i) = 1;
+		return mat;
+	}
+
+	axis /= lenaxis;
 	t_mat mat = rotation<t_mat, t_vec>(axis, angle, true);
 	return mat;
 }
@@ -1756,6 +1931,267 @@ requires is_vec<t_vec>
 
 
 /**
+ * create a disk
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_disk(typename t_vec::value_type r = 1, std::size_t num_points=32)
+requires is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+
+	// vertices
+	t_cont<t_vec> vertices;
+
+	// inner vertex
+	//vertices.push_back(create<t_vec>({ 0, 0, 0 }));
+	for(std::size_t pt=0; pt<num_points; ++pt)
+	{
+		const t_real phi = t_real(pt)/t_real(num_points) * t_real(2)*pi<t_real>;
+		const t_real c = std::cos(phi);
+		const t_real s = std::sin(phi);
+
+		// outer vertices
+		t_vec vert = create<t_vec>({ r*c, r*s, 0 });
+		vertices.emplace_back(std::move(vert));
+	}
+
+	// faces, normals & uvs
+	t_cont<t_cont<std::size_t>> faces;
+	t_cont<t_vec> normals;
+	t_cont<t_cont<t_vec>> uvs;	// TODO
+
+	// directly generate triangles
+	/*for(std::size_t face=0; face<num_points; ++face)
+	{
+		std::size_t idx0 = face + 1;	// outer 1
+		std::size_t idx1 = (face == num_points-1 ? 1 : face + 2);	// outer 2
+		std::size_t idx2 = 0;	// inner
+
+		faces.push_back({ idx0, idx1, idx2 });
+	}*/
+
+	t_cont<std::size_t> face(num_points);
+	std::iota(face.begin(), face.end(), 0);
+	faces.push_back(face);
+	normals.push_back(create<t_vec>({0,0,1}));
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+/**
+ * create a cone
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_cone(typename t_vec::value_type r = 1, typename t_vec::value_type h = 1,
+	bool bWithCap = true, std::size_t num_points = 32)
+requires is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+
+	// vertices
+	t_cont<t_vec> vertices;
+
+	// inner vertex
+	vertices.push_back(create<t_vec>({ 0, 0, h }));
+
+	for(std::size_t pt=0; pt<num_points; ++pt)
+	{
+		const t_real phi = t_real(pt)/t_real(num_points) * t_real(2)*pi<t_real>;
+		const t_real c = std::cos(phi);
+		const t_real s = std::sin(phi);
+
+		// outer vertices
+		t_vec vert = create<t_vec>({ r*c, r*s, 0 });
+		vertices.emplace_back(std::move(vert));
+	}
+
+	// faces, normals & uvs
+	t_cont<t_cont<std::size_t>> faces;
+	t_cont<t_vec> normals;
+	t_cont<t_cont<t_vec>> uvs;	// TODO
+
+	for(std::size_t face=0; face<num_points; ++face)
+	{
+			std::size_t idx0 = face + 1;	// outer 1
+			std::size_t idx1 = (face == num_points-1 ? 1 : face + 2);	// outer 2
+			std::size_t idx2 = 0;	// inner
+
+			faces.push_back({ idx0, idx1, idx2 });
+
+
+			t_vec n = cross<t_vec>({vertices[idx2]-vertices[idx0], vertices[idx1]-vertices[idx0]});
+			n /= norm<t_vec>(n);
+
+			normals.push_back(n);
+	}
+
+
+	if(bWithCap)
+	{
+		const auto [disk_vertices, disk_faces, disk_normals, disk_uvs] = create_disk<t_vec, t_cont>(r, num_points);
+
+		// vertex indices have to be adapted for merging
+		const std::size_t vert_start_idx = vertices.size();
+		vertices.insert(vertices.end(), disk_vertices.begin(), disk_vertices.end());
+
+		auto disk_faces_bottom = disk_faces;
+		for(auto& disk_face : disk_faces_bottom)
+		{
+			for(auto& disk_face_idx : disk_face)
+				disk_face_idx += vert_start_idx;
+			std::reverse(disk_face.begin(), disk_face.end());
+		}
+		faces.insert(faces.end(), disk_faces_bottom.begin(), disk_faces_bottom.end());
+
+		for(const auto& normal : disk_normals)
+			normals.push_back(-normal);
+
+		uvs.insert(uvs.end(), disk_uvs.begin(), disk_uvs.end());
+	}
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+/**
+ * create a cylinder
+ * cyltype: 0 (no caps), 1 (with caps), 2 (arrow)
+ * returns [vertices, face vertex indices, face normals, face uvs]
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
+create_cylinder(typename t_vec::value_type r = 1, typename t_vec::value_type h = 1,
+	int cyltype = 0, std::size_t num_points = 32,
+	typename t_vec::value_type arrow_r = 1.5, typename t_vec::value_type arrow_h = 0.5)
+requires is_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+
+	// vertices
+	t_cont<t_vec> vertices;
+	t_cont<t_real> vertices_u;
+
+	for(std::size_t pt=0; pt<num_points; ++pt)
+	{
+		const t_real u = t_real(pt)/t_real(num_points);
+		const t_real phi = u * t_real(2)*pi<t_real>;
+		const t_real c = std::cos(phi);
+		const t_real s = std::sin(phi);
+
+		t_vec top = create<t_vec>({ r*c, r*s, h*t_real(0.5) });
+		t_vec bottom = create<t_vec>({ r*c, r*s, -h*t_real(0.5) });
+
+		vertices.emplace_back(std::move(top));
+		vertices.emplace_back(std::move(bottom));
+
+		vertices_u.push_back(u);
+	}
+
+	// faces, normals & uvs
+	t_cont<t_cont<std::size_t>> faces;
+	t_cont<t_vec> normals;
+	t_cont<t_cont<t_vec>> uvs;
+
+	for(std::size_t face=0; face<num_points; ++face)
+	{
+		std::size_t idx0 = face*2 + 0;	// top 1
+		std::size_t idx1 = face*2 + 1;	// bottom 1
+		std::size_t idx2 = (face >= num_points-1 ? 1 : face*2 + 3);	// bottom 2
+		std::size_t idx3 = (face >= num_points-1 ? 0 : face*2 + 2);	// top 2
+
+		t_vec n = cross<t_vec>({vertices[idx3]-vertices[idx0], vertices[idx1]-vertices[idx0]});
+		n /= norm<t_vec>(n);
+
+		faces.push_back({ idx0, idx1, idx2, idx3 });
+		normals.emplace_back(std::move(n));
+
+
+		t_real u1 = vertices_u[idx0];
+		t_real u2 = (face >= num_points-1 ? 1 : vertices_u[idx3]);
+		uvs.push_back({ create<t_vec>({u1,1}), create<t_vec>({u1,0}),
+			create<t_vec>({u2,0}), create<t_vec>({u2,1}) });
+	}
+
+
+	if(cyltype > 0)
+	{
+		const auto [disk_vertices, disk_faces, disk_normals, disk_uvs] = create_disk<t_vec, t_cont>(r, num_points);
+
+		// bottom lid
+		// vertex indices have to be adapted for merging
+		std::size_t vert_start_idx = vertices.size();
+		const t_vec top = create<t_vec>({ 0, 0, h*t_real(0.5) });
+
+		for(const auto& disk_vert : disk_vertices)
+			vertices.push_back(disk_vert - top);
+
+		auto disk_faces_bottom = disk_faces;
+		for(auto& disk_face : disk_faces_bottom)
+		{
+			for(auto& disk_face_idx : disk_face)
+				disk_face_idx += vert_start_idx;
+			std::reverse(disk_face.begin(), disk_face.end());
+		}
+		faces.insert(faces.end(), disk_faces_bottom.begin(), disk_faces_bottom.end());
+
+		for(const auto& normal : disk_normals)
+			normals.push_back(-normal);
+
+		uvs.insert(uvs.end(), disk_uvs.begin(), disk_uvs.end());
+
+
+		vert_start_idx = vertices.size();
+
+		if(cyltype == 1)	// top lid
+		{
+			for(const auto& disk_vert : disk_vertices)
+				vertices.push_back(disk_vert + top);
+
+			auto disk_faces_top = disk_faces;
+			for(auto& disk_face : disk_faces_top)
+				for(auto& disk_face_idx : disk_face)
+					disk_face_idx += vert_start_idx;
+			faces.insert(faces.end(), disk_faces_top.begin(), disk_faces_top.end());
+
+			for(const auto& normal : disk_normals)
+				normals.push_back(normal);
+
+			uvs.insert(uvs.end(), disk_uvs.begin(), disk_uvs.end());
+		}
+		else if(cyltype == 2)	// arrow top
+		{
+			// no need to cap the arrow if the radii are equal
+			bool bConeCap = !equals<t_real>(r, arrow_r);
+
+			const auto [cone_vertices, cone_faces, cone_normals, cone_uvs] =
+				create_cone<t_vec, t_cont>(arrow_r, arrow_h, bConeCap, num_points);
+
+			for(const auto& cone_vert : cone_vertices)
+				vertices.push_back(cone_vert + top);
+
+			auto cone_faces_top = cone_faces;
+			for(auto& cone_face : cone_faces_top)
+				for(auto& cone_face_idx : cone_face)
+					cone_face_idx += vert_start_idx;
+			faces.insert(faces.end(), cone_faces_top.begin(), cone_faces_top.end());
+
+			for(const auto& normal : cone_normals)
+				normals.push_back(normal);
+
+			uvs.insert(uvs.end(), cone_uvs.begin(), cone_uvs.end());
+		}
+	}
+
+	return std::make_tuple(vertices, faces, normals, uvs);
+}
+
+
+/**
  * create the faces of a cube
  * returns [vertices, face vertex indices, face normals, face uvs]
  */
@@ -2111,6 +2547,38 @@ requires is_mat<t_mat>
 	});
 }
 
+
+/**
+ * translation matrix in homogeneous coordinates
+ */
+template<class t_mat, class t_real = typename t_mat::value_type>
+t_mat hom_translation(t_real x, t_real y, t_real z)
+requires is_mat<t_mat>
+{
+	return create<t_mat>({
+		1., 	0., 	0., 	x,
+		0., 	1., 	0., 	y,
+		0.,		0.,		1., 	z,
+		0.,		0.,		0.,		1.
+	});
+}
+
+
+/**
+ * scaling matrix in homogeneous coordinates
+ */
+template<class t_mat, class t_real = typename t_mat::value_type>
+t_mat hom_scaling(t_real x, t_real y, t_real z)
+requires is_mat<t_mat>
+{
+	return create<t_mat>({
+		x, 		0., 	0., 	0.,
+		0., 	y, 		0., 	0.,
+		0.,		0.,		z, 		0.,
+		0.,		0.,		0.,		1.
+	});
+}
+
 // ----------------------------------------------------------------------------
 
 
@@ -2126,12 +2594,12 @@ requires is_mat<t_mat>
  */
 template<class t_mat>
 const t_mat& su2_matrix(std::size_t which)
-requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
+requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 {
 	using t_cplx = typename t_mat::value_type;
-	const t_cplx c0(0,0);
-	const t_cplx c1(1,0);
-	const t_cplx cI(0,1);
+	constexpr t_cplx c0(0,0);
+	constexpr t_cplx c1(1,0);
+	constexpr t_cplx cI(0,1);
 
 	static const t_mat mat[] =
 	{
@@ -2145,15 +2613,52 @@ requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
 
 
 /**
+ * get a vector of pauli matrices
+ */
+template<class t_vec>
+t_vec su2_matrices(bool bIncludeUnit = false)
+requires is_basic_vec<t_vec> && is_mat<typename t_vec::value_type>
+	&& is_complex<typename t_vec::value_type::value_type>
+{
+	using t_mat = typename t_vec::value_type;
+
+	t_vec vec;
+	if(bIncludeUnit)
+		vec.emplace_back(unit<t_mat>(2));
+	for(std::size_t i=0; i<3; ++i)
+		vec.emplace_back(su2_matrix<t_mat>(i));
+
+	return vec;
+}
+
+
+/**
+ * project the vector of SU(2) matrices onto a vector
+ * proj = <sigma|vec>
+ */
+template<class t_vec, class t_mat>
+t_mat proj_su2(const t_vec& vec, bool bIsNormalised=1)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	typename t_vec::value_type len = 1;
+	if(!bIsNormalised)
+		len = norm<t_vec>(vec);
+
+	const auto sigma = su2_matrices<std::vector<t_mat>>(false);
+	return inner<std::vector<t_mat>, t_vec>(sigma, vec);
+}
+
+
+/**
  * SU(2) ladders
  */
 template<class t_mat>
 const t_mat& su2_ladder(std::size_t which)
-requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
+requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 {
 	using t_cplx = typename t_mat::value_type;
-	const t_cplx cI(0,1);
-	const t_cplx c05(0.5, 0);
+	constexpr t_cplx cI(0,1);
+	constexpr t_cplx c05(0.5, 0);
 
 	static const t_mat mat[] =
 	{
@@ -2171,15 +2676,15 @@ requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
  */
 template<class t_mat>
 const t_mat& su3_matrix(std::size_t which)
-requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
+requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 {
 	using t_cplx = typename t_mat::value_type;
 	using t_real = typename t_cplx::value_type;
-	const t_cplx c0(0,0);
-	const t_cplx c1(1,0);
-	const t_cplx c2(2,0);
-	const t_cplx cI(0,1);
-	const t_real s3 = std::sqrt(3.);
+	constexpr t_cplx c0(0,0);
+	constexpr t_cplx c1(1,0);
+	constexpr t_cplx c2(2,0);
+	constexpr t_cplx cI(0,1);
+	constexpr t_real s3 = std::sqrt(3.);
 
 	static const t_mat mat[] =
 	{
@@ -2198,37 +2703,89 @@ requires is_mat<t_mat> /*&& is_complex<typename t_mat::value_type>*/
 
 
 /**
+ * crystallographic B matrix, B = 2pi * A^(-T)
+ * after: https://en.wikipedia.org/wiki/Fractional_coordinates
+ */
+template<class t_mat, class t_real = typename t_mat::value_type>
+t_mat B_matrix(t_real a, t_real b, t_real c, t_real _aa, t_real _bb, t_real _cc)
+requires is_mat<t_mat>
+{
+	const t_real sc = std::sin(_cc);
+	const t_real ca = std::cos(_aa);
+	const t_real cb = std::cos(_bb);
+	const t_real cc = std::cos(_cc);
+	const t_real rr = std::sqrt(1. + 2.*ca*cb*cc - (ca*ca + cb*cb + cc*cc));
+
+	return t_real(2)*pi<t_real> * create<t_mat>({
+		1./a,				0.,				0.,
+		-1./a * cc/sc,		1./b * 1./sc,			0.,
+		(cc*ca - cb)/(a*sc*rr), 	(cb*cc-ca)/(b*sc*rr),		sc/(c*rr)
+	});
+}
+
+
+/**
  * general structure factor calculation
  * e.g. type T as vector (complex number) for magnetic (nuclear) structure factor
+ * Ms_or_bs:
+	- nuclear scattering lengths for nuclear neutron scattering or
+	- atomic form factors for x-ray scattering
+	- magnetisation (* magnetic form factor) for magnetic neutron scattering
+ * Rs: atomic positions
+ * Q: scattering vector G for nuclear scattering or G+k for magnetic scattering with propagation vector k
+ * fs: optional magnetic form factors
  */
 template<class t_vec, class T = t_vec, template<class...> class t_cont = std::vector,
 	class t_cplx = std::complex<double>>
-T structure_factor(const t_cont<T>& Ms_or_bs, const t_cont<t_vec>& Rs, const t_vec& Q)
+T structure_factor(const t_cont<T>& Ms_or_bs, const t_cont<t_vec>& Rs, const t_vec& Q, const t_vec* fs=nullptr)
 requires is_basic_vec<t_vec>
 {
 	using t_real = typename t_cplx::value_type;
-	const t_cplx cI(0,1);
-	const t_real twopi = pi<t_real> * t_real(2);
+	constexpr t_cplx cI(0,1);
+	constexpr t_real twopi = pi<t_real> * t_real(2);
+	constexpr t_real expsign = -1;
 
 	T F;
 	if constexpr(is_vec<T>)
 		F = zero<T>(Rs.begin()->size());	// always 3 dims...
-	else /*if constexpr(is_complex<T>)*/
+	else if constexpr(is_complex<T>)
 		F = T(0);
 
 	auto iterM_or_b = Ms_or_bs.begin();
 	auto iterR = Rs.begin();
+	typename t_vec::const_iterator iterf;
+	if(fs) iterf = fs->begin();
 
 	while(iterM_or_b != Ms_or_bs.end() && iterR != Rs.end())
 	{
-		F += (*iterM_or_b) * std::exp(-cI * twopi * inner<t_vec>(Q, *iterR));
+		// if form factors are given, use them, otherwise set to 1
+		t_real f = t_real(1);
+		if(fs)
+		{
+			auto fval = *iterf;
+			if constexpr(is_complex<decltype(fval)>)
+				f = fval.real();
+			else
+				f = fval;
+		}
+
+		// structure factor
+		F += (*iterM_or_b) * f * std::exp(expsign * cI * twopi * inner<t_vec>(Q, *iterR));
 
 		// next M or b if available (otherwise keep current)
 		auto iterM_or_b_next = std::next(iterM_or_b, 1);
 		if(iterM_or_b_next != Ms_or_bs.end())
 			iterM_or_b = iterM_or_b_next;
 
-		// next atom position
+		if(fs)
+		{
+			// next form factor if available (otherwise keep current)
+			auto iterf_next = std::next(iterf, 1);
+			if(iterf_next != fs->end())
+				iterf = iterf_next;
+		}
+
+		// next atomic position
 		std::advance(iterR, 1);
 	}
 
@@ -2239,5 +2796,174 @@ requires is_basic_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 
+
+
+// ----------------------------------------------------------------------------
+// polarisation
+// ----------------------------------------------------------------------------
+
+
+/**
+ * conjugate complex vector
+ */
+template<class t_vec>
+t_vec conj(const t_vec& vec)
+requires is_basic_vec<t_vec>
+{
+	const std::size_t N = vec.size();
+	t_vec vecConj = zero<t_vec>(N);
+
+	for(std::size_t iComp=0; iComp<N; ++iComp)
+	{
+		if constexpr(is_complex<typename t_vec::value_type>)
+			vecConj[iComp] = std::conj(vec[iComp]);
+		else	// simply copy non-complex vector
+			vecConj[iComp] = vec[iComp];
+	}
+
+	return vecConj;
+}
+
+
+/**
+ * hermitian conjugate complex matrix
+ */
+template<class t_mat>
+t_mat herm(const t_mat& mat)
+requires is_basic_mat<t_mat>
+{
+	t_mat mat2;
+	if constexpr(is_dyn_mat<t_mat>)
+		mat2 = t_mat(mat.size2(), mat.size1());
+
+	for(std::size_t i=0; i<mat.size1(); ++i)
+		for(std::size_t j=0; j<mat.size2(); ++j)
+		{
+			if constexpr(is_complex<typename t_mat::value_type>)
+				mat2(j,i) = std::conj(mat(i,j));
+			else	// simply transpose non-complex matrix
+				mat2(j,i) = mat(i,j);
+		}
+
+	return mat2;
+}
+
+
+/**
+ * polarisation density matrix
+ *
+ * eigenvector expansion of a state: |psi> = a_i |xi_i>
+ * mean value of operator with mixed states:
+ * <A> = p_i * <a_i|A|a_i>
+ * <A> = tr( A * p_i * |a_i><a_i| )
+ * <A> = tr( A * rho )
+ * polarisation density matrix: rho = 0.5 * (1 + <P|sigma>)
+ */
+template<class t_vec, class t_mat>
+t_mat pol_density_mat(const t_vec& P, typename t_vec::value_type c=0.5)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	return (unit<t_mat>(2,2) + proj_su2<t_vec, t_mat>(P, true)) * c;
+}
+
+
+/**
+ * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - p. 225)
+ * returns scattering intensity and final polarisation vector
+ */
+template<class t_vec, typename t_cplx = typename t_vec::value_type>
+std::tuple<t_cplx, t_vec> blume_maleev(const t_vec& P_i, const t_vec& Mperp, const t_cplx& N)
+requires is_vec<t_vec>
+{
+	const t_vec MperpConj = conj(Mperp);
+	const t_cplx NConj = std::conj(N);
+	constexpr t_cplx imag(0, 1);
+
+	// ------------------------------------------------------------------------
+	// intensity
+	// nuclear
+	t_cplx I = N*NConj;
+
+	// nuclear-magnetic
+	I += NConj*inner<t_vec>(P_i, Mperp);
+	I += N*inner<t_vec>(Mperp, P_i);
+
+	// magnetic, non-chiral
+	I += inner<t_vec>(Mperp, Mperp);
+
+	// magnetic, chiral
+	I += -imag * inner<t_vec>(P_i, cross<t_vec>({ Mperp, MperpConj }));
+	// ------------------------------------------------------------------------
+
+	// ------------------------------------------------------------------------
+	// polarisation vector
+	// nuclear
+	t_vec P_f = P_i * N*NConj;
+
+	// nuclear-magnetic
+	P_f += NConj * Mperp;
+	P_f += N * MperpConj;
+	P_f += imag * N * cross<t_vec>({ P_i, MperpConj });
+	P_f += -imag * NConj * cross<t_vec>({ P_i, Mperp });
+
+	// magnetic, non-chiral
+	P_f += Mperp * inner<t_vec>(Mperp, P_i);
+	P_f += MperpConj * inner<t_vec>(P_i, Mperp);
+	P_f += -P_i * inner<t_vec>(Mperp, Mperp);
+
+	// magnetic, chiral
+	P_f += imag * cross<t_vec>({ Mperp, MperpConj });
+	// ------------------------------------------------------------------------
+
+	return std::make_tuple(I, P_f/I);
+}
+
+
+/**
+ * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - p. 225)
+ * calculate indirectly with density matrix
+ *
+ * V   = N*1 + <Mperp|sigma>
+ * I   = 0.5 * tr( V^H V rho )
+ * P_f = 0.5 * tr( V^H sigma V rho ) / I
+ *
+ * returns scattering intensity and final polarisation vector
+ */
+template<class t_mat, class t_vec, typename t_cplx = typename t_vec::value_type>
+std::tuple<t_cplx, t_vec> blume_maleev_indir(const t_vec& P_i, const t_vec& Mperp, const t_cplx& N)
+requires is_mat<t_mat> && is_vec<t_vec>
+{
+	// spin-1/2
+	constexpr t_cplx c = 0.5;
+
+	// vector of pauli matrices
+	const auto sigma = su2_matrices<std::vector<t_mat>>(false);
+
+	// density matrix
+	const auto density = pol_density_mat<t_vec, t_mat>(P_i, c);
+
+	// potential
+	const auto V_mag = proj_su2<t_vec, t_mat>(Mperp, true);
+	const auto V_nuc = N * unit<t_mat>(2);
+	const auto V = V_nuc + V_mag;
+	const auto VConj = herm(V);
+
+	// scattering intensity
+	t_cplx I = c * trace(VConj*V * density/c);
+
+	// ------------------------------------------------------------------------
+	// scattered polarisation vector
+	const auto m0 = (VConj * sigma[0]) * V * density/c;
+	const auto m1 = (VConj * sigma[1]) * V * density/c;
+	const auto m2 = (VConj * sigma[2]) * V * density/c;
+
+	t_vec P_f = create<t_vec>({ c*trace(m0), c*trace(m1), c*trace(m2) });
+	// ------------------------------------------------------------------------
+
+	return std::make_tuple(I, P_f/I);
+}
+
+
+// ----------------------------------------------------------------------------
 }
 #endif
