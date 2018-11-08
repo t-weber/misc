@@ -493,7 +493,9 @@ void GlPlot::initializeGL()
 	pGl->glCullFace(GL_BACK);
 	pGl->glEnable(GL_CULL_FACE);
 
-	pGl->glEnable(GL_MULTISAMPLE | GL_LINE_SMOOTH | GL_POLYGON_SMOOTH);
+	pGl->glEnable(GL_MULTISAMPLE);
+	pGl->glEnable(GL_LINE_SMOOTH);
+	pGl->glEnable(GL_POLYGON_SMOOTH);
 	pGl->glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
 	pGl->glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
 

@@ -4,7 +4,7 @@
  * @date Nov-2017
  * @license: see 'LICENSE.GPL' file
  *
- *  * References:
+ * References:
  *  * http://doc.qt.io/qt-5/qopenglwidget.html#details
  *  * http://code.qt.io/cgit/qt/qtbase.git/tree/examples/opengl/threadedqopenglwidget
  */
