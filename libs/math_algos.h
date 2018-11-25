@@ -885,6 +885,21 @@ requires is_basic_vec<t_vec>
 	T fullDet = T(0);
 	std::size_t iRow = 0;
 
+	// get row with maximum number of zeros
+	std::size_t iMaxNumZeros = 0;
+	for(std::size_t iCurRow=0; iCurRow<iN; ++iCurRow)
+	{
+		std::size_t iNumZeros = 0;
+		for(std::size_t iCurCol=0; iCurCol<iN; ++iCurCol)
+		{
+			if(equals<T>(mat[iCurRow*iN + iCurCol], T(0)))
+				++iNumZeros;
+		}
+
+		if(iNumZeros > iMaxNumZeros)
+			iRow = iCurRow;
+	}
+
 	for(std::size_t iCol=0; iCol<iN; ++iCol)
 	{
 		const T elem = mat[iRow*iN + iCol];

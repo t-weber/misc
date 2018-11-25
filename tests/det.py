@@ -28,8 +28,10 @@ def det(M):
 		if (ROW+COL) % 2 != 0:
 			sign = -1.
 
-		Msub = np.delete(np.delete(M, ROW, 0), COL, 1)
-		d += sign*M[ROW, COL]*det(Msub)
+		newidx_1 = [i for i in range(0, NUMROWS) if i!=ROW]
+		newidx_2 = [j for j in range(0, NUMCOLS) if j!=COL]
+		Msub = M[newidx_1, :][:, newidx_2]
+		d += sign * M[ROW, COL] * det(Msub)
 
 	return d
 
@@ -39,8 +41,5 @@ import numpy.linalg as la
 
 mat1 = np.array([[1,2],[3,4]])
 mat2 = np.array([[1.5,2.2,3.1],[-4,5,-6],[7,-8,9]])
-print(det(mat1))
-print(la.det(mat1))
-
-print(det(mat2))
-print(la.det(mat2))
+print("det=%g, check=%g" % (det(mat1), la.det(mat1)))
+print("det=%g, check=%g" % (det(mat2), la.det(mat2)))

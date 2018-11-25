@@ -1,0 +1,52 @@
+#
+# determinant test
+# @date 24-nov-18
+# @author tweber
+# @license see 'LICENSE.EUPL' file
+#
+
+
+
+function d = mydet(M)
+	d = 0.;
+
+	NUMROWS = size(M, 1);
+	NUMCOLS = size(M, 2);
+
+	if NUMROWS != NUMCOLS
+		printf("Need square matrix!\n");
+		return;
+	endif
+
+	if NUMROWS == 0
+		d = 0.;
+		return;
+	elseif NUMROWS == 1
+		d = M(1, 1);
+		return;
+	endif
+
+	COL = 1;
+	for ROW = 1:NUMROWS
+		sign = 1.;
+		if mod(ROW+COL, 2) != 0
+			sign = -1.;
+		endif
+
+		Msub = M;
+		Msub([ROW], :) = [];
+		Msub(:, [COL]) = [];
+		d += sign * M(ROW, COL) * mydet(Msub);
+	endfor
+
+endfunction
+
+
+
+# test and comparison with bult-in det() function
+
+mat1 = [ 1,2 ; 3,4 ];
+mat2 = [ 1.5,2.2,3.1 ; -4,5,-6 ; 7,-8,9 ];
+
+printf("det=%g, check=%g\n", mydet(mat1), det(mat1));
+printf("det=%g, check=%g\n", mydet(mat2), det(mat2));
