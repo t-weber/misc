@@ -6,7 +6,6 @@
 #
 
 
-
 function d = mydet(M)
 	d = 0.;
 
@@ -18,6 +17,8 @@ function d = mydet(M)
 		return;
 	endif
 
+
+	# recursion end conditions
 	if NUMROWS == 0
 		d = 0.;
 		return;
@@ -26,7 +27,30 @@ function d = mydet(M)
 		return;
 	endif
 
+
+	# find the column with the most zeros
 	COL = 1;
+	maxZeros = 0;
+
+	for _COL = 1 : NUMCOLS
+		numZeros = 0;
+
+		for _ROW = 1 : NUMROWS
+			if M(_ROW, _COL) == 0.
+				numZeros += 1;
+			endif
+		endfor
+
+		if numZeros > maxZeros
+			COL = _COL;
+			maxZeros = numZeros;
+		endif
+	endfor
+
+	#printf("Using column %d.\n", COL);
+
+
+	# calculate determinant
 	for ROW = 1:NUMROWS
 		sign = 1.;
 		if mod(ROW+COL, 2) != 0
@@ -43,10 +67,11 @@ endfunction
 
 
 
+
 # test and comparison with bult-in det() function
 
 mat1 = [ 1,2 ; 3,4 ];
-mat2 = [ 1.5,2.2,3.1 ; -4,5,-6 ; 7,-8,9 ];
+mat2 = [ 1.5,2.2,0. ; -4,5,-6 ; 7,-8,9 ];
 
 printf("det=%g, check=%g\n", mydet(mat1), det(mat1));
 printf("det=%g, check=%g\n", mydet(mat2), det(mat2));

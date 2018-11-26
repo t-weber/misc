@@ -97,7 +97,6 @@ pt1 = [-0.5, 0];
 pt3 = [0.5, 0];
 pt2 = pt1 + rotatevec(pt2-pt1, 60.);
 points = [ pt1;pt2;pt3;pt1 ];
-NUMITER = 4;
 
 for i = 1 : NUMITER
 	points = kochiterate(points);

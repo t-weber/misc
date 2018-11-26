@@ -897,7 +897,10 @@ requires is_basic_vec<t_vec>
 		}
 
 		if(iNumZeros > iMaxNumZeros)
+		{
 			iRow = iCurRow;
+			iMaxNumZeros = iNumZeros;
+		}
 	}
 
 	for(std::size_t iCol=0; iCol<iN; ++iCol)
