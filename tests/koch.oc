@@ -1,0 +1,108 @@
+#
+# koch fractal test
+# @date 25-nov-18
+# @author tweber
+# @license see 'LICENSE.EUPL' file
+#
+
+
+#
+# draws 2d points stored in the rows of the matrix "points"
+#
+function plotpoints(points, file, min=-1, max=1)
+	fig = figure();
+
+	xlim([min, max]);
+	ylim([min, max]);
+	hold on;
+	box off;
+	axis off;
+
+	for pt = 1 : size(points, 1)-1
+		pt1 = points(pt, :);
+		pt2 = points(pt+1, :);
+		plot([pt1(1), pt2(1)], [pt1(2), pt2(2)], "-", "linewidth", 1., "color", [0,0,0]);
+	endfor
+
+	print(fig, file)
+endfunction
+
+
+
+#
+# rotates a 2d vector by a given angle
+#
+function retvec = rotatevec(vec, angle)
+	s = sin(angle / 180. * pi);
+	c = cos(angle / 180. * pi);
+
+	R = [ c, -s; s, c ];
+	retvec = (R*vec')';
+endfunction
+
+
+
+#
+# koch curve iteration
+#
+function newpoints = kochiterate(points)
+	newpoints = [];
+
+	for pt = 1 : size(points, 1)-1
+		pt1 = points(pt, :);
+		pt2 = points(pt+1, :);
+
+		origin = pt1;
+		dir = pt2 - pt1;
+
+		newpt1 = origin;
+		newpt2 = origin + dir/3.;
+		newpt3 = origin + dir/3. + rotatevec(dir/3., 60.);
+		newpt4 = origin + 2.*dir/3.;
+		newpt5 = origin + 3.*dir/3.;
+
+		newpoints = [ newpoints(:,:); newpt1; newpt2; newpt3; newpt4; newpt5 ];
+	endfor
+
+endfunction
+
+
+
+
+# -----------------------------------------------------------------------------
+# iteration depth
+NUMITER = 3;
+
+
+
+# plot linear koch curve
+pt1 = [-0.5, 0];
+pt2 = [0.5, 0];
+points = [ pt1; pt2 ];
+
+for i = 1 : NUMITER
+	points = kochiterate(points);
+endfor
+
+plotpoints(points, "kochlinear.pdf", -0.75, 0.75);
+
+
+
+# -----------------------------------------------------------------------------
+
+
+
+# plot triangular koch curve
+pt1 = [-0.5, 0];
+pt3 = [0.5, 0];
+pt2 = pt1 + rotatevec(pt2-pt1, 60.);
+points = [ pt1;pt2;pt3;pt1 ];
+NUMITER = 4;
+
+for i = 1 : NUMITER
+	points = kochiterate(points);
+endfor
+
+plotpoints(points, "kochtrig.pdf", -1, 1);
+# -----------------------------------------------------------------------------
+
