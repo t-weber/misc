@@ -6,7 +6,11 @@
 #
 
 
+global g_eps = 1e-6
+
+
 function d = mydet(M)
+	global g_eps
 	d = 0.;
 
 	NUMROWS = size(M, 1);
@@ -52,6 +56,12 @@ function d = mydet(M)
 
 	# calculate determinant
 	for ROW = 1:NUMROWS
+		elem = M(ROW, COL);
+
+		if abs(elem) <= g_eps
+			continue;
+		endif
+
 		sign = 1.;
 		if mod(ROW+COL, 2) != 0
 			sign = -1.;
@@ -60,7 +70,7 @@ function d = mydet(M)
 		Msub = M;
 		Msub([ROW], :) = [];
 		Msub(:, [COL]) = [];
-		d += sign * M(ROW, COL) * mydet(Msub);
+		d += sign * elem * mydet(Msub);
 	endfor
 
 endfunction
@@ -68,7 +78,7 @@ endfunction
 
 
 
-# test and comparison with bult-in det() function
+# test and comparison with built-in det() function
 
 mat1 = [ 1,2 ; 3,4 ];
 mat2 = [ 1.5,2.2,0. ; -4,5,-6 ; 7,-8,9 ];

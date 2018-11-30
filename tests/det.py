@@ -8,6 +8,9 @@
 import numpy as np
 
 
+g_eps = 1e-6
+
+
 def det(M):
 	NUMROWS = M.shape[0]
 	NUMCOLS = M.shape[1]
@@ -45,6 +48,10 @@ def det(M):
 	# calculate determinant
 	d = 0.
 	for ROW in range(0, NUMROWS):
+		elem = M[ROW, COL]
+		if np.abs(elem) <= g_eps:
+			continue
+
 		sign = 1.
 		if (ROW+COL) % 2 != 0:
 			sign = -1.
@@ -52,7 +59,7 @@ def det(M):
 		newidx_1 = [i for i in range(0, NUMROWS) if i!=ROW]
 		newidx_2 = [j for j in range(0, NUMCOLS) if j!=COL]
 		Msub = M[newidx_1, :][:, newidx_2]
-		d += sign * M[ROW, COL] * det(Msub)
+		d += sign * elem * det(Msub)
 
 	return d
 
