@@ -14,8 +14,9 @@
 #include <atomic>
 #include <chrono>
 #include <complex>
-#include <boost/asio.hpp>
 #include <iostream>
+#include <fstream>
+#include <boost/asio.hpp>
 
 
 using t_real = double;
@@ -32,7 +33,7 @@ bool is_in_circle(t_real rad, t_real x, t_real y)
 }
 
 
-bool is_in_mandel(t_real lim, std::size_t iter, t_real x, t_real y)
+std::tuple<bool, t_real> is_in_mandel(t_real lim, std::size_t iter, t_real x, t_real y)
 {
 	std::complex<t_real> z(0., 0.);
 	std::complex<t_real> pos(x, y);
@@ -40,7 +41,10 @@ bool is_in_mandel(t_real lim, std::size_t iter, t_real x, t_real y)
 	for(std::size_t i=0; i<iter; ++i)
 		z = z*z + pos;
 
-	return std::norm(z) <= lim*lim;
+	t_real norm = std::norm(z);
+	bool isinside = norm <= lim*lim;
+
+	return std::make_tuple(isinside, norm);
 }
 
 
@@ -105,10 +109,55 @@ t_real calc_area(t_real a, t_real b, t_func is_inside, std::size_t N, unsigned i
 }
 
 
+void plot_mandel(t_real start, t_real end, t_real delta, unsigned int Nthreads=4, unsigned int Niter=100)
+{
+	boost::asio::thread_pool tp{Nthreads};
+	unsigned Npixels = unsigned((end-start) / delta);
+	t_real* pixels = new t_real[Npixels * Npixels];
+
+	for(t_real y=start; y<=end; y+=delta)
+	{
+		boost::asio::post(tp, [y, start, end, delta, Niter, Npixels, pixels]() -> void
+		{
+			for(t_real x=start; x<=end; x+=delta)
+			{
+				auto [isinside, norm] = is_in_mandel(2., Niter, x, y);
+				if(!isinside)
+					norm = 0.;
+				else
+					norm = std::sqrt(norm);
+
+				unsigned pixX = (x-start) / delta;
+				unsigned pixY = (y-start) / delta;
+
+				if(pixY < Npixels && pixX < Npixels)
+					pixels[pixY*Npixels + pixX] = norm;
+			}
+		});
+	}
+
+	tp.join();
+
+
+	// plot "mandel.dat" using (($1/1000-0.5)*4):(($2/1000-0.5)*4):3 matrix with image
+	std::ofstream ofstr("mandel.dat");
+	for(unsigned y=0; y<Npixels; ++y)
+	{
+		for(unsigned x=0; x<Npixels; ++x)
+			ofstr << pixels[y*Npixels + x] << " ";
+		ofstr << "\n";
+	}
+
+	delete[] pixels;
+}
+
+
 int main()
 {
 	const std::size_t N = 100000;
 	std::cout.precision(8);
+
+	// ------------------------------------------------------------------------
 
 	{	// maximum number of supported threads
 		std::cout << "--------------------------------------------------------\n";
@@ -140,12 +189,14 @@ int main()
 	}
 
 
+	// ------------------------------------------------------------------------
+
 
 	// inscribed function
 	auto inscribed = [](t_real x, t_real y) -> bool
 	{
 		//return is_in_circle(1., x, y);
-		return is_in_mandel(2., 100, x, y);
+		return std::get<0>(is_in_mandel(2., 100, x, y));
 	};
 
 
@@ -172,6 +223,40 @@ int main()
 		std::cout << "area = " << calc_area(4., 4., inscribed, N, Nthreads) << std::endl;
 
 		auto dur = std::chrono::duration<t_real>{t_clock::now() - starttime};
+		std::cout << "Duration: "
+			<< std::chrono::duration<t_real>{t_clock::now() - starttime}.count()
+			<< " s" << std::endl;
+		std::cout << "--------------------------------------------------------\n";
+	}
+
+
+	// ------------------------------------------------------------------------
+
+
+	{	// maximum number of supported threads
+		std::cout << "--------------------------------------------------------\n";
+		const unsigned int Nthreads = std::thread::hardware_concurrency();
+		std::cout << "Using " << Nthreads << " thread(s)." << std::endl;
+
+		auto starttime = t_clock::now();
+		std::cout << "Plotting mandel..." << std::endl;
+		plot_mandel(-2., 2., 0.004, Nthreads, 100);
+
+		std::cout << "Duration: "
+			<< std::chrono::duration<t_real>{t_clock::now() - starttime}.count()
+			<< " s" << std::endl;
+		std::cout << "--------------------------------------------------------\n";
+	}
+
+	{	// only 1 thread (slower than threaded version!)
+		std::cout << "--------------------------------------------------------\n";
+		const unsigned int Nthreads = 1;
+		std::cout << "Using " << Nthreads << " thread(s)." << std::endl;
+
+		auto starttime = t_clock::now();
+		std::cout << "Plotting mandel..." << std::endl;
+		plot_mandel(-2., 2., 0.004, Nthreads, 100);
+
 		std::cout << "Duration: "
 			<< std::chrono::duration<t_real>{t_clock::now() - starttime}.count()
 			<< " s" << std::endl;
