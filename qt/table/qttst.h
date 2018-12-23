@@ -39,7 +39,9 @@ protected:
 	void MoveTabItemUp();
 	void MoveTabItemDown();
 
-	void ShowContextMenu(const QPoint& pt);
+	void TableCellChanged(int rowNew, int colNew, int rowOld, int colOld);
+	void TableCellEntered(const QModelIndex& idx);
+	void ShowTableContextMenu(const QPoint& pt);
 
 private:
 	int m_iCursorRow = -1;

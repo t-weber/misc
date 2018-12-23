@@ -25,7 +25,7 @@ TstDlg::TstDlg(QWidget* pParent) : QDialog{pParent}
 	m_pTab = new QTableWidget(m_pTabWidget);
 	m_pTab->setShowGrid(true);
 	m_pTab->setSortingEnabled(false);
-	m_pTab->setMouseTracking(false);
+	m_pTab->setMouseTracking(true);
 	m_pTab->setSelectionBehavior(QTableWidget::SelectRows);
 	m_pTab->setSelectionMode(QTableWidget::ContiguousSelection);
 	m_pTab->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -87,7 +87,9 @@ TstDlg::TstDlg(QWidget* pParent) : QDialog{pParent}
 	connect(m_pTabBtnDel, &QToolButton::clicked, this, &TstDlg::DelTabItem);
 	connect(m_pTabBtnUp, &QToolButton::clicked, this, &TstDlg::MoveTabItemUp);
 	connect(m_pTabBtnDown, &QToolButton::clicked, this, &TstDlg::MoveTabItemDown);
-	connect(m_pTab, &QTableWidget::customContextMenuRequested, this, &TstDlg::ShowContextMenu);
+	connect(m_pTab, &QTableWidget::currentCellChanged, this, &TstDlg::TableCellChanged);
+	connect(m_pTab, &QTableWidget::entered, this, &TstDlg::TableCellEntered);
+	connect(m_pTab, &QTableWidget::customContextMenuRequested, this, &TstDlg::ShowTableContextMenu);
 
 
 	// main grid
@@ -214,7 +216,19 @@ std::vector<int> TstDlg::GetSelectedRows(bool sort_reversed) const
 }
 
 
-void TstDlg::ShowContextMenu(const QPoint& pt)
+void TstDlg::TableCellChanged(int rowNew, int colNew, int rowOld, int colOld)
+{
+	std::cout << "row selected: " << rowNew << std::endl;
+}
+
+
+void TstDlg::TableCellEntered(const QModelIndex& idx)
+{
+	std::cout << "row entered: " << idx.row() << std::endl;
+}
+
+
+void TstDlg::ShowTableContextMenu(const QPoint& pt)
 {
 	const auto* item = m_pTab->itemAt(pt);
 	if(!item)
