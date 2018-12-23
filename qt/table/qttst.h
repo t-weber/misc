@@ -12,6 +12,7 @@
 #include <QDialog>
 #include <QTableWidget>
 #include <QToolButton>
+#include <QMenu>
 #include <vector>
 
 
@@ -30,11 +31,18 @@ protected:
 	QToolButton *m_pTabBtnUp = nullptr;
 	QToolButton *m_pTabBtnDown = nullptr;
 
+	QMenu *m_pTabContextMenu = nullptr;
+
 protected:
-	void AddTabItem();
+	void AddTabItem(int row = -1);
 	void DelTabItem();
 	void MoveTabItemUp();
 	void MoveTabItemDown();
+
+	void ShowContextMenu(const QPoint& pt);
+
+private:
+	int m_iCursorRow = -1;
 
 private:
 	std::vector<int> GetSelectedRows(bool sort_reversed = false) const;

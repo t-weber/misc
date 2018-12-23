@@ -25,8 +25,10 @@ TstDlg::TstDlg(QWidget* pParent) : QDialog{pParent}
 	m_pTab = new QTableWidget(m_pTabWidget);
 	m_pTab->setShowGrid(true);
 	m_pTab->setSortingEnabled(false);
+	m_pTab->setMouseTracking(false);
 	m_pTab->setSelectionBehavior(QTableWidget::SelectRows);
 	m_pTab->setSelectionMode(QTableWidget::ContiguousSelection);
+	m_pTab->setContextMenuPolicy(Qt::CustomContextMenu);
 
 	m_pTab->setColumnCount(3);
 	m_pTab->setHorizontalHeaderItem(0, new QTableWidgetItem{"Col 0"});
@@ -72,11 +74,20 @@ TstDlg::TstDlg(QWidget* pParent) : QDialog{pParent}
 	pTabGrid->addWidget(m_pTabBtnUp, 1,3,1,1);
 	pTabGrid->addWidget(m_pTabBtnDown, 1,4,1,1);
 
+
+	// table context CustomContextMenu
+	m_pTabContextMenu = new QMenu(m_pTab);
+	m_pTabContextMenu->addAction("Add Item Before", this, [this]() { this->AddTabItem(-2); });
+	m_pTabContextMenu->addAction("Add Item After", this, [this]() { this->AddTabItem(-3); });
+	m_pTabContextMenu->addAction("Delete Item", this, &TstDlg::DelTabItem);
+
+
 	// signals
-	connect(m_pTabBtnAdd, &QToolButton::clicked, this, &TstDlg::AddTabItem);
+	connect(m_pTabBtnAdd, &QToolButton::clicked, this, [this]() { this->AddTabItem(-1); });
 	connect(m_pTabBtnDel, &QToolButton::clicked, this, &TstDlg::DelTabItem);
 	connect(m_pTabBtnUp, &QToolButton::clicked, this, &TstDlg::MoveTabItemUp);
 	connect(m_pTabBtnDown, &QToolButton::clicked, this, &TstDlg::MoveTabItemDown);
+	connect(m_pTab, &QTableWidget::customContextMenuRequested, this, &TstDlg::ShowContextMenu);
 
 
 	// main grid
@@ -87,9 +98,14 @@ TstDlg::TstDlg(QWidget* pParent) : QDialog{pParent}
 }
 
 
-void TstDlg::AddTabItem()
+void TstDlg::AddTabItem(int row)
 {
-	const int row = m_pTab->rowCount();
+	if(row == -1)	// append to end of table
+		row = m_pTab->rowCount();
+	else if(row == -2 && m_iCursorRow >= 0)	// use row from member variable
+		row = m_iCursorRow;
+	else if(row == -3 && m_iCursorRow >= 0)	// use row from member variable +1
+		row = m_iCursorRow + 1;
 	m_pTab->insertRow(row);
 
 	m_pTab->setItem(row, 0, new QTableWidgetItem("Item 0"));
@@ -195,6 +211,19 @@ std::vector<int> TstDlg::GetSelectedRows(bool sort_reversed) const
 	}
 
 	return vec;
+}
+
+
+void TstDlg::ShowContextMenu(const QPoint& pt)
+{
+	const auto* item = m_pTab->itemAt(pt);
+	if(!item)
+		return;
+
+	m_iCursorRow = item->row();
+	auto ptGlob = m_pTab->mapToGlobal(pt);
+	ptGlob.setY(ptGlob.y() + m_pTabContextMenu->sizeHint().height()/2);
+	m_pTabContextMenu->popup(ptGlob);
 }
 // ----------------------------------------------------------------------------
 
