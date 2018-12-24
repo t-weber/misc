@@ -17,7 +17,7 @@ endfunction
 #
 # is the point (x,y) in the fractal?
 #
-function b = is_in_mandel(lim, iter, x, y)
+function [b,norm] = is_in_mandel(lim, iter, x, y)
 	z = 0 + 0i;
 	pos = x + y*1i;
 
@@ -25,7 +25,8 @@ function b = is_in_mandel(lim, iter, x, y)
 		z = z*z + pos;
 	endfor
 
-	b = abs(z) <= lim;
+	norm = abs(z);
+	b = norm <= lim;
 endfunction
 
 
@@ -49,6 +50,37 @@ function thearea = calc_area(a, b, is_inside, N)
 endfunction
 
 
+function plot_mandel(iters)
+	startx = -2.;
+	endx = 2.;
+	deltax = 0.02;
+	starty = -2.;
+	endy = 2.;
+	deltay = 0.02;
+
+	thefile = fopen("mandel.dat", "w");
+	printf("Calculating plot...\n");
+
+	for y = linspace(starty, endy, round((endy-starty)/deltay))
+		printf("\r%.2f%%    ", 100.*(y-starty)/(endy-starty));
+
+		for x = linspace(startx, endx, round((endx-startx)/deltax))
+			[is_inside, norm] = is_in_mandel(2., iters, x, y);
+			if !is_inside
+				norm = 0.;
+			endif
+
+			fprintf(thefile, "%g ", norm);	
+		endfor
+
+		fprintf(thefile, "\n");	
+	endfor
+
+	printf("\n");
+	fclose(thefile);
+endfunction
+
+
 
 # -----------------------------------------------------------------------------
 mandel_iters = 100;
@@ -58,7 +90,7 @@ printf("Number of MC iterations: %d.\n", rand_iters);
 circ = calc_area(4., 4., @(x,y) is_in_circle(1., x, y), rand_iters);
 printf("Unit circle area: %g.\n", circ);
 
-mand = calc_area(4., 4., @(x,y) is_in_mandel(2., mandel_iters, x, y), rand_iters);
+mand = calc_area(4., 4., @(x,y) is_in_mandel(2., mandel_iters, x, y)(1), rand_iters);
 printf("Mandel area: %g.\n", mand);
+plot_mandel(mandel_iters);
 # -----------------------------------------------------------------------------
-
