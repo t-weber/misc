@@ -24,7 +24,7 @@ TstDlg::TstDlg(QWidget* pParent) : QDialog{pParent}
 
 	m_pTab = new QTableWidget(m_pTabWidget);
 	m_pTab->setShowGrid(true);
-	m_pTab->setSortingEnabled(false);
+	m_pTab->setSortingEnabled(true);
 	m_pTab->setMouseTracking(true);
 	m_pTab->setSelectionBehavior(QTableWidget::SelectRows);
 	m_pTab->setSelectionMode(QTableWidget::ContiguousSelection);
@@ -108,15 +108,21 @@ void TstDlg::AddTabItem(int row)
 		row = m_iCursorRow;
 	else if(row == -3 && m_iCursorRow >= 0)	// use row from member variable +1
 		row = m_iCursorRow + 1;
+
+	//bool sorting = m_pTab->isSortingEnabled();
+	m_pTab->setSortingEnabled(false);
+
 	m_pTab->insertRow(row);
 
 	m_pTab->setItem(row, 0, new QTableWidgetItem("Item 0"));
 	m_pTab->setItem(row, 1, new QTableWidgetItem("Item 1"));
-	m_pTab->setItem(row, 2, new QTableWidgetItem("Item 2"));
+	m_pTab->setItem(row, 2, new NumericTableWidgetItem<int>(100-row));
 	//m_pTab->setCellWidget(row, 2, new QSpinBox(m_pTab));
 
 	m_pTab->scrollToItem(m_pTab->item(row, 0));
 	m_pTab->setCurrentCell(row, 0);
+
+	m_pTab->setSortingEnabled(/*sorting*/ true);
 }
 
 
@@ -137,6 +143,8 @@ void TstDlg::DelTabItem()
 
 void TstDlg::MoveTabItemUp()
 {
+	m_pTab->setSortingEnabled(false);
+
 	auto selected = GetSelectedRows(false);
 	for(int row : selected)
 	{
@@ -167,6 +175,8 @@ void TstDlg::MoveTabItemUp()
 
 void TstDlg::MoveTabItemDown()
 {
+	m_pTab->setSortingEnabled(false);
+
 	auto selected = GetSelectedRows(true);
 	for(int row : selected)
 	{

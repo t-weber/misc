@@ -8,12 +8,34 @@
 #ifndef __QTTST_H__
 #define __QTTST_H__
 
-
 #include <QDialog>
 #include <QTableWidget>
 #include <QToolButton>
 #include <QMenu>
+
 #include <vector>
+#include <sstream>
+
+
+template<class T = int>
+class NumericTableWidgetItem : public QTableWidgetItem
+{
+public:
+	NumericTableWidgetItem(T&& val) : QTableWidgetItem(std::to_string(std::forward<T>(val)).c_str())
+	{}
+
+	virtual bool operator<(const QTableWidgetItem& item) const override
+	{
+		std::istringstream istr1{this->text().toStdString()};
+		std::istringstream istr2{item.text().toStdString()};
+
+		T val1{}, val2{};
+		istr1 >> val1;
+		istr2 >> val2;
+
+		return val1 < val2;
+	}
+};
 
 
 class TstDlg : public QDialog
