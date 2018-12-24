@@ -1,0 +1,64 @@
+#
+# mc area test for performance comparison with threadpool.cpp
+# @author tweber
+# @date 24-dec-18
+# @license see 'LICENSE.EUPL' file
+#
+
+#
+# is the point (x,y) in the circle with radius rad?
+#
+function b = is_in_circle(rad, x, y)
+	r = sqrt(x*x + y*y);
+	b = r <= rad;
+endfunction
+
+
+#
+# is the point (x,y) in the fractal?
+#
+function b = is_in_mandel(lim, iter, x, y)
+	z = 0 + 0i;
+	pos = x + y*1i;
+
+	for i = 1:iter
+		z = z*z + pos;
+	endfor
+
+	b = abs(z) <= lim;
+endfunction
+
+
+#
+# calculate the area of function is_inside(x,y),
+# which is inscribed in a MC rectangle of size a*b
+#
+function thearea = calc_area(a, b, is_inside, N)
+	area = 0.;
+	
+	for i = 1:N
+		x = rand()*a - a*0.5;
+		y = rand()*b - b*0.5;
+
+		if is_inside(x, y)
+			area = area + 1;
+		endif
+	endfor
+
+	thearea = area/N * a*b;
+endfunction
+
+
+
+# -----------------------------------------------------------------------------
+mandel_iters = 100;
+rand_iters = 10000;
+printf("Number of MC iterations: %d.\n", rand_iters);
+
+circ = calc_area(4., 4., @(x,y) is_in_circle(1., x, y), rand_iters);
+printf("Unit circle area: %g.\n", circ);
+
+mand = calc_area(4., 4., @(x,y) is_in_mandel(2., mandel_iters, x, y), rand_iters);
+printf("Mandel area: %g.\n", mand);
+# -----------------------------------------------------------------------------
+
