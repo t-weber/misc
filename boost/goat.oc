@@ -1,0 +1,70 @@
+#
+# MC goat problem test, for performance comparison with threadpool2.cpp
+# @author tweber
+# @date 24-dec-18
+# @license see 'LICENSE.EUPL' file
+#
+
+iters = 5000;
+printf("Number of MC iterations: %d.\n", iters);
+
+
+# number of wins without and with change, respectively
+won_stayed = 0;
+won_changed = 0;
+
+for iter = 1:iters
+	printf("\r%.2f%%    ", 100.*iter/iters);
+
+	# place goats
+	where_nogoat = randi(3);
+	goats = [true, true, true];
+	goats(where_nogoat) = false;
+
+	# pick a door
+	picked = randi(3);
+	if !goats(picked)
+		++won_stayed;
+	endif
+
+
+	# reveal a goat
+	revealed_goat = 0;
+	while true
+		revealed_goat = randi(3);
+
+		# skip the picked door
+		if revealed_goat == picked
+			continue;
+		endif
+
+		# only reveal goats
+		if !goats(revealed_goat)
+			continue;
+		endif
+
+		break;
+	endwhile
+
+	# pick remaining door
+	changedpick = 0;
+	for changedpick = 1:3
+		if changedpick == picked
+			continue;
+		endif
+		if changedpick == revealed_goat
+			continue;
+		endif
+
+		break;
+	endfor
+
+	# won with change?
+	if !goats(changedpick)
+		++won_changed;
+	endif
+endfor
+
+printf("\n");
+printf("Probability to win without change: %.2f.\n", won_stayed/iters);
+printf("Probability to win with change: %.2f.\n", won_changed/iters);
