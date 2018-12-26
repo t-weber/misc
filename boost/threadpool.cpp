@@ -23,7 +23,7 @@ using t_real = double;
 using t_clock = std::chrono::steady_clock;
 //using t_clock = std::chrono::high_resolution_clock;
 
-constexpr std::size_t g_seed = 1234;
+const std::size_t g_seed = std::random_device{}();
 
 
 bool is_in_circle(t_real rad, t_real x, t_real y)

@@ -5,8 +5,33 @@
 # @license see 'LICENSE.EUPL' file
 #
 
-iters = 5000;
+global iters = 5000;
+global use_own_randi = true;
+global themult = 1234567;
+global theinc = 0;
+global themod = 0xfffffffe;
+global theseed = 1234567;
+
+
 printf("Number of MC iterations: %d.\n", iters);
+
+
+# simplistic rng test
+function num = my_randi(max)
+	global use_own_randi;
+
+	if use_own_randi
+		global themult;
+		global theinc;
+		global themod;
+		global theseed;
+
+		theseed = mod(themult*theseed + theinc, themod);
+		num = mod(theseed, max) + 1;
+	else
+		num = randi(max);
+	endif
+endfunction
 
 
 # number of wins without and with change, respectively
@@ -17,12 +42,12 @@ for iter = 1:iters
 	printf("\r%.2f%%    ", 100.*iter/iters);
 
 	# place goats
-	where_nogoat = randi(3);
+	where_nogoat = my_randi(3);
 	goats = [true, true, true];
 	goats(where_nogoat) = false;
 
 	# pick a door
-	picked = randi(3);
+	picked = my_randi(3);
 	if !goats(picked)
 		++won_stayed;
 	endif
@@ -31,7 +56,7 @@ for iter = 1:iters
 	# reveal a goat
 	revealed_goat = 0;
 	while true
-		revealed_goat = randi(3);
+		revealed_goat = my_randi(3);
 
 		# skip the picked door
 		if revealed_goat == picked
@@ -64,6 +89,7 @@ for iter = 1:iters
 		++won_changed;
 	endif
 endfor
+
 
 printf("\n");
 printf("Probability to win without change: %.2f.\n", won_stayed/iters);

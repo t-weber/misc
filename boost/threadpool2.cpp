@@ -6,6 +6,7 @@
  *
  * Reference:
  *  * https://www.boost.org/doc/libs/1_69_0/doc/html/boost_asio/reference/thread_pool.html
+ *  * https://en.wikipedia.org/wiki/Linear_congruential_generator
  *
  * g++ -std=c++17 -O2 -march=native -o threadpool2 threadpool2.cpp -lboost_system -lpthread
  */
@@ -21,13 +22,44 @@
 using t_real = double;
 using t_clock = std::chrono::steady_clock;
 
-constexpr std::size_t g_seed = 1234;
+
+/**
+ * simplistic rng test
+ */
+class RandGen
+{
+public:
+	using result_type = unsigned int;
+
+private:
+	constexpr static result_type m_mult = 1234567;
+	constexpr static result_type m_inc = 0;
+	constexpr static result_type m_mod = std::numeric_limits<result_type>::max()-1;
+	mutable result_type m_seed = std::random_device{}();
+
+public:
+	constexpr result_type operator()() const
+	{
+		m_seed = (m_mult*m_seed + m_inc) % m_mod;
+		return m_seed;
+	};
+
+	constexpr result_type min() const
+	{
+		return 0;
+	}
+
+	constexpr result_type max() const
+	{
+		return std::numeric_limits<result_type>::max();
+	}
+};
 
 
 std::tuple<t_real, t_real> goat(std::size_t N, unsigned int Nthreads=4)
 {
-	std::mt19937_64 gen;
-	gen.seed(g_seed);
+	//std::mt19937_64 gen{std::random_device{}()};
+	RandGen gen;
 
 	std::atomic<std::size_t> won_stayed = 0, won_changed = 0;
 	boost::asio::thread_pool tp{Nthreads};
