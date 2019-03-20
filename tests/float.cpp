@@ -61,6 +61,18 @@ struct float_traits<double>
 };
 
 
+template<class t_float>
+struct float_field
+{
+	using t_int = typename float_traits<t_float>::t_int;
+
+	t_int mant : float_traits<t_float>::mant_len;
+	t_int exp : float_traits<t_float>::exp_len;
+	bool sign : 1;
+};
+
+
+
 template<class t_float, class t_int>
 t_float decode_mant(t_int mant)
 {
@@ -92,6 +104,7 @@ void float_info(t_float f)
 
 	using t_int = typename float_traits<t_float>::t_int;
 	t_int bits = *reinterpret_cast<t_int*>(&f);
+	auto field = *reinterpret_cast<float_field<t_float>*>(&f);
 
 	const int bias = float_traits<t_float>::bias;
 	const t_int sign_mask = float_traits<t_float>::sign_mask;
@@ -107,9 +120,11 @@ void float_info(t_float f)
 	t_float themant = decode_mant<t_float, t_int>(mant);
 	std::cout << "sign: " << std::boolalpha << sign << std::endl;
 	std::cout << "exponent (biased): " << exp << std::endl;
+	std::cout << "exponent (biased, from bitfield): " << field.exp << std::endl;
 	std::cout << "exponent (unbiased): " << exp-bias << std::endl;
 	std::cout << "2^exponent: " << expval << std::endl;
 	std::cout << "raw mantissa: " << mant << std::endl;
+	std::cout << "raw mantissa (from bitfield): " << field.mant << std::endl;
 	std::cout << "mantissa: " << themant << std::endl;
 
 	t_float val = themant * t_float(expval);
