@@ -6,8 +6,11 @@
  */
 
 #include <vector>
+#include <map>
+#include <tuple>
 #include <string>
 #include <memory>
+#include <sstream>
 #include <iostream>
 #include <boost/multi_array.hpp>
 
@@ -34,6 +37,7 @@ public:
 
 	const std::string& GetId() const { return m_id; }
 
+
 private:
 	std::string m_id;
 };
@@ -50,8 +54,6 @@ public:
 	Terminal() = delete;
 
 	virtual SymbolType GetType() const override { return SymbolType::TERM; }
-
-private:
 };
 
 
@@ -76,13 +78,6 @@ public:
 		m_rules.push_back(m_rule);
 	}
 
-	/**
-	 * add a production rule
-	 */
-	void AddRule(const std::shared_ptr<Symbol>& m_rule)
-	{
-		m_rules.push_back({ m_rule });
-	}
 
 
 	/**
@@ -166,7 +161,7 @@ class Cyk
 public:
 	Cyk(const std::vector<std::shared_ptr<NonTerminal>>& syms,
 		const std::vector<std::shared_ptr<Terminal>>& input)
-		: m_dim{input.size()}, m_tab{boost::extents[m_dim][m_dim]}
+		: m_dim{input.size()}, m_tab{boost::extents[m_dim][m_dim]}, m_tabComeFrom{boost::extents[m_dim][m_dim]}
 	{
 		// main diagonal
 		for(std::size_t i=0; i<m_dim; ++i)
@@ -180,12 +175,20 @@ public:
 
 			for(std::size_t k=0; k<disttodiag; ++k)
 			{
+				auto subidx = std::make_tuple(i-k-1, j,  i, j+disttodiag-k);
+
 				auto combos = NonTerminal::GenerateAllCombos(
-					m_tab[i-k-1][j],
-					m_tab[i][j+disttodiag-k]);
+					m_tab[std::get<0>(subidx)][std::get<1>(subidx)],
+					m_tab[std::get<2>(subidx)][std::get<3>(subidx)]);
 
 				for(const auto& combo : combos)
-					InsertUniqueElems(m_tab[i][j], NonTerminal::FindProducers(syms, combo));
+				{
+					const auto& producers = NonTerminal::FindProducers(syms, combo);
+					InsertUniqueElems(m_tab[i][j], producers);
+
+					for(const auto& prod : producers)
+						m_tabComeFrom[i][j][prod->GetId()] = subidx;
+				}
 			}
 		}
 	}
@@ -193,10 +196,9 @@ public:
 	Cyk() = delete;
 
 	std::size_t GetDim() const { return m_dim; }
-	const std::vector<std::shared_ptr<NonTerminal>>& GetElem(std::size_t i, std::size_t j) const
-	{
-		return m_tab[i][j];
-	}
+	const auto& GetElem(std::size_t i, std::size_t j) const { return m_tab[i][j]; }
+	const auto& GetComeFrom(std::size_t i, std::size_t j) const { return m_tabComeFrom[i][j]; }
+
 
 protected:
 
@@ -246,9 +248,15 @@ protected:
 			InsertUniqueElem(cont, sym);
 	}
 
+
 private:
 	std::size_t m_dim = 0;
 	boost::multi_array<std::vector<std::shared_ptr<NonTerminal>>, 2> m_tab;
+	boost::multi_array<
+		std::map<
+			std::string /* id */,
+			std::tuple<std::size_t,std::size_t, std::size_t,std::size_t> /* table indices 1 and 2 */
+			>, 2> m_tabComeFrom;
 };
 
 
@@ -263,8 +271,22 @@ std::ostream& operator<<(std::ostream& ostr, const Cyk& cyk)
 			if(elems.size() == 0)
 				ostr << "n/a";
 
+			const auto& comeFromMap = cyk.GetComeFrom(i,j);
+
 			for(const auto& elem : elems)
-				ostr << elem->GetId() << ", ";
+			{
+				const auto& itercomeFrom = comeFromMap.find(elem->GetId());
+				std::ostringstream ostrFrom;
+				if(itercomeFrom != comeFromMap.end())
+				{
+					auto tup = itercomeFrom->second;
+					ostrFrom << " [from:"
+						<< " (" << std::get<0>(tup) << " " << std::get<1>(tup) << ")"
+						<< " (" << std::get<2>(tup) << " " << std::get<3>(tup) << ")"
+						<< "]";
+				}
+				ostr << elem->GetId() << ostrFrom.str() << ", ";
+			}
 
 			ostr << "; \t";
 		}
@@ -289,12 +311,14 @@ int main()
 	auto Start = std::make_shared<NonTerminal>("Start");
 	auto A = std::make_shared<NonTerminal>("A");
 	auto B = std::make_shared<NonTerminal>("B");
+	auto C = std::make_shared<NonTerminal>("C");
 
-	Start->AddRule(A);
-	Start->AddRule(B);
 	Start->AddRule({ A, B });
-	A->AddRule(a);
-	B->AddRule(b);
+	Start->AddRule({ B, A });
+	Start->AddRule({ A, C });
+	C->AddRule({ B, B });
+	A->AddRule({ a });
+	B->AddRule({ b });
 
 	//std::cout << Start->HasRule({ A, B }) << std::endl;
 	//std::cout << Start->HasRule({ A }) << std::endl;
@@ -303,7 +327,7 @@ int main()
 	//for(const auto& producer : producers)
 	//	std::cout << producer->GetId() << std::endl;
 
-	Cyk cyk({Start, A, B}, { a, b });
+	Cyk cyk({Start, A, B, C}, { a, b, b });
 	std::cout << cyk << std::endl;
 
 	return 0;
