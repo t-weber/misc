@@ -50,14 +50,26 @@ struct AVLElem
 };
 
 
-template<class node_traits, class t_node_ptr>
-void recurse_avl(t_node_ptr node)
+template<class t_elem, class node_traits, class t_node_ptr>
+void print_avl(t_node_ptr node, unsigned depth=0)
 {
+	using t_hook = decltype(t_elem::_h);
+
+	// get parent object pointer from hook member
+	const t_elem *elem = 
+		intr::get_parent_from_member<t_elem, t_hook>
+		(reinterpret_cast<t_hook*>(node), &t_elem::_h);
+		//reinterpret_cast<t_elem*>(reinterpret_cast<char*>(node) - 8);
+
+	for(unsigned i=0; i<depth; ++i)
+		std::cout << "\t";
+	std::cout << "value: " << elem->val << std::endl;
+
 	auto left = node_traits::get_left(node);
 	auto right = node_traits::get_right(node);
 
-	if(left) recurse_avl<node_traits>(left);
-	if(right) recurse_avl<node_traits>(right);
+	if(left) print_avl<t_elem, node_traits>(left, depth+1);
+	if(right) print_avl<t_elem, node_traits>(right, depth+1);
 }
 
 
@@ -79,7 +91,9 @@ int main()
 
 		for(const auto& elem : lst)
 		{
-			std::cout << "element: " << (void*) &elem << ": " << elem << std::endl;
+			std::cout << "element: " 
+				<< (void*) &elem << ": " 
+				<< elem << std::endl;
 		}
 
 		// clear list in case safe_link is used
@@ -95,7 +109,6 @@ int main()
 		intr::avltree<AVLElem<int>,
 			intr::member_hook<AVLElem<int>, decltype(AVLElem<int>::_h), &AVLElem<int>::_h>> avl;
 		using node_traits = decltype(avl)::node_traits;
-		using value_traits = decltype(avl)::value_traits;
 
 		AVLElem<int> e1{.val = 10};
 		AVLElem<int> e2{.val = 5};
@@ -114,16 +127,15 @@ int main()
 		//std::cout << (void*)&*avl.find(e1b) << std::endl;
 
 
-		auto root = avl.root();
-		//std::cout << "root value: " << root->val << std::endl;
-		//std::cout << "left hook: " << node_traits::get_left(root->_h.this_ptr()) << std::endl;
-		recurse_avl<node_traits>(root->_h.this_ptr());
-
-
 		for(const auto& elem : avl)
 		{
-			std::cout << "element: " << (void*)&elem << ", hook: " << (void*)&elem._h << ", value: " << elem << std::endl;
+			std::cout << "element: " 
+				<< (void*)&elem << ", hook: " 
+				<< (void*)&elem._h 
+				<< ", value: " << elem << std::endl;
 		}
+
+		print_avl<AVLElem<int>, node_traits>(avl.root()->_h.this_ptr());
 	}
 
 
