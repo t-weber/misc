@@ -23,9 +23,6 @@ using t_dist = std::tuple<t_real, t_vertex>;	// distance and predecessor
 
 int main()
 {
-	// vertices
-	std::unordered_set<t_vertex> vertices{{ "A", "B", "C", "D" }};
-
 	// edges and distances (weights)
 	std::vector<t_edge> edges
 	{{
@@ -37,19 +34,23 @@ int main()
 
 	}};
 
+	// get (unvisited) vertices from the edge endpoints
+	std::unordered_set<t_vertex> unvisited, visited;
+	for(const auto& edge : edges)
+	{
+		unvisited.insert(std::get<0>(edge));
+		unvisited.insert(std::get<1>(edge));
+	}
 
-	std::unordered_map<t_vertex, t_dist> distmap;
-	std::unordered_set<t_vertex> unvisited = vertices;
-	std::unordered_set<t_vertex> visited;
 
+	// start vertex
 	t_vertex vertcur = "A";
 	t_real curdist = 0.;
 	std::size_t curiter = 0;
+	std::unordered_map<t_vertex, t_dist> distmap;
+
 	while(unvisited.size() != 0)
 	{
-		std::cout << "Iteration " << ++curiter << std::endl;
-		std::cout << "Current vertex: " << vertcur << std::endl;
-
 		// iterate all paths starting from current vertex
 		for(const auto& edge : edges)
 		{
@@ -80,13 +81,11 @@ int main()
 			}
 		}
 
+
+		// mark current vertex as visited
 		visited.insert(vertcur);
 		unvisited.erase(vertcur);
 
-		std::cout << "Visited: ";
-		for(const t_vertex& vert : visited)
-			std::cout << vert << " ";
-		std::cout << std::endl;
 
 		// find closest unvisited vertex
 		t_real closestdist = std::numeric_limits<t_real>::max();
@@ -103,6 +102,15 @@ int main()
 			}
 		}
 
+
+		// output
+		std::cout << "Iteration " << ++curiter << std::endl;
+		std::cout << "Current vertex: " << vertcur << std::endl;
+
+		std::cout << "Visited: ";
+		for(const t_vertex& vert : visited)
+			std::cout << vert << " ";
+		std::cout << std::endl;
 
 		std::cout
 			<< std::setw(15) << " Vertex"
@@ -123,7 +131,6 @@ int main()
 		}
 		std::cout << std::endl;
 	}
-
 
 	return 0;
 }
