@@ -43,7 +43,7 @@ int main()
 	}
 
 
-	// start vertex
+	// start (or end) vertex
 	t_vertex vertcur = "A";
 	t_real curdist = 0.;
 	std::size_t curiter = 0;
@@ -51,6 +51,10 @@ int main()
 
 	while(unvisited.size() != 0)
 	{
+		std::cout << "Iteration " << ++curiter << std::endl;
+		std::cout << "Current vertex: " << vertcur << std::endl;
+
+
 		// iterate all paths starting from current vertex
 		for(const auto& edge : edges)
 		{
@@ -77,7 +81,7 @@ int main()
 			{
 				// new entry
 				distmap.insert(std::make_pair(*vertto, t_dist{curdist + dist, vertcur}));
-				std::cout << "New entry: " << *vertfrom << " -> " << *vertto << " (" << curdist + dist << ")" << std::endl;
+				//std::cout << "New entry: " << *vertfrom << " -> " << *vertto << " (" << curdist + dist << ")" << std::endl;
 			}
 			else
 			{
@@ -114,9 +118,6 @@ int main()
 
 
 		// output
-		std::cout << "Iteration " << ++curiter << std::endl;
-		std::cout << "Current vertex: " << vertcur << std::endl;
-
 		std::cout << "Visited: ";
 		for(const t_vertex& vert : visited)
 			std::cout << vert << " ";

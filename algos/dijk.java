@@ -48,7 +48,7 @@ public class dijk
 	/**
 	 * calculates the shortest path
 	 * @param edge edges of the graph
-	 * @param startvertex starting point
+	 * @param startvertex starting or ending point
 	 */
 	public Map<String, Dist> calc(Vector<Edge> edges, String startvertex)
 	{
@@ -70,6 +70,13 @@ public class dijk
 
 		while(unvisited.size() != 0)
 		{
+			if(m_debug)
+			{
+				System.out.println("Iteration " + curiter++);
+				System.out.println("Current vertex: " + vertcur);
+			}
+
+
 			// iterate all paths starting from current vertex
 			for(Edge edge : edges)
 			{
@@ -137,9 +144,6 @@ public class dijk
 			// output
 			if(m_debug)
 			{
-				System.out.println("Iteration " + curiter++);
-				System.out.println("Current vertex: " + vertcur);
-
 				System.out.print("Visited:");
 				for(String vertex : visited)
 					System.out.print(" " + vertex);
