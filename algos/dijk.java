@@ -67,27 +67,45 @@ public class dijk
 			unvisited.add(edge.vertex_to);
 		}
 
-	
+
 		while(unvisited.size() != 0)
 		{
 			// iterate all paths starting from current vertex
 			for(Edge edge : edges)
 			{
-				if(!edge.vertex_from.equals(vertcur))
+				String vertex_from = new String(edge.vertex_from);
+				String vertex_to = new String(edge.vertex_to);
+
+				// one endpoint of the edge has to be the current vertex
+				if(!vertex_from.equals(vertcur) && !vertex_to.equals(vertcur))
 					continue;
-				
-				Dist distto = distmap.get(edge.vertex_to);
+
+				// edge has to point from current to new vertex
+				if(vertex_to.equals(vertcur))
+				{
+					// swap elements
+					String vertex_to_cpy = vertex_to;
+					vertex_to = vertex_from;
+					vertex_from = vertex_to_cpy;
+				}
+
+				// already seen?
+				if(visited.contains(vertex_to))
+					continue;
+
+
+				Dist distto = distmap.get(vertex_to);
 				if(distto == null)
 				{
 					// new entry
-					distmap.put(edge.vertex_to, new Dist(edge.vertex_to, vertcur, curdist+edge.dist));
+					distmap.put(vertex_to, new Dist(vertex_to, vertcur, curdist+edge.dist));
 				}
 				else
 				{
 					// update existing entry if the distance is lower
 					if(curdist+edge.dist < distto.dist)
 					{
-						distto.vertex = edge.vertex_to;
+						distto.vertex = vertex_to;
 						distto.predecessor = vertcur;
 						distto.dist = curdist + edge.dist;
 					}
@@ -160,6 +178,7 @@ public class dijk
 		edges.add(d.new Edge("B", "C", 10.));
 		edges.add(d.new Edge("B", "D", 2.));
 		edges.add(d.new Edge("D", "C", 1.));
+		edges.add(d.new Edge("C", "A", 5.));
 
 		d.calc(edges, "A");
 	}

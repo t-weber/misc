@@ -31,7 +31,7 @@ int main()
 		std::make_tuple("B", "C", 10.),
 		std::make_tuple("B", "D", 2.),
 		std::make_tuple("D", "C", 1.),
-
+		std::make_tuple("C", "A", 5.),
 	}};
 
 	// get (unvisited) vertices from the edge endpoints
@@ -54,20 +54,30 @@ int main()
 		// iterate all paths starting from current vertex
 		for(const auto& edge : edges)
 		{
-			const t_vertex& vertfrom = std::get<0>(edge);
-			const t_vertex& vertto = std::get<1>(edge);
+			const t_vertex* vertfrom = &std::get<0>(edge);
+			const t_vertex* vertto = &std::get<1>(edge);
 			const t_real dist = std::get<2>(edge);
 
-			if(vertfrom != vertcur)
+			// one endpoint of the edge has to be the current vertex
+			if(*vertfrom != vertcur && *vertto != vertcur)
 				continue;
 
-			auto iter = distmap.find(vertto);
+			// edge has to point from current to new vertex
+			if(*vertto == vertcur)
+				std::swap(vertfrom, vertto);
+
+			// already seen?
+			if(visited.find(*vertto) != visited.end())
+				continue;
+
+
+			auto iter = distmap.find(*vertto);
 
 			if(iter == distmap.end())
 			{
 				// new entry
-				distmap.insert(std::make_pair(vertto, t_dist{curdist + dist, vertcur}));
-				//std::cout << "New entry: " << vertfrom << " -> " << vertto << " (" << curdist + dist << ")" << std::endl;
+				distmap.insert(std::make_pair(*vertto, t_dist{curdist + dist, vertcur}));
+				std::cout << "New entry: " << *vertfrom << " -> " << *vertto << " (" << curdist + dist << ")" << std::endl;
 			}
 			else
 			{
