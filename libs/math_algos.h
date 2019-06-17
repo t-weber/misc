@@ -1511,16 +1511,17 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 	// ----------------------------------------------------
 	// general case
-	// project along rotation axis
+	// project along rotation axis using |v><v|
 	t_mat matProj1 = projector<t_mat, t_vec>(axis, bIsNormalised);
 
-	// project along axis 2 in plane perpendiculat to rotation axis
+	// project along axis 2 in plane perpendicular to rotation axis using 1-|v><v|
 	t_mat matProj2 = ortho_projector<t_mat, t_vec>(axis, bIsNormalised) * c;
 
-	// project along axis 3 in plane perpendiculat to rotation axis and axis 2
+	// project along axis 3 in plane perpendicular to rotation axis and axis 2 using v_cross matrix
 	t_mat matProj3 = skewsymmetric<t_mat, t_vec>(axis/len) * s;
 
 	//std::cout << matProj1(3,3) <<  " " << matProj2(3,3) <<  " " << matProj3(3,3) << std::endl;
+	// rotation in the orthogonal plane is done above by axis2*cos + axis3*sin
 	t_mat matProj = matProj1 + matProj2 + matProj3;
 
 	// if matrix is larger than 3x3 (e.g. for homogeneous cooridnates), fill up with identity
