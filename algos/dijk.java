@@ -1,5 +1,6 @@
 /**
- * shortest path in graph
+ * shortest path in graph, see e.g. https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+ *
  * @author Tobias Weber
  * @date 15-jun-19
  * @license: see 'LICENSE.GPL' file
