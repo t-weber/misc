@@ -1,5 +1,5 @@
 /**
- * shortest path in graph, see e.g. https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+ * shortest path in graph
  *
  * @author Tobias Weber
  * @date 15-jun-19
@@ -50,6 +50,7 @@ public class dijk
 	 * calculates the shortest path
 	 * @param edge edges of the graph
 	 * @param startvertex starting or ending point
+	 * @see https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
 	 */
 	public Map<String, Dist> calc(Vector<Edge> edges, String startvertex)
 	{
