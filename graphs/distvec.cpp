@@ -59,6 +59,25 @@ public:
 	}
 
 
+	/**
+	 * find minimal distance to target node
+	 */
+	t_real GetMinDistTo(const std::string& node)
+	{
+		t_real dist = std::numeric_limits<t_real>::max();
+
+		for(const auto& pair : m_route)
+		{
+			std::size_t iPos = pair.first.find("->")+2;
+			std::string nodeTo = pair.first.substr(iPos);
+			if(nodeTo == node)
+				dist = std::min(dist, pair.second);
+		}
+
+		return dist;
+	}
+
+
 	void ReceiveRoute(const std::string& nameVia, const std::string& nameTo, t_real dist)
 	{
 		// check if the sending node is a known neighbour and get the distance to it
@@ -83,6 +102,8 @@ public:
 			// more efficient route found?
 			if(distToSendingNode + dist < iter->second)
 			{
+				bool bNewMinDist = distToSendingNode + dist < GetMinDistTo(nameTo);
+
 				// update distance
 				iter->second = distToSendingNode + dist;
 
@@ -91,12 +112,15 @@ public:
 					<< std::endl;
 
 				// announce updated route
-				m_sigAnnounceRoute(m_name, nameTo, distToSendingNode + dist);
+				if(bNewMinDist)
+					m_sigAnnounceRoute(m_name, nameTo, distToSendingNode + dist);
 			}
 		}
 		// new route
 		else
 		{
+			bool bNewMinDist = distToSendingNode + dist < GetMinDistTo(nameTo);
+
 			m_route[strRouteName] = distToSendingNode + dist;
 
 			std::cout << "New route for node " << m_name << ": "
@@ -104,7 +128,8 @@ public:
 				<< std::endl;
 
 			// announce new route
-			m_sigAnnounceRoute(m_name, nameTo, distToSendingNode + dist);
+			if(bNewMinDist)
+				m_sigAnnounceRoute(m_name, nameTo, distToSendingNode + dist);
 		}
 	}
 
