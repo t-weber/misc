@@ -8,6 +8,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <numeric>
 #include <experimental/iterator>
 
 
@@ -84,16 +85,17 @@ void quick_sort(t_cont<t_elem>& cont, Cmp cmp)
 	requires(is_cmp<Cmp, t_elem>)
 #endif
 {
-	t_cont<t_elem> contSmaller, contEqu, contLarger;
+	t_cont<t_elem> contSmaller, contLarger;
 
 
-	// split on first element and sort into three containers
+	// split on first element and sort into two containers
+	const t_elem* pPivot = &cont[0];
 	for(const t_elem& elem : cont)
 	{
-		if(cmp(elem, cont[0]))
+		if(&elem == pPivot)
+			continue;
+		if(cmp(elem, *pPivot))
 			contSmaller.push_back(elem);
-		else if(elem == cont[0])
-			contEqu.push_back(elem);
 		else
 			contLarger.push_back(elem);
 	}
@@ -113,13 +115,74 @@ void quick_sort(t_cont<t_elem>& cont, Cmp cmp)
 
 
 	// insert sorted elements into original container
+	t_elem pivot = *pPivot;
 	std::size_t idx = 0;
 	for(const t_elem& elem : contSmaller)
 		cont[idx++] = elem;
-	for(const t_elem& elem : contEqu)
-		cont[idx++] = elem;
+	cont[idx++] = pivot;
 	for(const t_elem& elem : contLarger)
 		cont[idx++] = elem;
+}
+
+
+
+template<class t_elem, template<class...> class t_cont=std::vector, class Cmp>
+void quick_sort_idx(const t_cont<t_elem>& cont, Cmp cmp, t_cont<std::size_t>& contIdx)
+#ifdef __cpp_concepts
+	requires(is_cmp<Cmp, t_elem>)
+#endif
+{
+	if(!cont.size())
+		return;
+
+	if(!contIdx.size())
+	{
+		contIdx.resize(cont.size());
+		std::iota(contIdx.begin(), contIdx.end(), 0);
+	}
+
+
+	t_cont<std::size_t> contSmaller, contLarger;
+
+	// split on first element and sort into two containers
+	std::size_t idxPivot = contIdx[0];
+	for(std::size_t idx : contIdx)
+	{
+		if(idx == idxPivot)
+			continue;
+		if(cmp(cont[idx], cont[idxPivot]))
+			contSmaller.push_back(idx);
+		else
+			contLarger.push_back(idx);
+	}
+
+
+	// sort the two containers with smaller and larger elements
+	if(contSmaller.size() >= 2)
+		quick_sort_idx<t_elem, t_cont, Cmp>(cont, cmp, contSmaller);
+	if(contLarger.size() >= 2)
+		quick_sort_idx<t_elem, t_cont, Cmp>(cont, cmp, contLarger);
+
+
+	// insert sorted elements into original container
+	std::size_t idx = 0;
+	for(std::size_t elem : contSmaller)
+		contIdx[idx++] = elem;
+	contIdx[idx++] = idxPivot;
+	for(std::size_t elem : contLarger)
+		contIdx[idx++] = elem;
+}
+
+
+template<class t_elem, template<class...> class t_cont=std::vector>
+t_cont<t_elem> rearrange(const t_cont<t_elem>& cont, const t_cont<std::size_t>& contIdx)
+{
+	t_cont<t_elem> contNew;
+
+	for(std::size_t idx : contIdx)
+		contNew.push_back(cont[idx]);
+
+	return contNew;
 }
 
 
@@ -197,6 +260,13 @@ int main()
 	};
 
 
+	std::cout << "unsorted: ";
+	auto joiner = std::experimental::make_ostream_joiner(std::cout, ", ");
+	for(const auto& elem : _vec)
+		*joiner++ = elem;
+	std::cout << std::endl;
+
+
 	{
 		auto vec = _vec;
 
@@ -227,6 +297,20 @@ int main()
 		quick_sort(vec, cmp);
 
 		std::cout << "quick sort: ";
+		auto joiner = std::experimental::make_ostream_joiner(std::cout, ", ");
+		for(const auto& elem : vec)
+			*joiner++ = elem;
+		std::cout << std::endl;
+	}
+
+
+	{
+		auto vec = _vec;
+		std::vector<std::size_t> indices;
+		quick_sort_idx(vec, cmp, indices);
+		vec = rearrange(vec, indices);
+
+		std::cout << "quick sort (indices): ";
 		auto joiner = std::experimental::make_ostream_joiner(std::cout, ", ");
 		for(const auto& elem : vec)
 			*joiner++ = elem;
