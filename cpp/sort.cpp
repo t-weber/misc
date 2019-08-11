@@ -203,7 +203,10 @@ void bubble_sort(t_cont<t_elem>& cont, Cmp cmp)
 		{
 			auto iter_next = std::next(iter);
 
-			if(!cmp(*iter, *iter_next))
+			bool bSmaller = cmp(*iter, *iter_next);
+			bool bLarger = cmp(*iter_next, *iter);
+			// if larger (but not equal)
+			if(!bSmaller && bLarger)
 			{
 				std::swap(*iter, *iter_next);
 				++iNumSwaps;
@@ -233,6 +236,8 @@ void insertion_sort(t_cont<t_elem>& cont, Cmp cmp)
 	for(auto iter=cont.begin(); iter!=cont.end(); std::advance(iter,1))
 	{
 		auto iter_next = std::next(iter);
+		if(iter_next == cont.end())
+			break;
 
 		for(; iter_next!=cont.begin(); std::advance(iter_next, -1))
 		{
@@ -240,6 +245,7 @@ void insertion_sort(t_cont<t_elem>& cont, Cmp cmp)
 
 			if(!cmp(*iter_prev, *iter_next))
 			{
+				//std::cout << "Swapping " << *iter_prev << " and " << *iter_next << std::endl;
 				std::swap(*iter_prev, *iter_next);
 				++iTotalSwaps;
 			}
@@ -253,7 +259,7 @@ void insertion_sort(t_cont<t_elem>& cont, Cmp cmp)
 
 int main()
 {
-	const std::vector<int> _vec{{ 5, 9, 1, 7, 0, 3, 8, 2, 6, 4,}};
+	const std::vector<int> _vec{{ 4, 5, 9, 1, 7, 0, 3, 8, 2, 9, 6, 4,}};
 	auto cmp = [](auto i0, auto i1) -> bool
 	{
 		return i0 < i1;
