@@ -8,11 +8,14 @@
 
 import java.util.Queue;
 import java.util.PriorityQueue;
+import java.util.Deque;
+import java.util.ArrayDeque;
 import java.util.Vector;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Collections;
 import java.lang.Math;
 
 
@@ -23,7 +26,7 @@ public class Graph
 	{
 		public t_first first;
 		public t_second second;
-		
+
 		public Pair(t_first t1, t_second t2)
 		{
 			this.first = t1;
@@ -45,7 +48,7 @@ public class Graph
 		@Override public String toString() { return name; }
 	}
 
-	
+
 	// edge of a graph
 	public class Edge
 	{
@@ -58,7 +61,7 @@ public class Graph
 			this.vertex_to = vertex_to;
 			this.dist = dist;
 		}
-		
+
 		public Vertex getVertexFrom() { return vertex_from; }
 		public Vertex getVertexTo() { return vertex_to; }
 		public Double getDist() { return dist; }
@@ -75,7 +78,7 @@ public class Graph
 		}
 	}
 
-	
+
 	private Vector<Vertex> m_vertices;
 	private Vector<Edge> m_edges;
 	boolean m_directed = false;	// directed graph?
@@ -104,7 +107,7 @@ public class Graph
 		return v;
 	}
 
-	
+
 	public Edge addEdge(Vertex vert_from, Vertex vert_to, Double dist)
 	{
 		Edge e = new Edge(vert_from, vert_to, dist);
@@ -125,7 +128,7 @@ public class Graph
 			else if(!m_directed && e.getVertexTo() == v)
 				vec.add(new Pair<Vertex, Double>(e.getVertexFrom(), e.getDist()));
 		}
-		
+
 		return vec;
 	}
 
@@ -141,10 +144,10 @@ public class Graph
 				if(d1.getDist() < d2.getDist()) return -1;
 				return 1;
 			});
-		
+
 		// predecessor list
 		List<Edge> predecessors = new LinkedList<Edge>();
-		
+
 		// visited vertices
 		Set<Vertex> visited = new HashSet<Vertex>();
 
@@ -159,18 +162,18 @@ public class Graph
 				continue;
 			visited.add(nextprio.vertex_to);
 			predecessors.add(nextprio);
-			
+
 			for(Pair<Vertex, Double> pair : getNeighbours(nextprio.vertex_to))
 			{
 				Double dist = pair.second + nextprio.getDist();
 				prio.add(new Edge(nextprio.vertex_to, pair.first, dist));
 			}
 		}
-		
+
 		return predecessors;
 	}
 
-	
+
 	// like dijk(), but without priority queue, ignoring distances
 	public List<Vertex> breadth_first_order(Vertex start)
 	{
@@ -190,11 +193,11 @@ public class Graph
 			if(visited.contains(nextprio))
 				continue;
 			visited.add(nextprio);
-			
+
 			for(Pair<Vertex, Double> pair : getNeighbours(nextprio))
 				queue.add(pair.first);
 		}
-		
+
 		return visited;
 	}
 
@@ -212,12 +215,38 @@ public class Graph
 		}
 	}
 
-	
+
 	public List<Vertex> depth_first_order(Vertex start)
 	{
 		// visited vertices
 		List<Vertex> visited = new LinkedList<Vertex>();
 		__depth_first_order(start, visited);
+		return visited;
+	}
+
+
+	public List<Vertex> depth_first_order_iter(Vertex start)
+	{
+		// visited vertices
+		List<Vertex> visited = new LinkedList<Vertex>();
+
+		// to be visited vertices
+		Deque<Vertex> stack = new ArrayDeque<Vertex>();
+		stack.push(start);
+
+		while(stack.peek() != null)
+		{
+			Vertex v = stack.pop();
+			if(visited.contains(v))
+				continue;
+			visited.add(v);
+
+			Vector<Pair<Vertex, Double>> pairs = getNeighbours(v);
+			Collections.reverse(pairs);
+			for(Pair<Vertex, Double> pair : pairs)
+				stack.push(pair.first);
+		}
+
 		return visited;
 	}
 
@@ -248,5 +277,8 @@ public class Graph
 
 		List<Vertex> verts_depth = graph.depth_first_order(A);
 		System.out.println("depth-first: " + verts_depth);
+
+		List<Vertex> verts_depth2 = graph.depth_first_order_iter(A);
+		System.out.println("depth-first (iterative): " + verts_depth2);
 	}
 }
