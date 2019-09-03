@@ -23,6 +23,50 @@
 namespace ios = boost::iostreams;
 
 
+class TestOutFilter
+{
+	public:
+		using char_type = char;
+		struct category : public ios::output_filter_tag {};
+
+		template<class Snk>
+		bool put(Snk& snk, char_type c)
+		{
+			// replace '1' by "one"
+			if(c == '1')
+				return ios::put(snk, 'o') && ios::put(snk, 'n') && ios::put(snk, 'e');
+
+			// else output unchanged
+			return ios::put(snk, c);
+		}
+};
+
+
+class TestInFilter
+{
+public:
+	using char_type = char;
+	struct category : public ios::input_filter_tag {};
+
+	template<class Src>
+	char_type get(Src& src)
+	{
+		while(true)
+		{
+			char_type c = ios::get(src);
+			if(c < 0)	// EOF?
+				return c;
+
+			// filter out all letters
+			if(!std::isalpha(c))
+				return c;
+		}
+
+		return 0;
+	}
+};
+
+
 int main()
 {
 	// load file
@@ -97,6 +141,31 @@ int main()
 		for(std::size_t i=0; i<1024; ++i)
 			file.data()[i] = '0';
 	}
+
+
+	// custom output filter
+	{
+		ios::stream<ios::file_sink> file("test.txt");
+		ios::filtering_ostream ios;
+		ios.push(TestOutFilter());
+		ios.push(file);
+		ios << "Test\n1234\n";
+	}
+
+
+	// custom input filter
+	{
+		ios::stream<ios::file_source> file("test.txt");
+
+		ios::filtering_istream ios;
+		ios.push(TestInFilter());
+		ios.push(file);
+
+		std::copy(std::istream_iterator<char>(ios), std::istream_iterator<char>(),
+			std::ostream_iterator<char>(std::cout, ""));
+		std::cout << std::endl;
+	}
+
 
 	return 0;
 }
