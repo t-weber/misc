@@ -25,7 +25,7 @@
 #
 print:
 	# create stack frame
-	subi	$sp,	$sp,	8
+	sub	$sp,	$sp,	8
 
 	# output string
 	lw	$a0,	0($sp)
@@ -38,7 +38,7 @@ print:
 	syscall
 
 	# unwind stack frame
-	addi	$sp,	$sp,	8
+	add	$sp,	$sp,	8
 	jr	$ra
 
 
