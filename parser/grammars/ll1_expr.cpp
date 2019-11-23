@@ -7,21 +7,24 @@
  *	- https://www.cs.uaf.edu/~cs331/notes/FirstFollow.pdf
  *	- https://de.wikipedia.org/wiki/LL(k)-Grammatik
  *
- * flex -o ll1_lexer.cpp ll1_expr.l
- * g++ -o ll1_expr ll1_expr.cpp ll1_lexer.cpp
+ * flex -o ll1_lexer.cpp ll1_expr.l && g++ -std=c++17 -o ll1_expr ll1_expr.cpp ll1_lexer.cpp
  */
 
 #include <iostream>
+#include <unordered_map>
 #include <cmath>
 
 
-#define TOK_REAL 1000
-#define TOK_END 1001
+#define TOK_REAL	1000
+#define TOK_IDENT	1001
+#define TOK_END		1002
+
 
 using t_real = double;
 
 extern int yylex();
 extern t_real yylval;
+extern char* yytext;
 static int lookahead = -1;
 
 
@@ -52,10 +55,16 @@ t_real term();
 t_real term_rest(t_real arg);
 
 
+std::unordered_map<std::string, t_real> g_mapSymbols =
+{
+	{ "pi", M_PI },
+};
+
+
 t_real expr()
 {
 	// expr -> term expr_rest
-	if(lookahead == '(' || lookahead == TOK_REAL)
+	if(lookahead == '(' || lookahead == TOK_REAL || lookahead == TOK_IDENT)
 	{
 		t_real term_val = term();
 		t_real expr_rest_val = expr_rest(term_val);
@@ -138,6 +147,22 @@ t_real factor()
 		return val;
 	}
 
+	// factor -> TOK_IDENT
+	else if(lookahead == TOK_IDENT)
+	{
+		std::string ident = yytext;
+		next_lookahead();
+
+		auto iter = g_mapSymbols.find(ident);
+		if(iter == g_mapSymbols.end())
+		{
+			std::cerr << "Unknown identifier \"" << ident << "\"." << std::endl;
+			return 0.;
+		}
+
+		return iter->second;
+	}
+
 	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
 	return 0.;
 }
@@ -146,7 +171,7 @@ t_real factor()
 t_real term()
 {
 	// term -> factor term_rest
-	if(lookahead == '(' || lookahead == TOK_REAL)
+	if(lookahead == '(' || lookahead == TOK_REAL || lookahead == TOK_IDENT)
 	{
 		t_real factor_val = factor();
 		t_real term_rest_val = term_rest(factor_val);
@@ -205,7 +230,9 @@ t_real term_rest(t_real arg)
 
 int main()
 {
-	//std::cout << yylex() << ", " << yylval << std::endl;
+	//std::cout << yylex() << ", " << yylval << " (" << yytext << ")" << std::endl;
+
+	std::cout.precision(8);
 
 	while(1)
 	{
