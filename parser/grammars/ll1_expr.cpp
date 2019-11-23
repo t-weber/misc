@@ -1,4 +1,7 @@
 /**
+ * simple LL(1) expression test,
+ * see ll1.cpp for grammar and calculation of first/follow sets.
+ *
  * @author Tobias Weber
  * @date 23-nov-19
  * @license see 'LICENSE.EUPL' file
@@ -14,13 +17,16 @@
 #include <unordered_map>
 #include <cmath>
 
+using t_real = double;
+
+
+// ----------------------------------------------------------------------------
+// Lexer interface
+// ----------------------------------------------------------------------------
 
 #define TOK_REAL	1000
 #define TOK_IDENT	1001
 #define TOK_END		1002
-
-
-using t_real = double;
 
 extern int yylex();
 extern t_real yylval;
@@ -46,19 +52,44 @@ static bool match(int expected)
 
 	return true;
 }
+// ----------------------------------------------------------------------------
 
+
+
+// ----------------------------------------------------------------------------
+// Tables
+// ----------------------------------------------------------------------------
+
+// symbol table
+static std::unordered_map<std::string, t_real> g_mapSymbols =
+{
+	{ "pi", M_PI },
+};
+
+
+// function table
+static std::unordered_map<std::string, t_real(*)(t_real)> g_mapFuncs =
+{
+	{ "sin", std::sin },
+	{ "cos", std::cos },
+	{ "tan", std::tan },
+
+	{ "sqrt", std::sqrt },
+	{ "exp", std::exp },
+};
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
+// Productions
+// ----------------------------------------------------------------------------
 
 t_real expr();
 t_real expr_rest(t_real arg);
 t_real factor();
 t_real term();
 t_real term_rest(t_real arg);
-
-
-std::unordered_map<std::string, t_real> g_mapSymbols =
-{
-	{ "pi", M_PI },
-};
 
 
 t_real expr()
@@ -153,14 +184,37 @@ t_real factor()
 		std::string ident = yytext;
 		next_lookahead();
 
-		auto iter = g_mapSymbols.find(ident);
-		if(iter == g_mapSymbols.end())
+		// function call
+		// using next lookahead, grammar still ll(1)?
+		if(lookahead == '(')
 		{
-			std::cerr << "Unknown identifier \"" << ident << "\"." << std::endl;
-			return 0.;
+			auto iter = g_mapFuncs.find(ident);
+			if(iter == g_mapFuncs.end())
+			{
+				std::cerr << "Unknown function \"" << ident << "\"." << std::endl;
+				return 0.;
+			}
+
+			next_lookahead();
+			t_real expr_val = expr();
+			match(')');
+			next_lookahead();
+
+			return (*iter->second)(expr_val);
 		}
 
-		return iter->second;
+		// variable lookup
+		else
+		{
+			auto iter = g_mapSymbols.find(ident);
+			if(iter == g_mapSymbols.end())
+			{
+				std::cerr << "Unknown identifier \"" << ident << "\"." << std::endl;
+				return 0.;
+			}
+
+			return iter->second;
+		}
 	}
 
 	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
@@ -225,13 +279,13 @@ t_real term_rest(t_real arg)
 	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
 	return 0.;
 }
+// ----------------------------------------------------------------------------
 
 
 
 int main()
 {
 	//std::cout << yylex() << ", " << yylval << " (" << yytext << ")" << std::endl;
-
 	std::cout.precision(8);
 
 	while(1)

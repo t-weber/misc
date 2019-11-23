@@ -434,6 +434,7 @@ int main()
 	auto bracket_open = std::make_shared<Terminal>("(");
 	auto bracket_close = std::make_shared<Terminal>(")");
 	auto sym = std::make_shared<Terminal>("symbol");
+	auto ident = std::make_shared<Terminal>("ident");
 
 	expr->AddRule({ term, expr_rest });
 	expr->AddRule({ plus, term, expr_rest });	// unary +
@@ -450,6 +451,7 @@ int main()
 	term_rest->AddRule({ g_eps });
 
 	factor->AddRule({ bracket_open, expr, bracket_close });
+	factor->AddRule({ ident, bracket_open, expr, bracket_close });	// function call
 	factor->AddRule({ sym });
 
 
