@@ -430,10 +430,14 @@ int main()
 	auto minus = std::make_shared<Terminal>("-");
 	auto mult = std::make_shared<Terminal>("*");
 	auto div = std::make_shared<Terminal>("/");
+	auto mod = std::make_shared<Terminal>("%");
 	auto bracket_open = std::make_shared<Terminal>("(");
 	auto bracket_close = std::make_shared<Terminal>(")");
 	auto sym = std::make_shared<Terminal>("symbol");
 
+	expr->AddRule({ term, expr_rest });
+	expr->AddRule({ plus, term, expr_rest });	// unary +
+	expr->AddRule({ minus, term, expr_rest });	// unary -
 	expr->AddRule({ term, expr_rest });
 	expr_rest->AddRule({ plus, term, expr_rest });
 	expr_rest->AddRule({ minus, term, expr_rest });
@@ -442,6 +446,7 @@ int main()
 	term->AddRule({ factor, term_rest });
 	term_rest->AddRule({ mult, factor, term_rest });
 	term_rest->AddRule({ div, factor, term_rest });
+	term_rest->AddRule({ mod, factor, term_rest });
 	term_rest->AddRule({ g_eps });
 
 	factor->AddRule({ bracket_open, expr, bracket_close });
