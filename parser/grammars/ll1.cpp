@@ -433,6 +433,7 @@ int main()
 	auto mod = std::make_shared<Terminal>("%");
 	auto bracket_open = std::make_shared<Terminal>("(");
 	auto bracket_close = std::make_shared<Terminal>(")");
+	auto comma = std::make_shared<Terminal>(",");
 	auto sym = std::make_shared<Terminal>("symbol");
 	auto ident = std::make_shared<Terminal>("ident");
 
@@ -451,7 +452,9 @@ int main()
 	term_rest->AddRule({ g_eps });
 
 	factor->AddRule({ bracket_open, expr, bracket_close });
-	factor->AddRule({ ident, bracket_open, expr, bracket_close });	// function call
+	factor->AddRule({ ident, bracket_open, bracket_close });			// function call
+	factor->AddRule({ ident, bracket_open, expr, bracket_close });			// function call
+	factor->AddRule({ ident, bracket_open, expr, comma, expr, bracket_close });	// function call
 	factor->AddRule({ sym });
 
 

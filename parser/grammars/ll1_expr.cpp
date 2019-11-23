@@ -67,8 +67,14 @@ static std::unordered_map<std::string, t_real> g_mapSymbols =
 };
 
 
-// function table
-static std::unordered_map<std::string, t_real(*)(t_real)> g_mapFuncs =
+// zero-args function table
+static std::unordered_map<std::string, t_real(*)()> g_mapFuncs0 =
+{
+};
+
+
+// one-arg function table
+static std::unordered_map<std::string, t_real(*)(t_real)> g_mapFuncs1 =
 {
 	{ "sin", std::sin },
 	{ "cos", std::cos },
@@ -76,6 +82,13 @@ static std::unordered_map<std::string, t_real(*)(t_real)> g_mapFuncs =
 
 	{ "sqrt", std::sqrt },
 	{ "exp", std::exp },
+};
+
+
+// two-args function table
+static std::unordered_map<std::string, t_real(*)(t_real, t_real)> g_mapFuncs2 =
+{
+	{ "pow", std::pow },
 };
 // ----------------------------------------------------------------------------
 
@@ -146,7 +159,7 @@ t_real expr_rest(t_real arg)
 		return expr_rest_val;
 	}
 	// expr_rest -> epsilon
-	else if(lookahead == ')' || lookahead == TOK_END)
+	else if(lookahead == ')' || lookahead == TOK_END || lookahead == ',')
 	{
 		return arg;
 	}
@@ -188,19 +201,69 @@ t_real factor()
 		// using next lookahead, grammar still ll(1)?
 		if(lookahead == '(')
 		{
-			auto iter = g_mapFuncs.find(ident);
-			if(iter == g_mapFuncs.end())
+			next_lookahead();
+
+			// 0-argument function
+			// factor -> TOK_IDENT '(' ')'
+			if(lookahead == ')')
 			{
-				std::cerr << "Unknown function \"" << ident << "\"." << std::endl;
-				return 0.;
+				next_lookahead();
+
+				auto iter = g_mapFuncs0.find(ident);
+				if(iter == g_mapFuncs0.end())
+				{
+					std::cerr << "Unknown function \"" << ident << "\"." << std::endl;
+					return 0.;
+				}
+
+				return (*iter->second)();
 			}
 
-			next_lookahead();
-			t_real expr_val = expr();
-			match(')');
-			next_lookahead();
+			// function with arguments
+			else
+			{
+				// first argument
+				t_real expr_val1 = expr();
 
-			return (*iter->second)(expr_val);
+				// one-argument-function
+				// factor -> TOK_IDENT '(' expr ')'
+				if(lookahead == ')')
+				{
+					next_lookahead();
+
+					auto iter = g_mapFuncs1.find(ident);
+					if(iter == g_mapFuncs1.end())
+					{
+						std::cerr << "Unknown function \"" << ident << "\"." << std::endl;
+						return 0.;
+					}
+
+					return (*iter->second)(expr_val1);
+				}
+
+				// two-argument-function
+				// factor -> TOK_IDENT '(' expr ',' expr ')'
+				else if(lookahead == ',')
+				{
+					next_lookahead();
+					t_real expr_val2 = expr();
+					match(')');
+					next_lookahead();
+
+					auto iter = g_mapFuncs2.find(ident);
+					if(iter == g_mapFuncs2.end())
+					{
+						std::cerr << "Unknown function \"" << ident << "\"." << std::endl;
+						return 0.;
+					}
+
+					return (*iter->second)(expr_val1, expr_val2);
+				}
+				else
+				{
+					std::cerr << "Invalid function call to \"" << ident << "\"." << std::endl;
+				}
+			}
 		}
 
 		// variable lookup
@@ -271,7 +334,7 @@ t_real term_rest(t_real arg)
 	}
 
 	// term_rest -> epsilon
-	else if(lookahead == '+' || lookahead == '-' || lookahead == ')' || lookahead == TOK_END)
+	else if(lookahead == '+' || lookahead == '-' || lookahead == ')' || lookahead == TOK_END || lookahead == ',')
 	{
 		return arg;
 	}

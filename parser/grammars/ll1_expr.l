@@ -43,6 +43,7 @@ ident	[A-Za-z]+[A-Za-z0-9]*
 "%"	{ return '%'; }
 "("	{ return '('; }
 ")"	{ return ')'; }
+","	{ return ','; }
 
 
 {real} {
