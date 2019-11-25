@@ -41,6 +41,7 @@ ident	[A-Za-z]+[A-Za-z0-9]*
 "*"	{ return '*'; }
 "/"	{ return '/'; }
 "%"	{ return '%'; }
+"^"	{ return '^'; }
 "("	{ return '('; }
 ")"	{ return ')'; }
 ","	{ return ','; }
@@ -58,7 +59,8 @@ ident	[A-Za-z]+[A-Za-z0-9]*
 
 
 . {
-	std::cerr << "Unkown token encountered in lexer: " << yylex << "." << std::endl;
+	std::cerr << "Unkown token encountered in lexer: \""
+		<< yytext << "\"." << std::endl;
 }
 
 

@@ -98,36 +98,49 @@ static std::unordered_map<std::string, t_real(*)(t_real, t_real)> g_mapFuncs2 =
 // Productions
 // ----------------------------------------------------------------------------
 
-t_real expr();
-t_real expr_rest(t_real arg);
+// +,- terms
+// (lowest precedence, 1)
+t_real plus_term();
+t_real plus_term_rest(t_real arg);
+
+// *,/,% terms
+// (precedence 2)
+t_real mul_term();
+t_real mul_term_rest(t_real arg);
+
+// ^ terms
+// (precedence 3)
+t_real pow_term();
+t_real pow_term_rest(t_real arg);
+
+// () terms, real factor or identifier
+// (highest precedence, 4)
 t_real factor();
-t_real term();
-t_real term_rest(t_real arg);
 
 
-t_real expr()
+t_real plus_term()
 {
-	// expr -> term expr_rest
+	// plus_term -> mul_term plus_term_rest
 	if(lookahead == '(' || lookahead == TOK_REAL || lookahead == TOK_IDENT)
 	{
-		t_real term_val = term();
-		t_real expr_rest_val = expr_rest(term_val);
+		t_real term_val = mul_term();
+		t_real expr_rest_val = plus_term_rest(term_val);
 
 		return expr_rest_val;
 	}
 	else if(lookahead == '+')	// unary +
 	{
 		next_lookahead();
-		t_real term_val = term();
-		t_real expr_rest_val = expr_rest(term_val);
+		t_real term_val = mul_term();
+		t_real expr_rest_val = plus_term_rest(term_val);
 
 		return expr_rest_val;
 	}
 	else if(lookahead == '-')	// unary -
 	{
 		next_lookahead();
-		t_real term_val = -term();
-		t_real expr_rest_val = expr_rest(term_val);
+		t_real term_val = -mul_term();
+		t_real expr_rest_val = plus_term_rest(term_val);
 
 		return expr_rest_val;
 	}
@@ -137,29 +150,128 @@ t_real expr()
 }
 
 
-t_real expr_rest(t_real arg)
+t_real plus_term_rest(t_real arg)
 {
-	// expr_rest -> '+' term expr_rest
+	// plus_term_rest -> '+' mul_term plus_term_rest
 	if(lookahead == '+')
 	{
 		next_lookahead();
-		t_real term_val = arg + term();
-		t_real expr_rest_val = expr_rest(term_val);
+		t_real term_val = arg + mul_term();
+		t_real expr_rest_val = plus_term_rest(term_val);
 
 		return expr_rest_val;
 	}
 
-	// expr_rest -> '-' term expr_rest
+	// plus_term_rest -> '-' mul_term plus_term_rest
 	else if(lookahead == '-')
 	{
 		next_lookahead();
-		t_real term_val = arg - term();
-		t_real expr_rest_val = expr_rest(term_val);
+		t_real term_val = arg - mul_term();
+		t_real expr_rest_val = plus_term_rest(term_val);
 
 		return expr_rest_val;
 	}
-	// expr_rest -> epsilon
+	// plus_term_rest -> epsilon
 	else if(lookahead == ')' || lookahead == TOK_END || lookahead == ',')
+	{
+		return arg;
+	}
+
+	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
+	return 0.;
+}
+
+
+t_real mul_term()
+{
+	// mul_term -> pow_term mul_term_rest
+	if(lookahead == '(' || lookahead == TOK_REAL || lookahead == TOK_IDENT)
+	{
+		t_real factor_val = pow_term();
+		t_real term_rest_val = mul_term_rest(factor_val);
+
+		return term_rest_val;
+	}
+
+	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
+	return 0.;
+}
+
+
+t_real mul_term_rest(t_real arg)
+{
+	// mul_term_rest -> '*' pow_term mul_term_rest
+	if(lookahead == '*')
+	{
+		next_lookahead();
+		t_real factor_val = arg * pow_term();
+		t_real term_rest_val = mul_term_rest(factor_val);
+
+		return term_rest_val;
+	}
+
+	// mul_term_rest -> '/' pow_term mul_term_rest
+	else if(lookahead == '/')
+	{
+		next_lookahead();
+		t_real factor_val = arg / pow_term();
+		t_real term_rest_val = mul_term_rest(factor_val);
+
+		return term_rest_val;
+	}
+
+	// mul_term_rest -> '%' pow_term mul_term_rest
+	else if(lookahead == '%')
+	{
+		next_lookahead();
+		t_real factor_val = std::fmod(arg, pow_term());
+		t_real term_rest_val = mul_term_rest(factor_val);
+
+		return term_rest_val;
+	}
+
+	// mul_term_rest -> epsilon
+	else if(lookahead == '+' || lookahead == '-' || lookahead == ')' || lookahead == TOK_END || lookahead == ',')
+	{
+		return arg;
+	}
+
+	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
+	return 0.;
+}
+
+
+t_real pow_term()
+{
+	// pow_term -> factor pow_term_rest
+	if(lookahead == '(' || lookahead == TOK_REAL || lookahead == TOK_IDENT)
+	{
+		t_real factor_val = factor();
+		t_real term_rest_val = pow_term_rest(factor_val);
+
+		return term_rest_val;
+	}
+
+	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
+	return 0.;
+}
+
+
+t_real pow_term_rest(t_real arg)
+{
+	// pow_term_rest -> '^' factor pow_term_rest
+	if(lookahead == '^')
+	{
+		next_lookahead();
+		t_real factor_val = std::pow(arg, factor());
+		t_real term_rest_val = pow_term_rest(factor_val);
+
+		return term_rest_val;
+	}
+
+	// pow_term_rest -> epsilon
+	else if(lookahead == '+' || lookahead == '-' || lookahead == ')' || lookahead == TOK_END || lookahead == ','
+		|| lookahead == '*' || lookahead == '/' || lookahead == '%')
 	{
 		return arg;
 	}
@@ -171,11 +283,11 @@ t_real expr_rest(t_real arg)
 
 t_real factor()
 {
-	// factor -> '(' expr ')'
+	// factor -> '(' plus_term ')'
 	if(lookahead == '(')
 	{
 		next_lookahead();
-		t_real expr_val = expr();
+		t_real expr_val = plus_term();
 		match(')');
 		next_lookahead();
 
@@ -223,10 +335,10 @@ t_real factor()
 			else
 			{
 				// first argument
-				t_real expr_val1 = expr();
+				t_real expr_val1 = plus_term();
 
 				// one-argument-function
-				// factor -> TOK_IDENT '(' expr ')'
+				// factor -> TOK_IDENT '(' plus_term ')'
 				if(lookahead == ')')
 				{
 					next_lookahead();
@@ -242,11 +354,11 @@ t_real factor()
 				}
 
 				// two-argument-function
-				// factor -> TOK_IDENT '(' expr ',' expr ')'
+				// factor -> TOK_IDENT '(' plus_term ',' plus_term ')'
 				else if(lookahead == ',')
 				{
 					next_lookahead();
-					t_real expr_val2 = expr();
+					t_real expr_val2 = plus_term();
 					match(')');
 					next_lookahead();
 
@@ -283,65 +395,6 @@ t_real factor()
 	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
 	return 0.;
 }
-
-
-t_real term()
-{
-	// term -> factor term_rest
-	if(lookahead == '(' || lookahead == TOK_REAL || lookahead == TOK_IDENT)
-	{
-		t_real factor_val = factor();
-		t_real term_rest_val = term_rest(factor_val);
-
-		return term_rest_val;
-	}
-
-	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
-	return 0.;
-}
-
-
-t_real term_rest(t_real arg)
-{
-	// term_rest -> '*' factor term_rest
-	if(lookahead == '*')
-	{
-		next_lookahead();
-		t_real factor_val = arg * factor();
-		t_real term_rest_val = term_rest(factor_val);
-
-		return term_rest_val;
-	}
-
-	// term_rest -> '/' factor term_rest
-	else if(lookahead == '/')
-	{
-		next_lookahead();
-		t_real factor_val = arg / factor();
-		t_real term_rest_val = term_rest(factor_val);
-
-		return term_rest_val;
-	}
-
-	// term_rest -> '%' factor term_rest
-	else if(lookahead == '%')
-	{
-		next_lookahead();
-		t_real factor_val = std::fmod(arg, factor());
-		t_real term_rest_val = term_rest(factor_val);
-
-		return term_rest_val;
-	}
-
-	// term_rest -> epsilon
-	else if(lookahead == '+' || lookahead == '-' || lookahead == ')' || lookahead == TOK_END || lookahead == ',')
-	{
-		return arg;
-	}
-
-	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
-	return 0.;
-}
 // ----------------------------------------------------------------------------
 
 
@@ -354,7 +407,7 @@ int main()
 	while(1)
 	{
 		next_lookahead();
-		std::cout << expr() << std::endl;
+		std::cout << plus_term() << std::endl;
 	}
 
 	return 0;

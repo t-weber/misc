@@ -211,6 +211,8 @@ protected:
 			return;
 
 		std::set<std::shared_ptr<Symbol>> first;
+		std::vector<std::set<std::shared_ptr<Symbol>>> first_perrule;
+		first_perrule.resize(nonterm->NumRules());
 
 		// iterate rules
 		for(std::size_t iRule=0; iRule<nonterm->NumRules(); ++iRule)
@@ -226,6 +228,7 @@ protected:
 				if(sym->GetType() == SymbolType::TERM)
 				{
 					first.insert(sym);
+					first_perrule[iRule].insert(sym);
 					break;
 				}
 				// non-terminal
@@ -245,12 +248,16 @@ protected:
 
 							// last non-terminal reached -> add epsilon
 							if(iSym == rule.size()-1)
+							{
 								first.insert(symprod);
+								first_perrule[iRule].insert(symprod);
+							}
 
 							continue;
 						}
 
 						first.insert(symprod);
+						first_perrule[iRule].insert(symprod);
 					}
 
 					// no epsilon in production -> end
@@ -261,6 +268,7 @@ protected:
 		}
 
 		m_first[nonterm->GetId()] = first;
+		m_first_perrule[nonterm->GetId()] = first_perrule;
 	}
 
 
@@ -359,6 +367,7 @@ protected:
 public:
 	LL1(const std::vector<std::shared_ptr<NonTerminal>>& nonterms,
 		const std::shared_ptr<NonTerminal>& start)
+		: m_nonterminals(nonterms), m_start(start)
 	{
 		// calculate first sets for all known non-terminals
 		for(const auto& nonterm : nonterms)
@@ -375,18 +384,61 @@ public:
 	const std::map<std::string, std::set<std::shared_ptr<Symbol>>>& GetFirst() const { return m_first; }
 	const std::map<std::string, std::set<std::shared_ptr<Symbol>>>& GetFollow() const { return m_follow; }
 
+	const std::map<std::string, std::vector<std::set<std::shared_ptr<Symbol>>>>& GetFirstPerRule() const { return m_first_perrule; }
+
+	const std::vector<std::shared_ptr<NonTerminal>>& GetProductions() const { return m_nonterminals; }
+
 
 private:
+	// productions
+	std::vector<std::shared_ptr<NonTerminal>> m_nonterminals;
+	std::shared_ptr<NonTerminal> m_start;
+
 	// first and follow sets
 	std::map<std::string, std::set<std::shared_ptr<Symbol>>> m_first;
 	std::map<std::string, std::set<std::shared_ptr<Symbol>>> m_follow;
+
+	// per-rile first sets
+	std::map<std::string, std::vector<std::set<std::shared_ptr<Symbol>>>> m_first_perrule;
 };
 
 
 
 std::ostream& operator<<(std::ostream& ostr, const LL1& ll1)
 {
-	ostr << "FIRST sets:\n";
+	ostr << "Productions:\n";
+	for(const auto& nonterm : ll1.GetProductions())
+	{
+		ostr << "\t" << nonterm->GetId() << "\n\t\t-> ";
+		for(std::size_t iRule=0; iRule<nonterm->NumRules(); ++iRule)
+		{
+			// rule
+			const auto& rule = nonterm->GetRule(iRule);
+			for(const auto& rhs : rule)
+				ostr << rhs->GetId() << " ";
+
+			// first set
+			auto iter = ll1.GetFirstPerRule().find(nonterm->GetId());
+			if(iter != ll1.GetFirstPerRule().end())
+			{
+				if(iRule < iter->second.size())
+				{
+					ostr << "\n\t\t\tFIRST: { ";
+					const auto& first = iter->second[iRule];
+					for(const auto& sym : first)
+						ostr << sym->GetId() << ", ";
+					ostr << " }";
+				}
+			}
+
+			if(iRule < nonterm->NumRules()-1)
+				ostr << "\n\t\t | ";
+		}
+		ostr << "\n";
+	}
+
+
+	ostr << "\nFIRST sets:\n";
 	for(const auto& [id, set] : ll1.GetFirst() )
 	{
 		ostr << "\t" << std::left << std::setw(16) << id << ": { ";
@@ -420,10 +472,12 @@ int main()
 
 
 	// test grammar from: https://de.wikipedia.org/wiki/LL(k)-Grammatik#Beispiel
-	auto expr = std::make_shared<NonTerminal>("expr");
-	auto expr_rest = std::make_shared<NonTerminal>("expr_rest");
-	auto term = std::make_shared<NonTerminal>("term");
-	auto term_rest = std::make_shared<NonTerminal>("term_rest");
+	auto expr = std::make_shared<NonTerminal>("plus_term");
+	auto expr_rest = std::make_shared<NonTerminal>("plus_term_rest");
+	auto term = std::make_shared<NonTerminal>("mul_term");
+	auto term_rest = std::make_shared<NonTerminal>("mul_term_rest");
+	auto pow_term = std::make_shared<NonTerminal>("pow_term");
+	auto pow_term_rest = std::make_shared<NonTerminal>("pow_term_rest");
 	auto factor = std::make_shared<NonTerminal>("factor");
 
 	auto plus = std::make_shared<Terminal>("+");
@@ -431,6 +485,7 @@ int main()
 	auto mult = std::make_shared<Terminal>("*");
 	auto div = std::make_shared<Terminal>("/");
 	auto mod = std::make_shared<Terminal>("%");
+	auto pow = std::make_shared<Terminal>("^");
 	auto bracket_open = std::make_shared<Terminal>("(");
 	auto bracket_close = std::make_shared<Terminal>(")");
 	auto comma = std::make_shared<Terminal>(",");
@@ -440,16 +495,19 @@ int main()
 	expr->AddRule({ term, expr_rest });
 	expr->AddRule({ plus, term, expr_rest });	// unary +
 	expr->AddRule({ minus, term, expr_rest });	// unary -
-	expr->AddRule({ term, expr_rest });
 	expr_rest->AddRule({ plus, term, expr_rest });
 	expr_rest->AddRule({ minus, term, expr_rest });
 	expr_rest->AddRule({ g_eps });
 
-	term->AddRule({ factor, term_rest });
-	term_rest->AddRule({ mult, factor, term_rest });
-	term_rest->AddRule({ div, factor, term_rest });
-	term_rest->AddRule({ mod, factor, term_rest });
+	term->AddRule({ pow_term, term_rest });
+	term_rest->AddRule({ mult, pow_term, term_rest });
+	term_rest->AddRule({ div, pow_term, term_rest });
+	term_rest->AddRule({ mod, pow_term, term_rest });
 	term_rest->AddRule({ g_eps });
+
+	pow_term->AddRule({ factor, pow_term_rest });
+	pow_term_rest->AddRule({ pow, factor, pow_term_rest });
+	pow_term_rest->AddRule({ g_eps });
 
 	factor->AddRule({ bracket_open, expr, bracket_close });
 	factor->AddRule({ ident, bracket_open, bracket_close });			// function call
@@ -458,7 +516,7 @@ int main()
 	factor->AddRule({ sym });
 
 
-	LL1 ll1({expr, expr_rest, term, term_rest, factor}, expr);
+	LL1 ll1({expr, expr_rest, term, term_rest, pow_term, pow_term_rest, factor}, expr);
 	std::cout << ll1 << std::endl;
 
 	return 0;
