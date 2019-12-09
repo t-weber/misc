@@ -108,7 +108,7 @@ term_pow[pot]
 
 term_pow_rest[pot]
 	: '^' factor[term1] term_pow_rest[term2]	{ $pot = std::pow($term1, $term2); }
-	| /*eps*/		{ $$ = 1.; }
+	| /*eps*/		{ $pot = 1.; }
 	;
 
 
