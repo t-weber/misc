@@ -1,10 +1,12 @@
 /**
- * first and follow sets of LL(1) grammars
+ * action and jump tables of LR(1) grammars
  * @author Tobias Weber
- * @date 19-oct-19
+ * @date 10-dec-19
  * @license see 'LICENSE.EUPL' file
  *
  * References:
+ *	- http://www.cs.ecu.edu/karl/5220/spr16/Notes/Bottom-up/slr1table.html
+ *	- https://en.wikipedia.org/wiki/LR_parser
  *	- https://www.cs.uaf.edu/~cs331/notes/FirstFollow.pdf
  *	- https://de.wikipedia.org/wiki/LL(k)-Grammatik
  */
@@ -18,6 +20,7 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <functional>
 
 
 
@@ -196,9 +199,9 @@ private:
 
 
 /**
- * LL(1) grammar
+ * LR(1) grammar
  */
-class LL1
+class LR1
 {
 protected:
 	/**
@@ -364,8 +367,82 @@ protected:
 	}
 
 
+	/**
+	 * calculates SLR collection
+	 */
+	void CalcLRCollection(
+		const std::shared_ptr<NonTerminal>& lhs,
+		const std::vector<std::shared_ptr<Symbol>> &rule,
+		std::size_t cursor = 0)
+	{
+		// cursor at the end?
+		if(cursor >= rule.size())
+			return;
+
+
+		std::vector<std::tuple<std::shared_ptr<NonTerminal>,	// lhs
+			std::vector<std::shared_ptr<Symbol>>,				// rules
+			std::size_t>										// cursor
+		> collection;
+
+		const auto& sym = rule[cursor];
+		collection.push_back(std::make_tuple(lhs, rule, cursor));
+
+		// non-terminal: need to insert productions
+		if(sym->GetType() == SymbolType::NONTERM)
+		{
+			const auto& nonterm = reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
+
+			std::function<void(const std::shared_ptr<NonTerminal>& _nonterm)> addrhsrules;
+			addrhsrules = [&collection, &addrhsrules, this]
+				(const std::shared_ptr<NonTerminal>& _nonterm) -> void
+			{
+				for(std::size_t rulerhsidx=0; rulerhsidx<_nonterm->NumRules(); ++rulerhsidx)
+				{
+					auto& rulerhs = _nonterm->GetRule(rulerhsidx);
+					collection.push_back(std::make_tuple(_nonterm, rulerhs, 0));
+
+					// recursively add further nonterminals next to cursor
+					if(rulerhs.size() && rulerhs[0]->GetType() == SymbolType::NONTERM)
+						addrhsrules(reinterpret_cast<const std::shared_ptr<NonTerminal>&>(rulerhs[0]));
+				}
+			};
+
+			addrhsrules(nonterm);
+		}
+
+
+		// output collection
+		for(const auto& item : collection)
+		{
+			const auto& lhs = std::get<0>(item);
+			const auto& rules = std::get<1>(item);
+			const auto& cursor = std::get<2>(item);
+
+			if(lhs)
+				std::cout << lhs->GetId() << " -> ";
+
+			for(std::size_t iSym=0; iSym<rules.size(); ++iSym)
+			{
+				if(iSym == cursor)
+					std::cout << ". ";
+				std::cout << rules[iSym]->GetId() << " ";
+			}
+			// cursor at end?
+			if(cursor >= rules.size())
+				std::cout << ".";
+
+			std::cout << std::endl;
+		}
+
+
+		// advance cursor
+		// TODO
+	}
+
+
 public:
-	LL1(const std::vector<std::shared_ptr<NonTerminal>>& nonterms,
+	LR1(const std::vector<std::shared_ptr<NonTerminal>>& nonterms,
 		const std::shared_ptr<NonTerminal>& start)
 		: m_nonterminals(nonterms), m_start(start)
 	{
@@ -376,9 +453,12 @@ public:
 		// calculate follow sets for all known non-terminals
 		for(const auto& nonterm : nonterms)
 			CalcFollow(nonterms, start, nonterm);
+
+		// calculate the LR collection
+		CalcLRCollection(start, start->GetRule(0), 0);
 	}
 
-	LL1() = delete;
+	LR1() = delete;
 
 
 	const std::map<std::string, std::set<std::shared_ptr<Symbol>>>& GetFirst() const { return m_first; }
@@ -404,10 +484,10 @@ private:
 
 
 
-std::ostream& operator<<(std::ostream& ostr, const LL1& ll1)
+std::ostream& operator<<(std::ostream& ostr, const LR1& lr1)
 {
 	ostr << "Productions:\n";
-	for(const auto& nonterm : ll1.GetProductions())
+	for(const auto& nonterm : lr1.GetProductions())
 	{
 		ostr << "\t" << nonterm->GetId() << "\n\t\t-> ";
 		for(std::size_t iRule=0; iRule<nonterm->NumRules(); ++iRule)
@@ -418,8 +498,8 @@ std::ostream& operator<<(std::ostream& ostr, const LL1& ll1)
 				ostr << rhs->GetId() << " ";
 
 			// first set
-			auto iter = ll1.GetFirstPerRule().find(nonterm->GetId());
-			if(iter != ll1.GetFirstPerRule().end())
+			auto iter = lr1.GetFirstPerRule().find(nonterm->GetId());
+			if(iter != lr1.GetFirstPerRule().end())
 			{
 				if(iRule < iter->second.size())
 				{
@@ -439,7 +519,7 @@ std::ostream& operator<<(std::ostream& ostr, const LL1& ll1)
 
 
 	ostr << "\nFIRST sets:\n";
-	for(const auto& [id, set] : ll1.GetFirst() )
+	for(const auto& [id, set] : lr1.GetFirst() )
 	{
 		ostr << "\t" << std::left << std::setw(16) << id << ": { ";
 		for(const auto& sym : set)
@@ -448,7 +528,7 @@ std::ostream& operator<<(std::ostream& ostr, const LL1& ll1)
 	}
 
 	ostr << "\nFOLLOW sets:\n";
-	for(const auto& [id, set] : ll1.GetFollow() )
+	for(const auto& [id, set] : lr1.GetFollow() )
 	{
 		ostr << "\t" << std::left << std::setw(16) << id << ": { ";
 		for(const auto& sym : set)
@@ -472,6 +552,7 @@ int main()
 
 
 	// test grammar from: https://de.wikipedia.org/wiki/LL(k)-Grammatik#Beispiel
+	auto start = std::make_shared<NonTerminal>("start");
 	auto add_term = std::make_shared<NonTerminal>("add_term");
 	auto add_term_rest = std::make_shared<NonTerminal>("add_term_rest");
 	auto mul_term = std::make_shared<NonTerminal>("mul_term");
@@ -491,6 +572,8 @@ int main()
 	auto comma = std::make_shared<Terminal>(",");
 	auto sym = std::make_shared<Terminal>("symbol");
 	auto ident = std::make_shared<Terminal>("ident");
+
+	start->AddRule({ add_term });
 
 	add_term->AddRule({ mul_term, add_term_rest });
 	add_term->AddRule({ plus, mul_term, add_term_rest });	// unary +
@@ -516,8 +599,8 @@ int main()
 	factor->AddRule({ sym });
 
 
-	LL1 ll1({add_term, add_term_rest, mul_term, mul_term_rest, pow_term, pow_term_rest, factor}, add_term);
-	std::cout << ll1 << std::endl;
+	LR1 lr1({start, add_term, add_term_rest, mul_term, mul_term_rest, pow_term, pow_term_rest, factor}, start);
+	std::cout << lr1 << std::endl;
 
 	return 0;
 }
