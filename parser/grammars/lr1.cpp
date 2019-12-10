@@ -31,7 +31,6 @@ enum class SymbolType
 };
 
 
-
 /**
  * symbol base class
  */
@@ -371,47 +370,59 @@ protected:
 	 * calculates SLR collection
 	 */
 	void CalcLRCollection(
-		const std::shared_ptr<NonTerminal>& lhs,
-		const std::vector<std::shared_ptr<Symbol>> &rule,
-		std::size_t cursor = 0)
+		const std::vector<std::shared_ptr<NonTerminal>>& _lhs,
+		const std::vector<std::vector<std::shared_ptr<Symbol>>> &rules,
+		const std::vector<std::size_t>& cursors)
 	{
-		// cursor at the end?
-		if(cursor >= rule.size())
-			return;
+		using t_collection = std::vector<std::tuple<
+			std::shared_ptr<NonTerminal>,	// lhs
+			std::vector<std::shared_ptr<Symbol>>,	// rule
+			std::size_t>							// cursor
+		>;
+		t_collection collection;
 
-
-		std::vector<std::tuple<std::shared_ptr<NonTerminal>,	// lhs
-			std::vector<std::shared_ptr<Symbol>>,				// rules
-			std::size_t>										// cursor
-		> collection;
-
-		const auto& sym = rule[cursor];
-		collection.push_back(std::make_tuple(lhs, rule, cursor));
-
-		// non-terminal: need to insert productions
-		if(sym->GetType() == SymbolType::NONTERM)
+		std::function<void(const std::shared_ptr<NonTerminal>& _nonterm)> addrhsrules;
+		addrhsrules = [&collection, &addrhsrules, this]
+		(const std::shared_ptr<NonTerminal>& _nonterm) -> void
 		{
-			const auto& nonterm = reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
-
-			std::function<void(const std::shared_ptr<NonTerminal>& _nonterm)> addrhsrules;
-			addrhsrules = [&collection, &addrhsrules, this]
-				(const std::shared_ptr<NonTerminal>& _nonterm) -> void
+			for(std::size_t rulerhsidx=0; rulerhsidx<_nonterm->NumRules(); ++rulerhsidx)
 			{
-				for(std::size_t rulerhsidx=0; rulerhsidx<_nonterm->NumRules(); ++rulerhsidx)
-				{
-					auto& rulerhs = _nonterm->GetRule(rulerhsidx);
-					collection.push_back(std::make_tuple(_nonterm, rulerhs, 0));
+				auto& rulerhs = _nonterm->GetRule(rulerhsidx);
+				collection.push_back(std::make_tuple(_nonterm, rulerhs, 0));
 
-					// recursively add further nonterminals next to cursor
-					if(rulerhs.size() && rulerhs[0]->GetType() == SymbolType::NONTERM)
-						addrhsrules(reinterpret_cast<const std::shared_ptr<NonTerminal>&>(rulerhs[0]));
-				}
-			};
+				// recursively add further nonterminals next to cursor
+				if(rulerhs.size() && rulerhs[0]->GetType() == SymbolType::NONTERM)
+					addrhsrules(reinterpret_cast<const std::shared_ptr<NonTerminal>&>(rulerhs[0]));
+			}
+		};
 
-			addrhsrules(nonterm);
+
+		// iterate all relevant productions for given lhs
+		for(std::size_t ruleidx=0; ruleidx<rules.size(); ++ruleidx)
+		{
+			const auto& lhs = _lhs[ruleidx];
+			const auto& rule = rules[ruleidx];
+			std::size_t cursor = cursors[ruleidx];
+
+			// cursor at the end?
+			// TODO: output collections with cursor at the end
+			if(cursor >= rule.size())
+				continue;
+
+			const auto& sym = rule[cursor];
+			collection.push_back(std::make_tuple(lhs, rule, cursor));
+
+			// non-terminal: need to insert productions
+			if(sym->GetType() == SymbolType::NONTERM)
+			{
+				const auto& nonterm = reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
+				addrhsrules(nonterm);
+			}
 		}
 
 
+
+		// --------------------------------------------------------------------
 		// output collection
 		for(const auto& item : collection)
 		{
@@ -432,12 +443,73 @@ protected:
 			if(cursor >= rules.size())
 				std::cout << ".";
 
+			std::cout << "\n";
+		}
+		if(collection.size())
 			std::cout << std::endl;
+		// --------------------------------------------------------------------
+
+
+
+		// --------------------------------------------------------------------
+		// advance cursor
+		// get possible transition symbols
+		std::unordered_map<std::string, std::vector<std::size_t>> transSyms;
+		for(std::size_t itemidx=0; itemidx<collection.size(); ++itemidx)
+		{
+			const auto& item = collection[itemidx];
+
+			const auto& rule = std::get<1>(item);
+			const auto& cursor = std::get<2>(item);
+
+			if(cursor < rule.size())
+				transSyms[rule[cursor]->GetId()].push_back(itemidx);
 		}
 
 
-		// advance cursor
-		// TODO
+		// for memoisation of already calculated collections
+		static std::set<std::string> memo;
+
+		// iterate possible transition symbols
+		for(const auto& pair : transSyms)
+		{
+			std::vector<std::shared_ptr<NonTerminal>> nextlhs;
+			std::vector<std::vector<std::shared_ptr<Symbol>>> nextrules;
+			std::vector<std::size_t> nextcursors;
+			std::string hash;
+
+			const std::string& trans = pair.first;
+			for(std::size_t itemidx : pair.second)
+			{
+				const auto& item = collection[itemidx];
+
+				const auto& lhs = std::get<0>(item);
+				const auto& rule = std::get<1>(item);
+				std::size_t cursor = std::get<2>(item) + 1;
+
+				nextlhs.push_back(lhs);
+				nextrules.push_back(rule);
+				nextcursors.push_back(cursor);
+
+				// TODO: use real hash
+				hash += lhs->GetId() + "#;#";
+				for(const auto& sym : rule)
+					hash += sym->GetId() + "#,#";
+				hash += "#;#";;
+				hash += std::to_string(cursor);
+				hash += "#|#";
+			}
+
+			// not yet calculated?
+			if(memo.find(hash) == memo.end())
+			{
+				memo.insert(hash);
+				CalcLRCollection(nextlhs, nextrules, nextcursors);
+
+				// TODO
+			}
+		}
+		// --------------------------------------------------------------------
 	}
 
 
@@ -455,7 +527,7 @@ public:
 			CalcFollow(nonterms, start, nonterm);
 
 		// calculate the LR collection
-		CalcLRCollection(start, start->GetRule(0), 0);
+		CalcLRCollection({{start}}, {{start->GetRule(0)}}, {{0}});
 	}
 
 	LR1() = delete;
@@ -550,57 +622,82 @@ int main()
 	g_eps = std::make_shared<Terminal>("eps", true, false);
 	g_end = std::make_shared<Terminal>("end", false, true);
 
+	constexpr int example = 1;
 
-	// test grammar from: https://de.wikipedia.org/wiki/LL(k)-Grammatik#Beispiel
-	auto start = std::make_shared<NonTerminal>("start");
-	auto add_term = std::make_shared<NonTerminal>("add_term");
-	auto add_term_rest = std::make_shared<NonTerminal>("add_term_rest");
-	auto mul_term = std::make_shared<NonTerminal>("mul_term");
-	auto mul_term_rest = std::make_shared<NonTerminal>("mul_term_rest");
-	auto pow_term = std::make_shared<NonTerminal>("pow_term");
-	auto pow_term_rest = std::make_shared<NonTerminal>("pow_term_rest");
-	auto factor = std::make_shared<NonTerminal>("factor");
+	if constexpr(example == 0)
+	{
+		// test grammar from: https://de.wikipedia.org/wiki/LL(k)-Grammatik#Beispiel
+		auto start = std::make_shared<NonTerminal>("start");
 
-	auto plus = std::make_shared<Terminal>("+");
-	auto minus = std::make_shared<Terminal>("-");
-	auto mult = std::make_shared<Terminal>("*");
-	auto div = std::make_shared<Terminal>("/");
-	auto mod = std::make_shared<Terminal>("%");
-	auto pow = std::make_shared<Terminal>("^");
-	auto bracket_open = std::make_shared<Terminal>("(");
-	auto bracket_close = std::make_shared<Terminal>(")");
-	auto comma = std::make_shared<Terminal>(",");
-	auto sym = std::make_shared<Terminal>("symbol");
-	auto ident = std::make_shared<Terminal>("ident");
+		auto add_term = std::make_shared<NonTerminal>("add_term");
+		auto add_term_rest = std::make_shared<NonTerminal>("add_term_rest");
+		auto mul_term = std::make_shared<NonTerminal>("mul_term");
+		auto mul_term_rest = std::make_shared<NonTerminal>("mul_term_rest");
+		auto pow_term = std::make_shared<NonTerminal>("pow_term");
+		auto pow_term_rest = std::make_shared<NonTerminal>("pow_term_rest");
+		auto factor = std::make_shared<NonTerminal>("factor");
 
-	start->AddRule({ add_term });
+		auto plus = std::make_shared<Terminal>("+");
+		auto minus = std::make_shared<Terminal>("-");
+		auto mult = std::make_shared<Terminal>("*");
+		auto div = std::make_shared<Terminal>("/");
+		auto mod = std::make_shared<Terminal>("%");
+		auto pow = std::make_shared<Terminal>("^");
+		auto bracket_open = std::make_shared<Terminal>("(");
+		auto bracket_close = std::make_shared<Terminal>(")");
+		auto comma = std::make_shared<Terminal>(",");
+		auto sym = std::make_shared<Terminal>("symbol");
+		auto ident = std::make_shared<Terminal>("ident");
 
-	add_term->AddRule({ mul_term, add_term_rest });
-	add_term->AddRule({ plus, mul_term, add_term_rest });	// unary +
-	add_term->AddRule({ minus, mul_term, add_term_rest });	// unary -
-	add_term_rest->AddRule({ plus, mul_term, add_term_rest });
-	add_term_rest->AddRule({ minus, mul_term, add_term_rest });
-	add_term_rest->AddRule({ g_eps });
+		start->AddRule({ add_term });
 
-	mul_term->AddRule({ pow_term, mul_term_rest });
-	mul_term_rest->AddRule({ mult, pow_term, mul_term_rest });
-	mul_term_rest->AddRule({ div, pow_term, mul_term_rest });
-	mul_term_rest->AddRule({ mod, pow_term, mul_term_rest });
-	mul_term_rest->AddRule({ g_eps });
+		add_term->AddRule({ mul_term, add_term_rest });
+		add_term->AddRule({ plus, mul_term, add_term_rest });	// unary +
+		add_term->AddRule({ minus, mul_term, add_term_rest });	// unary -
+		add_term_rest->AddRule({ plus, mul_term, add_term_rest });
+		add_term_rest->AddRule({ minus, mul_term, add_term_rest });
+		add_term_rest->AddRule({ g_eps });
 
-	pow_term->AddRule({ factor, pow_term_rest });
-	pow_term_rest->AddRule({ pow, factor, pow_term_rest });
-	pow_term_rest->AddRule({ g_eps });
+		mul_term->AddRule({ pow_term, mul_term_rest });
+		mul_term_rest->AddRule({ mult, pow_term, mul_term_rest });
+		mul_term_rest->AddRule({ div, pow_term, mul_term_rest });
+		mul_term_rest->AddRule({ mod, pow_term, mul_term_rest });
+		mul_term_rest->AddRule({ g_eps });
 
-	factor->AddRule({ bracket_open, add_term, bracket_close });
-	factor->AddRule({ ident, bracket_open, bracket_close });			// function call
-	factor->AddRule({ ident, bracket_open, add_term, bracket_close });			// function call
-	factor->AddRule({ ident, bracket_open, add_term, comma, add_term, bracket_close });	// function call
-	factor->AddRule({ sym });
+		pow_term->AddRule({ factor, pow_term_rest });
+		pow_term_rest->AddRule({ pow, factor, pow_term_rest });
+		pow_term_rest->AddRule({ g_eps });
+
+		factor->AddRule({ bracket_open, add_term, bracket_close });
+		factor->AddRule({ ident, bracket_open, bracket_close });			// function call
+		factor->AddRule({ ident, bracket_open, add_term, bracket_close });			// function call
+		factor->AddRule({ ident, bracket_open, add_term, comma, add_term, bracket_close });	// function call
+		factor->AddRule({ sym });
 
 
-	LR1 lr1({start, add_term, add_term_rest, mul_term, mul_term_rest, pow_term, pow_term_rest, factor}, start);
-	std::cout << lr1 << std::endl;
+		LR1 lr1({start, add_term, add_term_rest, mul_term, mul_term_rest, pow_term, pow_term_rest, factor}, start);
+		std::cout << lr1 << std::endl;
+	}
+
+	else if constexpr(example == 1)
+	{
+		auto start = std::make_shared<NonTerminal>("start");
+
+		auto A = std::make_shared<NonTerminal>("A");
+		auto B = std::make_shared<NonTerminal>("B");
+
+		auto a = std::make_shared<Terminal>("a");
+		auto b = std::make_shared<Terminal>("b");
+
+		start->AddRule({ A });
+
+		A->AddRule({ a, b, B });
+		A->AddRule({ b, b, B });
+		B->AddRule({ b, B });
+
+		LR1 lr1({start, A, B}, start);
+		std::cout << lr1 << std::endl;
+	}
 
 	return 0;
 }
