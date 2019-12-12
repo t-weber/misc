@@ -372,7 +372,8 @@ protected:
 	void CalcLRCollection(
 		const std::vector<std::shared_ptr<NonTerminal>>& _lhs,
 		const std::vector<std::vector<std::shared_ptr<Symbol>>> &rules,
-		const std::vector<std::size_t>& cursors)
+		const std::vector<std::size_t>& cursors,
+		std::size_t rulefrom = 0, const std::string *symTransition=nullptr)
 	{
 		using t_collection = std::vector<std::tuple<
 			std::shared_ptr<NonTerminal>,	// lhs
@@ -404,13 +405,12 @@ protected:
 			const auto& rule = rules[ruleidx];
 			std::size_t cursor = cursors[ruleidx];
 
-			// cursor at the end?
-			// TODO: output collections with cursor at the end
-			if(cursor >= rule.size())
-				continue;
-
 			const auto& sym = rule[cursor];
 			collection.push_back(std::make_tuple(lhs, rule, cursor));
+
+			// cursor at the end?
+			if(cursor >= rule.size())
+				continue;
 
 			// non-terminal: need to insert productions
 			if(sym->GetType() == SymbolType::NONTERM)
@@ -424,6 +424,16 @@ protected:
 
 		// --------------------------------------------------------------------
 		// output collection
+		static std::size_t rulectr = 0;
+		std::size_t rulenum = rulectr++;
+		std::cout << "item " << rulenum;
+		if(symTransition)
+		{
+			std::cout << " (transition from item " << rulefrom
+				<< " with symbol " << *symTransition;
+		}
+		std::cout << ":" << std::endl;
+
 		for(const auto& item : collection)
 		{
 			const auto& lhs = std::get<0>(item);
@@ -431,7 +441,7 @@ protected:
 			const auto& cursor = std::get<2>(item);
 
 			if(lhs)
-				std::cout << lhs->GetId() << " -> ";
+				std::cout << "\t" << lhs->GetId() << " -> ";
 
 			for(std::size_t iSym=0; iSym<rules.size(); ++iSym)
 			{
@@ -504,9 +514,9 @@ protected:
 			if(memo.find(hash) == memo.end())
 			{
 				memo.insert(hash);
-				CalcLRCollection(nextlhs, nextrules, nextcursors);
+				CalcLRCollection(nextlhs, nextrules, nextcursors, rulenum, &trans);
 
-				// TODO
+				// TODO: write transition to cached collection items
 			}
 		}
 		// --------------------------------------------------------------------
