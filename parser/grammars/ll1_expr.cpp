@@ -145,6 +145,9 @@ t_real plus_term()
 		return expr_rest_val;
 	}
 
+	if(lookahead == 0 || lookahead == EOF)
+		exit(0);
+
 	std::cerr << "Invalid lookahead in " << __func__ << ": " << lookahead << "." << std::endl;
 	return 0.;
 }
