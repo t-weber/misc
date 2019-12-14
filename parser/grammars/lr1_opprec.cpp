@@ -5,10 +5,15 @@
  * @date 14-dec-19
  * @license see 'LICENSE.EUPL' file
  *
- * Reference:
- * 	https://www.geeksforgeeks.org/operator-grammar-and-precedence-parser-in-toc/
+ * References:
+ * - https://www.geeksforgeeks.org/operator-grammar-and-precedence-parser-in-toc/
+ * - "Übersetzerbau" (1999, 2013), ISBN: 978-3540653899, Chapter 3.3.2
  *
  * flex -o ll1_lexer.cpp ll1_expr.l && g++ -std=c++17 -o lr1_opprec lr1_opprec.cpp ll1_lexer.cpp
+ *
+ * Tests:
+ * 	echo "2 + 3*4^2" | ./lr1_opprec
+ * 	echo "-(2+3)*(4+1)^2" | ./lr1_opprec
  */
 
 #include <iostream>
@@ -36,6 +41,13 @@ extern char* yytext;
 #define NONTERM_EXPR	2000
 
 
+// symbol table
+static std::unordered_map<std::string, t_real> g_mapSymbols =
+{
+	{ "pi", M_PI },
+};
+
+
 std::tuple<bool, t_real> parse(bool bDebug=0)
 {
 	auto get_prec_idx = [](int sym1, int sym2) -> int
@@ -44,10 +56,12 @@ std::tuple<bool, t_real> parse(bool bDebug=0)
 		if(sym1 == '-') sym1 = '+';
 		else if(sym1 == '/') sym1 = '*';
 		else if(sym1 == '%') sym1 = '*';
+		else if(sym1 == TOK_IDENT) sym1 = TOK_REAL;
 
 		if(sym2 == '-') sym2 = '+';
 		else if(sym2 == '/') sym2 = '*';
 		else if(sym2 == '%') sym2 = '*';
+		else if(sym2 == TOK_IDENT) sym2 = TOK_REAL;
 
 		return (sym1<<16) + sym2;
 	};
@@ -74,21 +88,25 @@ std::tuple<bool, t_real> parse(bool bDebug=0)
 	// operator precedence table
 	std::unordered_map<int, short> prec_tab
 	{{
+		// symmetric precedences
+
 		std::make_pair(get_prec_idx('+', '+'), -1),
 		std::make_pair(get_prec_idx('+', '*'), +1),
+		std::make_pair(get_prec_idx('+', '^'), +1),
 		std::make_pair(get_prec_idx('+', TOK_REAL), +1),
-		std::make_pair(get_prec_idx('+', TOK_IDENT), +1),
 		std::make_pair(get_prec_idx('+', TOK_END), -1),
 
 		std::make_pair(get_prec_idx('*', '*'), -1),
+		std::make_pair(get_prec_idx('*', '^'), +1),
 		std::make_pair(get_prec_idx('*', TOK_REAL), +1),
-		std::make_pair(get_prec_idx('*', TOK_IDENT), +1),
 		std::make_pair(get_prec_idx('*', TOK_END), -1),
 
-		std::make_pair(get_prec_idx('/', '/'), -1),
-		std::make_pair(get_prec_idx('/', TOK_REAL), +1),
-		std::make_pair(get_prec_idx('/', TOK_IDENT), +1),
-		std::make_pair(get_prec_idx('/', TOK_END), -1),
+		std::make_pair(get_prec_idx('^', '^'), +1),
+		std::make_pair(get_prec_idx('^', TOK_REAL), +1),
+		std::make_pair(get_prec_idx('^', TOK_END), -1),
+
+		std::make_pair(get_prec_idx('(', '('), +1),
+		std::make_pair(get_prec_idx(')', ')'), -1),
 
 		std::make_pair(get_prec_idx(TOK_REAL, TOK_END), -1),
 		std::make_pair(get_prec_idx(TOK_IDENT, TOK_END), -1),
@@ -96,18 +114,59 @@ std::tuple<bool, t_real> parse(bool bDebug=0)
 
 	symmetrise(prec_tab);
 
+	// non-symmetric precedences
+	{
+		prec_tab.insert(std::make_pair(get_prec_idx('(', ')'), 0));
+
+		for(int thesym : {'+', '-', '*', '^'})
+		{
+			prec_tab.insert(std::make_pair(get_prec_idx('(', thesym), +1));
+			prec_tab.insert(std::make_pair(get_prec_idx(thesym, '('), +1));
+
+			prec_tab.insert(std::make_pair(get_prec_idx(')', thesym), -1));
+			prec_tab.insert(std::make_pair(get_prec_idx(thesym, ')'), -1));
+		}
+
+		prec_tab.insert(std::make_pair(get_prec_idx('(', TOK_REAL), +1));
+		prec_tab.insert(std::make_pair(get_prec_idx(TOK_REAL, ')'), -1));
+
+		prec_tab.insert(std::make_pair(get_prec_idx(')', TOK_END), -1));
+		prec_tab.insert(std::make_pair(get_prec_idx(TOK_END, '('), +1));
+	}
+
 
 	using t_stackelem = std::tuple<
-		int,			// 0: token
+		int,			// 0: symbol
 		t_real, 		// 1: value
 		bool,			// 2: is terminal?
 		short>;			// 3: precedence
 	std::stack<t_stackelem> stack;
 
+	constexpr int STACK_SYM = 0;
+	constexpr int STACK_VAL_REAL = 1;
+	constexpr int STACK_IS_TERM = 2;
+	constexpr int STACK_PREC = 3;
+
 
 	// shift tokens onto the stack
-	auto shift = [&stack](int tok, t_real value, bool is_term, short prec) -> void
+	auto shift = [&stack](int tok, t_real value, const std::string& value_str, bool is_term, short prec) -> void
 	{
+		// look up constants in symbol map
+		if(tok == TOK_IDENT)
+		{
+			auto iterConst = g_mapSymbols.find(value_str);
+			if(iterConst == g_mapSymbols.end())
+			{
+				std::cerr << "Unknown constant \"" << value_str << "\", assuming 0." << std::endl;
+				value = 0;
+			}
+			else
+			{
+				tok = TOK_REAL;
+				value = iterConst->second;
+			}
+		}
+
 		stack.emplace(std::make_tuple(tok, value, is_term, prec));
 	};
 
@@ -129,12 +188,12 @@ std::tuple<bool, t_real> parse(bool bDebug=0)
 			vecreduce.push_back(stackelem);
 			stack.pop();
 
-			bool is_term = std::get<2>(stackelem);
-			short prec = std::get<3>(stackelem);
+			bool is_term = std::get<STACK_IS_TERM>(stackelem);
+			short prec = std::get<STACK_PREC>(stackelem);
 
 			if(bDebug)
 			{
-				std::cerr << "in reduce(): stack element " << std::get<0>(stackelem)
+				std::cerr << "in reduce(): stack element " << std::get<STACK_SYM>(stackelem)
 					<< ", precedence " << prec << std::endl;
 			}
 
@@ -142,7 +201,7 @@ std::tuple<bool, t_real> parse(bool bDebug=0)
 			if(prec > 0 && is_term)
 			{
 				// non-terminal on top now?
-				if(stack.size()>=1 && std::get<2>(stack.top())==0)
+				if(stack.size()>=1 && std::get<STACK_IS_TERM>(stack.top())==0)
 				{
 					t_stackelem stackelem_nonterm = stack.top();
 					vecreduce.push_back(stackelem_nonterm);
@@ -155,30 +214,53 @@ std::tuple<bool, t_real> parse(bool bDebug=0)
 
 		t_real result = 0;
 
+		// binary expressions
 		if(vecreduce.size()==3 &&
-			std::get<0>(vecreduce[0])==NONTERM_EXPR &&
-			std::get<0>(vecreduce[2])==NONTERM_EXPR)
+			std::get<STACK_SYM>(vecreduce[0])==NONTERM_EXPR &&
+			std::get<STACK_SYM>(vecreduce[2])==NONTERM_EXPR)
 		{
-			if(std::get<0>(vecreduce[1])=='+')
-				result = std::get<1>(vecreduce[2]) + std::get<1>(vecreduce[0]);
-			else if(std::get<0>(vecreduce[1])=='-')
-				result = std::get<1>(vecreduce[2]) - std::get<1>(vecreduce[0]);
-			else if(std::get<0>(vecreduce[1])=='*')
-				result = std::get<1>(vecreduce[2]) * std::get<1>(vecreduce[0]);
-			else if(std::get<0>(vecreduce[1])=='/')
-				result = std::get<1>(vecreduce[2]) / std::get<1>(vecreduce[0]);
-			else if(std::get<0>(vecreduce[1])=='%')
-				result = std::fmod(std::get<1>(vecreduce[2]), std::get<1>(vecreduce[0]));
-			else if(std::get<0>(vecreduce[1])=='^')
-				result = std::pow(std::get<1>(vecreduce[2]), std::get<1>(vecreduce[0]));
+			if(std::get<STACK_SYM>(vecreduce[1])=='+')
+				result = std::get<STACK_VAL_REAL>(vecreduce[2]) + std::get<STACK_VAL_REAL>(vecreduce[0]);
+			else if(std::get<STACK_SYM>(vecreduce[1])=='-')
+				result = std::get<STACK_VAL_REAL>(vecreduce[2]) - std::get<STACK_VAL_REAL>(vecreduce[0]);
+			else if(std::get<STACK_SYM>(vecreduce[1])=='*')
+				result = std::get<STACK_VAL_REAL>(vecreduce[2]) * std::get<STACK_VAL_REAL>(vecreduce[0]);
+			else if(std::get<STACK_SYM>(vecreduce[1])=='/')
+				result = std::get<STACK_VAL_REAL>(vecreduce[2]) / std::get<STACK_VAL_REAL>(vecreduce[0]);
+			else if(std::get<STACK_SYM>(vecreduce[1])=='%')
+				result = std::fmod(std::get<STACK_VAL_REAL>(vecreduce[2]), std::get<STACK_VAL_REAL>(vecreduce[0]));
+			else if(std::get<STACK_SYM>(vecreduce[1])=='^')
+				result = std::pow(std::get<STACK_VAL_REAL>(vecreduce[2]), std::get<STACK_VAL_REAL>(vecreduce[0]));
 		}
-		else if(vecreduce.size()==1 && std::get<0>(vecreduce[0])==TOK_REAL)
+
+		// bracket expression
+		else if(vecreduce.size()==3 && std::get<STACK_SYM>(vecreduce[1])==NONTERM_EXPR)
 		{
-			result = std::get<1>(vecreduce[0]);
+			if(std::get<STACK_SYM>(vecreduce[2])=='(' && std::get<STACK_SYM>(vecreduce[0])==')')
+				result = std::get<STACK_VAL_REAL>(vecreduce[1]);
 		}
+
+		// unary expressions
+		else if(vecreduce.size()==2 &&
+			std::get<STACK_SYM>(vecreduce[0])==NONTERM_EXPR)
+		{
+			if(std::get<STACK_SYM>(vecreduce[1])=='+')
+				result = + std::get<STACK_VAL_REAL>(vecreduce[0]);
+			else if(std::get<STACK_SYM>(vecreduce[1])=='-')
+				result = - std::get<STACK_VAL_REAL>(vecreduce[0]);
+		}
+
+		// symbols
+		else if(vecreduce.size()==1 && std::get<STACK_SYM>(vecreduce[0])==TOK_REAL)
+		{
+			result = std::get<STACK_VAL_REAL>(vecreduce[0]);
+		}
+
+		// error
 		else
 		{
-			std::cerr << "No production rule found for reduction." << std::endl;
+			std::cerr << "No production rule found for reduction of "
+				<< vecreduce.size() << " symbols." << std::endl;
 		}
 
 		// directly push result for the moment (TODO: build AST here)
@@ -236,7 +318,7 @@ std::tuple<bool, t_real> parse(bool bDebug=0)
 		if(iterPrec == prec_tab.end())
 		{
 			std::cerr << "No entry in precedence table for tokens ("
-				<< lookahead << ", " << top_tok << ")." << std::endl;
+				<< "stack: " << top_tok << ", lookahead: " << lookahead << ")." << std::endl;
 			break;
 		}
 
@@ -253,7 +335,7 @@ std::tuple<bool, t_real> parse(bool bDebug=0)
 			if(bDebug)
 				std::cerr << "shifting token " << lookahead << " (" << char(lookahead) << ")" << std::endl;
 
-			shift(lookahead, yylval, 1, iterPrec->second);
+			shift(lookahead, yylval, yytext, 1, iterPrec->second);
 			lookahead = yylex();
 		}
 		// reduce
@@ -275,7 +357,9 @@ std::tuple<bool, t_real> parse(bool bDebug=0)
 int main()
 {
 	std::cout.precision(8);
-	auto [accepted, result] = parse();
+	bool bDebug = 0;
+
+	auto [accepted, result] = parse(bDebug);
 	if(accepted)
 		std::cout << result << std::endl;
 	else
