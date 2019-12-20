@@ -199,9 +199,18 @@ public:
 
 	virtual void Generate0AC(std::ostream& ostr) const override
 	{
-		if(arg2) arg2->Generate0AC(ostr);
-		if(arg1) arg1->Generate0AC(ostr);
-		ostr << "CALL\n";
+		std::size_t numArgs = 0;
+		if(arg2)
+		{
+			arg2->Generate0AC(ostr);
+			++numArgs;
+		}
+		if(arg1)
+		{
+			arg1->Generate0AC(ostr);
+			++numArgs;
+		}
+		ostr << "CALL " << ident << " " << numArgs << "\n";
 	}
 
 private:
