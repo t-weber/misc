@@ -398,6 +398,10 @@ protected:
 		};
 
 
+
+		// for memoisation of already calculated rules
+		static std::set<std::string> memo_rules;
+
 		// iterate all relevant productions for given lhs
 		for(std::size_t ruleidx=0; ruleidx<rules.size(); ++ruleidx)
 		{
@@ -406,17 +410,30 @@ protected:
 			std::size_t cursor = cursors[ruleidx];
 
 			const auto& sym = rule[cursor];
-			collection.push_back(std::make_tuple(lhs, rule, cursor));
 
-			// cursor at the end?
-			if(cursor >= rule.size())
-				continue;
+			// TODO: use real hash
+			std::string hash;
+			hash += lhs->GetId() + "#;#";
+			for(const auto& sym : rule)
+				hash += sym->GetId() + "#,#";
+			hash += "#;#";;
+			hash += std::to_string(cursor);
 
-			// non-terminal: need to insert productions
-			if(sym->GetType() == SymbolType::NONTERM)
+			if(memo_rules.find(hash) == memo_rules.end())
 			{
-				const auto& nonterm = reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
-				addrhsrules(nonterm);
+				collection.push_back(std::make_tuple(lhs, rule, cursor));
+				memo_rules.insert(hash);
+
+				// cursor at the end?
+				if(cursor >= rule.size())
+					continue;
+
+				// non-terminal: need to insert productions
+				if(sym->GetType() == SymbolType::NONTERM)
+				{
+					const auto& nonterm = reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
+					addrhsrules(nonterm);
+				}
 			}
 		}
 
@@ -632,7 +649,7 @@ int main()
 	g_eps = std::make_shared<Terminal>("eps", true, false);
 	g_end = std::make_shared<Terminal>("end", false, true);
 
-	constexpr int example = 1;
+	constexpr int example = 0;
 
 	if constexpr(example == 0)
 	{
