@@ -382,25 +382,46 @@ protected:
 		>;
 		t_collection collection;
 
-		std::function<void(const std::shared_ptr<NonTerminal>& _nonterm)> addrhsrules;
+
+		// for memoisation of already calculated rules
+		static std::set<std::string> memo_rules;
+		std::set<std::string> cur_memo_rules;
+
+		std::function<void(const std::shared_ptr<NonTerminal>& _nonterm, std::set<std::string>& memo_rules)> addrhsrules;
+	
 		addrhsrules = [&collection, &addrhsrules, this]
-		(const std::shared_ptr<NonTerminal>& _nonterm) -> void
+		(const std::shared_ptr<NonTerminal>& _nonterm, std::set<std::string>& memo_rules) -> void
 		{
 			for(std::size_t rulerhsidx=0; rulerhsidx<_nonterm->NumRules(); ++rulerhsidx)
 			{
 				auto& rulerhs = _nonterm->GetRule(rulerhsidx);
-				collection.push_back(std::make_tuple(_nonterm, rulerhs, 0));
 
-				// recursively add further nonterminals next to cursor
-				if(rulerhs.size() && rulerhs[0]->GetType() == SymbolType::NONTERM)
-					addrhsrules(reinterpret_cast<const std::shared_ptr<NonTerminal>&>(rulerhs[0]));
+				// TODO: use real hash
+				std::string hash;
+				hash += _nonterm->GetId() + "#;#";
+				for(const auto& sym : rulerhs)
+					hash += sym->GetId() + "#,#";
+				hash += "#;#";;
+				hash += std::to_string(0);	// cursor
+				hash += "#|#";
+
+				const auto memoIter = memo_rules.find(hash);
+				if(memoIter == memo_rules.end())
+				{
+					memo_rules.insert(hash);
+
+					collection.push_back(std::make_tuple(_nonterm, rulerhs, 0));
+
+					// recursively add further nonterminals next to cursor
+					if(rulerhs.size() && rulerhs[0]->GetType() == SymbolType::NONTERM)
+						addrhsrules(reinterpret_cast<const std::shared_ptr<NonTerminal>&>(rulerhs[0]), memo_rules);
+				}
 			}
 		};
 
 
-
-		// for memoisation of already calculated rules
-		static std::set<std::string> memo_rules;
+		// TODO: use real hash
+		std::string hash;
 
 		// iterate all relevant productions for given lhs
 		for(std::size_t ruleidx=0; ruleidx<rules.size(); ++ruleidx)
@@ -411,18 +432,31 @@ protected:
 
 			const auto& sym = rule[cursor];
 
-			// TODO: use real hash
-			std::string hash;
 			hash += lhs->GetId() + "#;#";
 			for(const auto& sym : rule)
 				hash += sym->GetId() + "#,#";
 			hash += "#;#";;
 			hash += std::to_string(cursor);
+			hash += "#|#";
+		}
 
-			if(memo_rules.find(hash) == memo_rules.end())
+		
+		const auto memoIter = memo_rules.find(hash);
+		if(memoIter == memo_rules.end())
+		{
+			memo_rules.insert(hash);
+			
+			// iterate all relevant productions for given lhs
+			for(std::size_t ruleidx=0; ruleidx<rules.size(); ++ruleidx)
 			{
+				const auto& lhs = _lhs[ruleidx];
+				const auto& rule = rules[ruleidx];
+				std::size_t cursor = cursors[ruleidx];
+
+				const auto& sym = rule[cursor];
+
+				cur_memo_rules.insert(hash);
 				collection.push_back(std::make_tuple(lhs, rule, cursor));
-				memo_rules.insert(hash);
 
 				// cursor at the end?
 				if(cursor >= rule.size())
@@ -432,9 +466,13 @@ protected:
 				if(sym->GetType() == SymbolType::NONTERM)
 				{
 					const auto& nonterm = reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
-					addrhsrules(nonterm);
+					addrhsrules(nonterm, cur_memo_rules);
 				}
 			}
+		}
+		else
+		{
+			//std::cout << "memo: " << *memoIter << std::endl;
 		}
 
 
@@ -447,9 +485,12 @@ protected:
 		if(symTransition)
 		{
 			std::cout << " (transition from item " << rulefrom
-				<< " with symbol " << *symTransition;
+				<< " with symbol " << *symTransition << ")";
 		}
-		std::cout << ":" << std::endl;
+		
+		if(collection.size())
+			std::cout << ":";
+		std::cout << std::endl;
 
 		for(const auto& item : collection)
 		{
@@ -528,12 +569,17 @@ protected:
 			}
 
 			// not yet calculated?
-			if(memo.find(hash) == memo.end())
+			const auto memoIter = memo.find(hash);
+			if(memoIter == memo.end())
 			{
 				memo.insert(hash);
 				CalcLRCollection(nextlhs, nextrules, nextcursors, rulenum, &trans);
 
 				// TODO: write transition to cached collection items
+			}
+			else
+			{
+				//std::cout << "memo: " << *memoIter << std::endl;
 			}
 		}
 		// --------------------------------------------------------------------
