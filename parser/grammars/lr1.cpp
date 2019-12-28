@@ -386,24 +386,33 @@ protected:
 		// for memoisation of already calculated rules
 		static std::set<std::string> memo_rules;
 		std::set<std::string> cur_memo_rules;
+		
+		auto gethash = []
+			(const auto& lhs, const auto& rulerhs, std::size_t cursor) 
+				-> std::string
+		{
+			// TODO: use a real hash function
+			std::string hash;
+
+			hash += lhs->GetId() + "#->#";
+			for(const auto& sym : rulerhs)
+				hash += sym->GetId() + "#,#";
+			hash += "#;#";;
+			hash += std::to_string(cursor);
+			hash += "#|#";
+			
+			return hash;
+		};
 
 		std::function<void(const std::shared_ptr<NonTerminal>& _nonterm, std::set<std::string>& memo_rules)> addrhsrules;
 	
-		addrhsrules = [&collection, &addrhsrules, this]
+		addrhsrules = [&collection, &addrhsrules, &gethash, this]
 		(const std::shared_ptr<NonTerminal>& _nonterm, std::set<std::string>& memo_rules) -> void
 		{
 			for(std::size_t rulerhsidx=0; rulerhsidx<_nonterm->NumRules(); ++rulerhsidx)
 			{
 				auto& rulerhs = _nonterm->GetRule(rulerhsidx);
-
-				// TODO: use real hash
-				std::string hash;
-				hash += _nonterm->GetId() + "#;#";
-				for(const auto& sym : rulerhs)
-					hash += sym->GetId() + "#,#";
-				hash += "#;#";;
-				hash += std::to_string(0);	// cursor
-				hash += "#|#";
+				std::string hash = gethash(_nonterm, rulerhs, 0);
 
 				const auto memoIter = memo_rules.find(hash);
 				if(memoIter == memo_rules.end())
@@ -420,7 +429,6 @@ protected:
 		};
 
 
-		// TODO: use real hash
 		std::string hash;
 
 		// iterate all relevant productions for given lhs
@@ -431,15 +439,12 @@ protected:
 			std::size_t cursor = cursors[ruleidx];
 
 			const auto& sym = rule[cursor];
-
-			hash += lhs->GetId() + "#;#";
-			for(const auto& sym : rule)
-				hash += sym->GetId() + "#,#";
-			hash += "#;#";;
-			hash += std::to_string(cursor);
-			hash += "#|#";
+			hash += gethash(lhs, rule, cursor);
 		}
 
+
+		// global numbering of rules
+		static std::size_t rulectr = 0;
 		
 		const auto memoIter = memo_rules.find(hash);
 		if(memoIter == memo_rules.end())
@@ -472,14 +477,15 @@ protected:
 		}
 		else
 		{
-			//std::cout << "memo: " << *memoIter << std::endl;
+			// TODO, like output below
+			std::size_t memorulenum = rulectr++;
+			std::cout << "memo item " << memorulenum << ": " << *memoIter << std::endl;
 		}
 
 
 
 		// --------------------------------------------------------------------
 		// output collection
-		static std::size_t rulectr = 0;
 		std::size_t rulenum = rulectr++;
 		std::cout << "item " << rulenum;
 		if(symTransition)
@@ -536,7 +542,7 @@ protected:
 
 
 		// for memoisation of already calculated collections
-		static std::set<std::string> memo;
+		static std::unordered_map<std::string, std::size_t> memo;
 
 		// iterate possible transition symbols
 		for(const auto& pair : transSyms)
@@ -559,27 +565,26 @@ protected:
 				nextrules.push_back(rule);
 				nextcursors.push_back(cursor);
 
-				// TODO: use real hash
-				hash += lhs->GetId() + "#;#";
-				for(const auto& sym : rule)
-					hash += sym->GetId() + "#,#";
-				hash += "#;#";;
-				hash += std::to_string(cursor);
-				hash += "#|#";
+				hash += gethash(lhs, rule, cursor);
 			}
 
 			// not yet calculated?
 			const auto memoIter = memo.find(hash);
 			if(memoIter == memo.end())
 			{
-				memo.insert(hash);
+				memo.insert(std::make_pair(hash, rulenum));
 				CalcLRCollection(nextlhs, nextrules, nextcursors, rulenum, &trans);
-
-				// TODO: write transition to cached collection items
 			}
 			else
 			{
-				//std::cout << "memo: " << *memoIter << std::endl;
+				std::size_t memorulenum = rulectr++;
+				std::cout << "memo item " << memorulenum;
+				std::cout << " (transition from item " << rulenum
+					<< " with symbol " << trans << "): " 
+					<< "\n\tsame as the following transition from item " << memoIter->second << ":\n"
+					<< memoIter->first << "\n"	// TODO: format output
+					<< std::endl;
+
 			}
 		}
 		// --------------------------------------------------------------------
