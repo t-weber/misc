@@ -10,6 +10,7 @@
 
 #include "ast.h"
 #include "parser.h"
+#include "zeroac.h"
 
 
 /**
@@ -57,10 +58,13 @@ int main()
 	if(res != 0)
 		return res;
 
+
+	ZeroAC zeroac;
+
 	std::cout << "# Zero-address code:\n";
 	for(auto iter=ctx.GetStatements().rbegin(); iter!=ctx.GetStatements().rend(); ++iter)
 	{
-		(*iter)->Generate0AC(std::cout);
+		(*iter)->accept(&zeroac);
 		std::cout << std::endl;
 	}
 

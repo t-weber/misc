@@ -1,5 +1,5 @@
 /**
- * parser test
+ * parser test - syntax tree
  * @author Tobias Weber
  * @date 20-dec-19
  * @license: see 'LICENSE.GPL' file
@@ -12,11 +12,50 @@
 #include <iostream>
 
 
+class AST;
+class ASTUMinus;
+class ASTPlus;
+class ASTMinus;
+class ASTMult;
+class ASTDiv;
+class ASTMod;
+class ASTPow;
+class ASTConst;
+class ASTVar;
+class ASTCall;
+class ASTAssign;
+
+
+/**
+ * ast visitor
+ */
+class ASTVisitor
+{
+public:
+	virtual void visit(const ASTUMinus* ast) = 0;
+	virtual void visit(const ASTPlus* ast) = 0;
+	virtual void visit(const ASTMinus* ast) = 0;
+	virtual void visit(const ASTMult* ast) = 0;
+	virtual void visit(const ASTDiv* ast) = 0;
+	virtual void visit(const ASTMod* ast) = 0;
+	virtual void visit(const ASTPow* ast) = 0;
+	virtual void visit(const ASTConst* ast) = 0;
+	virtual void visit(const ASTVar* ast) = 0;
+	virtual void visit(const ASTCall* ast) = 0;
+	virtual void visit(const ASTAssign* ast) = 0;
+};
+
+
+#define ASTVISITOR_ACCEPT virtual void accept(ASTVisitor* visitor) const override { visitor->visit(this); }
+
+
+/**
+ * ast node base
+ */
 class AST
 {
 public:
-	// generate 0-address code
-	virtual void Generate0AC(std::ostream& ostr) const = 0;
+	virtual void accept(ASTVisitor* visitor) const = 0;
 };
 
 
@@ -27,11 +66,9 @@ public:
 	: term(term)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		term->Generate0AC(ostr);
-		ostr << "UMIN\n";
-	}
+	std::shared_ptr<AST> GetTerm() const { return term; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term;
@@ -45,12 +82,10 @@ public:
 		: term1(term1), term2(term2)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		term1->Generate0AC(ostr);
-		term2->Generate0AC(ostr);
-		ostr << "ADD\n";
-	}
+	std::shared_ptr<AST> GetTerm1() const { return term1; }
+	std::shared_ptr<AST> GetTerm2() const { return term2; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term1, term2;
@@ -64,12 +99,10 @@ public:
 		: term1(term1), term2(term2)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		term1->Generate0AC(ostr);
-		term2->Generate0AC(ostr);
-		ostr << "SUB\n";
-	}
+	std::shared_ptr<AST> GetTerm1() const { return term1; }
+	std::shared_ptr<AST> GetTerm2() const { return term2; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term1, term2;
@@ -83,12 +116,10 @@ public:
 		: term1(term1), term2(term2)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		term1->Generate0AC(ostr);
-		term2->Generate0AC(ostr);
-		ostr << "MUL\n";
-	}
+	std::shared_ptr<AST> GetTerm1() const { return term1; }
+	std::shared_ptr<AST> GetTerm2() const { return term2; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term1, term2;
@@ -102,12 +133,10 @@ public:
 		: term1(term1), term2(term2)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		term1->Generate0AC(ostr);
-		term2->Generate0AC(ostr);
-		ostr << "DIV\n";
-	}
+	std::shared_ptr<AST> GetTerm1() const { return term1; }
+	std::shared_ptr<AST> GetTerm2() const { return term2; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term1, term2;
@@ -121,12 +150,10 @@ public:
 		: term1(term1), term2(term2)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		term1->Generate0AC(ostr);
-		term2->Generate0AC(ostr);
-		ostr << "MOD\n";
-	}
+	std::shared_ptr<AST> GetTerm1() const { return term1; }
+	std::shared_ptr<AST> GetTerm2() const { return term2; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term1, term2;
@@ -140,12 +167,10 @@ public:
 		: term1(term1), term2(term2)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		term1->Generate0AC(ostr);
-		term2->Generate0AC(ostr);
-		ostr << "POW\n";
-	}
+	std::shared_ptr<AST> GetTerm1() const { return term1; }
+	std::shared_ptr<AST> GetTerm2() const { return term2; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term1, term2;
@@ -159,10 +184,9 @@ public:
 		: val(val)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		ostr << "PUSH " << val << "\n";
-	}
+	double GetVal() const { return val; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	double val{};
@@ -176,10 +200,9 @@ public:
 		: ident(ident)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		ostr << "PUSHVAR " << ident << "\n";
-	}
+	const std::string& GetIdent() const { return ident; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::string ident;
@@ -197,21 +220,11 @@ public:
 		: ident(ident), arg1(arg1), arg2(arg2)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		std::size_t numArgs = 0;
-		if(arg2)
-		{
-			arg2->Generate0AC(ostr);
-			++numArgs;
-		}
-		if(arg1)
-		{
-			arg1->Generate0AC(ostr);
-			++numArgs;
-		}
-		ostr << "CALL " << ident << " " << numArgs << "\n";
-	}
+	const std::string& GetIdent() const { return ident; }
+	std::shared_ptr<AST> GetArg1() const { return arg1; }
+	std::shared_ptr<AST> GetArg2() const { return arg2; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::string ident;
@@ -226,17 +239,16 @@ public:
 		: ident(ident), expr(expr)
 	{}
 
-	virtual void Generate0AC(std::ostream& ostr) const override
-	{
-		expr->Generate0AC(ostr);
-		ostr << "ADDR " << ident << "\n";
-		ostr << "ASSIGN\n";
-	}
+	const std::string& GetIdent() const { return ident; }
+	std::shared_ptr<AST> GetExpr() const { return expr; }
+
+	ASTVISITOR_ACCEPT
 
 private:
 	std::string ident;
 	std::shared_ptr<AST> expr;
 };
+
 
 
 #endif

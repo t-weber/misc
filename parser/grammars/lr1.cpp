@@ -386,7 +386,7 @@ protected:
 		// for memoisation of already calculated rules
 		static std::set<std::string> memo_rules;
 		std::set<std::string> cur_memo_rules;
-		
+
 		auto gethash = []
 			(const auto& lhs, const auto& rulerhs, std::size_t cursor) 
 				-> std::string
@@ -400,12 +400,12 @@ protected:
 			hash += "#;#";;
 			hash += std::to_string(cursor);
 			hash += "#|#";
-			
+
 			return hash;
 		};
 
 		std::function<void(const std::shared_ptr<NonTerminal>& _nonterm, std::set<std::string>& memo_rules)> addrhsrules;
-	
+
 		addrhsrules = [&collection, &addrhsrules, &gethash, this]
 		(const std::shared_ptr<NonTerminal>& _nonterm, std::set<std::string>& memo_rules) -> void
 		{
@@ -445,12 +445,12 @@ protected:
 
 		// global numbering of rules
 		static std::size_t rulectr = 0;
-		
+
 		const auto memoIter = memo_rules.find(hash);
 		if(memoIter == memo_rules.end())
 		{
 			memo_rules.insert(hash);
-			
+
 			// iterate all relevant productions for given lhs
 			for(std::size_t ruleidx=0; ruleidx<rules.size(); ++ruleidx)
 			{
@@ -493,7 +493,7 @@ protected:
 			std::cout << " (transition from item " << rulefrom
 				<< " with symbol " << *symTransition << ")";
 		}
-		
+
 		if(collection.size())
 			std::cout << ":";
 		std::cout << std::endl;

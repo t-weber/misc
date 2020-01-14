@@ -86,12 +86,12 @@ statements
 
 
 statement[res]
-	: expr[term] NEWLINE 					{ $res = $term; }
+	: expr[term] NEWLINE				{ $res = $term; }
 	;
 
 
 expr[res]
-	: '(' expr[term] ')'					{ $res = $term; }
+	: '(' expr[term] ')'				{ $res = $term; }
 
 	// unary expressions
 	| '+' expr[term]	%prec UNARY_OP		{ $res = $term; }
@@ -106,10 +106,10 @@ expr[res]
 	| expr[term1] '^' expr[term2]			{ $res = std::make_shared<ASTPow>($term1, $term2); }
 
 	// constant
-	| REAL[num]								{ $res = std::make_shared<ASTConst>($num); }
+	| REAL[num]					{ $res = std::make_shared<ASTConst>($num); }
 
 	// variable
-	| IDENT[ident]							{ $res = std::make_shared<ASTVar>($ident); }
+	| IDENT[ident]					{ $res = std::make_shared<ASTVar>($ident); }
 
 	// function call
 	| IDENT[ident] '(' expr[arg] ')'		{ $res = std::make_shared<ASTCall>($ident, $arg); }

@@ -1,7 +1,7 @@
 /**
  * data flow analysis
  * @author Tobias Weber
- * @date 12-jan-29
+ * @date 12-jan-20
  * @license see 'LICENSE.EUPL' file
  *
  * References:
@@ -269,13 +269,6 @@ int main()
 	add_edge(nodes[1], nodes[2]);
 	add_edge(nodes[2], nodes[1]);
 	add_edge(nodes[2], nodes[3]);
-
-
-	/*std::map<std::string, std::vector<int>> gen =
-	{
-	 	{ "B1", {1, 2}},
-	 	{ "B3", {5, 6}},
-	};*/
 
 
 	std::vector<std::set<int>> gen_set =
