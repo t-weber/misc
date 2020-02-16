@@ -2,7 +2,6 @@
  * @author Tobias Weber
  * @date 16-feb-20
  * @license: see 'LICENSE.EUPL' file
- * @see https://en.wikipedia.org/wiki/Visitor_pattern
  */
 
 #include <iostream>
