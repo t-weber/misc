@@ -31,7 +31,7 @@ namespace dll = boost::dll;
 int main()
 {
 	fs::path pathLib = "dll_lib.so";
-	auto loadmode = dll::load_mode::append_decorations & ~dll::load_mode::search_system_folders;
+	auto loadmode = /*dll::load_mode::append_decorations*/ dll::load_mode::default_mode & ~dll::load_mode::search_system_folders;
 
 
 	// get library infos
@@ -67,18 +67,30 @@ int main()
 	{
 		std::cout << "Loaded " << lib->location() << "\n";
 
-		// import function
-		if(lib->has("lib_print"))
+		try
 		{
-			auto funcPrint = lib->get<void(*)()>("lib_print");
-			funcPrint();
-		}
+			// import function
+			if(lib->has("lib_print"))
+			{
+				using t_fkt = void(*)();
+				auto* funcPrint = lib->get<t_fkt>("lib_print");
+				funcPrint();
 
-		// import function
-		if(lib->has("lib_calc_i"))
+				//using t_fkt_direct = std::remove_pointer_t<t_fkt>;
+				//auto* funcPrint2 = lib->get<t_fkt_direct>("lib_print");
+				//funcPrint2();
+			}
+
+			// import function
+			if(lib->has("lib_calc_i"))
+			{
+				auto* funcCalc = lib->get<int(*)(int,int)>("lib_calc_i");
+				std::cout << "calc: " << funcCalc(2,3) << "\n";
+			}
+		}
+		catch(const std::exception& ex)
 		{
-			auto funcCalc = lib->get<int(*)(int,int)>("lib_calc_i");
-			std::cout << "calc: " << funcCalc(2,3) << "\n";
+			std::cerr << ex.what() << std::endl;
 		}
 	}
 	else
