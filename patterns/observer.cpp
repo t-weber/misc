@@ -72,7 +72,7 @@ class Observer : public IObserverRole
 
 		virtual void update(const AbstrObservedRole* observed) override
 		{
-			std::cout << m_name << ": Observed varable XYZ changed to "
+			std::cout << m_name << ": Observed variable change to "
 				<< observed->GetVar() << "." << std::endl;
 		}
 

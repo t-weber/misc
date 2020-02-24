@@ -22,7 +22,9 @@ public:
 
 
 
-#define VISITOR_ACCEPT virtual void accept(const Visitor* visitor) const override { visitor->visit(this); }
+#define VISITOR_ACCEPT \
+	virtual void accept(const Visitor* visitor) const override \
+	{ visitor->visit(this); }
 
 
 
