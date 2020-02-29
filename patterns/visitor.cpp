@@ -6,6 +6,7 @@
  * @see https://en.wikipedia.org/wiki/Visitor_pattern
  */
 
+#include <memory>
 #include <iostream>
 
 
@@ -87,15 +88,13 @@ public:
 
 int main()
 {
-	const Base* bs[] = { new B1(), new B2() };
-	const Visitor* vs[] = { new V1(), new V2() };
+	const std::shared_ptr<Base> bs[] = { std::make_shared<B1>(), std::make_shared<B2>() };
+	const std::shared_ptr<Visitor> vs[] = { std::make_shared<V1>(), std::make_shared<V2>() };
 
-	for(auto* b : bs)
-		for(auto* v : vs)
-			b->accept(v);
-
-	delete bs[0]; delete bs[1];
-	delete vs[0]; delete vs[1];
+	for(const auto& b : bs)
+		for(const auto& v : vs)
+			b->accept(v.get());
 
 	return 0;
 }
+

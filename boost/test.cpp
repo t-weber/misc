@@ -26,6 +26,10 @@ namespace test = boost::unit_test;
 namespace testtools = boost::test_tools;
 
 
+#include <boost/type_index.hpp>
+namespace ty = boost::typeindex;
+
+
 // automatic test cases and suites
 #if TEST_EXAMPLE == 1
 
@@ -59,11 +63,13 @@ BOOST_AUTO_TEST_CASE(test_1a)
 // test a template function
 template<class T> constexpr T square(T x) { return x*x; }
 
-//using t_types = std::tuple<float, double>;
+//using t_types = std::tuple<float, double, long double>;
 //BOOST_AUTO_TEST_CASE_TEMPLATE(test_1b, T, t_types)
-BOOST_AUTO_TEST_CASE_TEMPLATE(test_1b, T, decltype(std::tuple<float, double>{}))
+BOOST_AUTO_TEST_CASE_TEMPLATE(test_1b, T, decltype(std::tuple<float, double, long double>{}))
 {
-	BOOST_TEST(square<T>(2) == T(4), testtools::tolerance(1e-4));
+	std::cout << "testing with type: " << ty::type_id_with_cvr<T>().pretty_name() << std::endl; 
+	//BOOST_TEST(square<T>(2) == T(4), testtools::tolerance(1e-4));
+	BOOST_TEST(square<T>(2) == T(4), testtools::tolerance(std::numeric_limits<T>::epsilon()));
 }
 
 
