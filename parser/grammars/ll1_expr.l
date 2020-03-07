@@ -65,3 +65,20 @@ ident	[A-Za-z]+[A-Za-z0-9]*
 
 
 %%
+
+
+/*
+// flex -o ll1_lexer.cpp ll1_expr.l && g++ -o lex ll1_lexer.cpp
+int main()
+{
+	while(1)
+	{
+		int token = yylex();
+		std::cout << "Token: " << token;
+		if(token < 128 && token >= -128)
+			std::cout << " (" << (char)token << ")";
+		std::cout << ", lval: " << yylval << std::endl;
+	}
+	return 0;
+}
+*/

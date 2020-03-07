@@ -11,6 +11,7 @@
  *	- https://de.wikipedia.org/wiki/LL(k)-Grammatik
  *
  * flex -o ll1_lexer.cpp ll1_expr.l && g++ -std=c++17 -o ll1_expr ll1_expr.cpp ll1_lexer.cpp
+ * g++ -std=c++17 -o ll1_expr ll1_expr.cpp lex.cpp
  */
 
 #include <iostream>
