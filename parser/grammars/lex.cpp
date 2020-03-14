@@ -21,7 +21,7 @@ enum class Token : int
 	TOK_REAL	= 1000,
 	TOK_IDENT	= 1001,
 	TOK_END		= 1002,
-	
+
 	TOK_INVALID	= 10000,
 };
 
@@ -32,7 +32,7 @@ enum class Token : int
 std::vector<std::pair<int, t_real>> get_matching_tokens(const std::string& str)
 {
 	std::vector<std::pair<int, t_real>> matches;
-	
+
 	{	// real
 		std::regex regex{"[0-9]+(\\.[0-9]*)?"};
 		std::smatch smatch;
@@ -93,7 +93,7 @@ int yylex()
 		// if outside any other match...
 		if(longest_matching.size() == 0)
 		{
-			// ...ignore white spaces 
+			// ...ignore white spaces
 			if(c==' ' || c=='\t')
 				continue;
 			// ...end on new line
@@ -170,7 +170,7 @@ int main(int argc, char **argv)
 		if(token < 128 && token >= -128)
 			std::cout << " (" << (char)token << ")";
 		std::cout << ", lval: " << yylval << std::endl;
-		
+
 		if(token == (int)Token::TOK_INVALID)
 			break;
 	}
