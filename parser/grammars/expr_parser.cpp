@@ -18,6 +18,16 @@ int main()
 	ExprParser<double> parser;
 	std::cout << parser.parse("2 + 3*4") << std::endl;
 	std::cout << parser.parse("(2 + 3)*4") << std::endl;
+	std::cout << parser.parse("pow((2 + 3)*4, 2)") << std::endl;
+	std::cout << parser.parse("sqrt(400)") << std::endl;
+
+	std::cout << std::endl;
+
+	ExprParser<int> parser2;
+	std::cout << parser2.parse("2 + 3*4") << std::endl;
+	std::cout << parser2.parse("(2 + 3)*4") << std::endl;
+	std::cout << parser2.parse("pow((2 + 3)*4, 2)") << std::endl;
+	std::cout << parser2.parse("sqrt(400)") << std::endl;
 
 	return 0;
 }

@@ -57,6 +57,7 @@ protected:
 	{
 		std::vector<std::pair<int, t_real>> matches;
 
+		if constexpr(std::is_floating_point_v<t_real>)
 		{	// real
 			std::regex regex{"[0-9]+(\\.[0-9]*)?"};
 			std::smatch smatch;
@@ -66,6 +67,21 @@ protected:
 				std::istringstream{str} >> val;
 				matches.push_back(std::make_pair((int)Token::TOK_REAL, val));
 			}
+		}
+		else if constexpr(std::is_integral_v<t_real>)
+		{	// real
+			std::regex regex{"[0-9]+"};
+			std::smatch smatch;
+			if(std::regex_match(str, smatch, regex))
+			{
+				t_real val{};
+				std::istringstream{str} >> val;
+				matches.push_back(std::make_pair((int)Token::TOK_REAL, val));
+			}
+		}
+		else
+		{
+			std::cerr << "Invalid number type." << std::endl;
 		}
 
 		{	// ident
@@ -518,19 +534,19 @@ private:
 	// one-arg function table
 	std::unordered_map<std::string, t_real(*)(t_real)> m_mapFuncs1 =
 	{
-		{ "sin", std::sin },
-		{ "cos", std::cos },
-		{ "tan", std::tan },
+		{ "sin", [](t_real x) -> t_real { return (t_real)std::sin(x); } },
+		{ "cos", [](t_real x) -> t_real { return (t_real)std::cos(x); } },
+		{ "tan", [](t_real x) -> t_real { return (t_real)std::tan(x); } },
 
-		{ "sqrt", std::sqrt },
-		{ "exp", std::exp },
+		{ "sqrt", [](t_real x) -> t_real { return (t_real)std::sqrt(x); } },
+		{ "exp", [](t_real x) -> t_real { return (t_real)std::exp(x); } },
 	};
 
 
 	// two-args function table
 	std::unordered_map<std::string, t_real(*)(t_real, t_real)> m_mapFuncs2 =
 	{
-		{ "pow", std::pow },
+		{ "pow", [](t_real x, t_real y) -> t_real { return (t_real)std::pow(x, y); } },
 	};
 	// ----------------------------------------------------------------------------
 };
