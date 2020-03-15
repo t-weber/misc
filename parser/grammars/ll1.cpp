@@ -472,6 +472,7 @@ int main()
 
 
 	// test grammar from: https://de.wikipedia.org/wiki/LL(k)-Grammatik#Beispiel
+	// same grammar as in lr1.cpp, but with eliminated left-recursion
 	auto add_term = std::make_shared<NonTerminal>("add_term");
 	auto add_term_rest = std::make_shared<NonTerminal>("add_term_rest");
 	auto mul_term = std::make_shared<NonTerminal>("mul_term");

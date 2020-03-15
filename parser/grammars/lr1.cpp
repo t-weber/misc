@@ -238,7 +238,10 @@ protected:
 				{
 					const std::shared_ptr<NonTerminal>& symnonterm
 						= reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
-					CalcFirst(symnonterm);
+
+					// if the rule is left-recursive, ignore calculating the same symbol again
+					if(symnonterm->GetId() != nonterm->GetId())
+						CalcFirst(symnonterm);
 
 					// add first set except eps
 					bool bHasEps = false;
@@ -708,11 +711,8 @@ int main()
 		auto start = std::make_shared<NonTerminal>("start");
 
 		auto add_term = std::make_shared<NonTerminal>("add_term");
-		auto add_term_rest = std::make_shared<NonTerminal>("add_term_rest");
 		auto mul_term = std::make_shared<NonTerminal>("mul_term");
-		auto mul_term_rest = std::make_shared<NonTerminal>("mul_term_rest");
 		auto pow_term = std::make_shared<NonTerminal>("pow_term");
-		auto pow_term_rest = std::make_shared<NonTerminal>("pow_term_rest");
 		auto factor = std::make_shared<NonTerminal>("factor");
 
 		auto plus = std::make_shared<Terminal>("+");
@@ -729,22 +729,17 @@ int main()
 
 		start->AddRule({ add_term });
 
-		add_term->AddRule({ mul_term, add_term_rest });
-		add_term->AddRule({ plus, mul_term, add_term_rest });	// unary +
-		add_term->AddRule({ minus, mul_term, add_term_rest });	// unary -
-		add_term_rest->AddRule({ plus, mul_term, add_term_rest });
-		add_term_rest->AddRule({ minus, mul_term, add_term_rest });
-		add_term_rest->AddRule({ g_eps });
+		add_term->AddRule({ add_term, plus, mul_term });
+		add_term->AddRule({ add_term, minus, mul_term });
+		add_term->AddRule({ mul_term });
 
-		mul_term->AddRule({ pow_term, mul_term_rest });
-		mul_term_rest->AddRule({ mult, pow_term, mul_term_rest });
-		mul_term_rest->AddRule({ div, pow_term, mul_term_rest });
-		mul_term_rest->AddRule({ mod, pow_term, mul_term_rest });
-		mul_term_rest->AddRule({ g_eps });
+		mul_term->AddRule({ mul_term, mult, pow_term });
+		mul_term->AddRule({ mul_term, div, pow_term });
+		mul_term->AddRule({ mul_term, mod, pow_term });
+		mul_term->AddRule({ pow_term });
 
-		pow_term->AddRule({ factor, pow_term_rest });
-		pow_term_rest->AddRule({ pow, factor, pow_term_rest });
-		pow_term_rest->AddRule({ g_eps });
+		pow_term->AddRule({ pow_term, pow, factor });
+		pow_term->AddRule({ factor });
 
 		factor->AddRule({ bracket_open, add_term, bracket_close });
 		factor->AddRule({ ident, bracket_open, bracket_close });			// function call
@@ -753,7 +748,7 @@ int main()
 		factor->AddRule({ sym });
 
 
-		LR1 lr1({start, add_term, add_term_rest, mul_term, mul_term_rest, pow_term, pow_term_rest, factor}, start);
+		LR1 lr1({start, add_term, mul_term, pow_term, factor}, start);
 		std::cout << lr1 << std::endl;
 	}
 
