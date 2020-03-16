@@ -18,6 +18,7 @@
 #include <string>
 #include <memory>
 #include <sstream>
+#include <fstream>
 #include <iostream>
 #include <iomanip>
 #include <functional>
@@ -379,9 +380,9 @@ protected:
 		std::size_t rulefrom = 0, const std::string *symTransition=nullptr)
 	{
 		using t_collection = std::vector<std::tuple<
-			std::shared_ptr<NonTerminal>,	// lhs
+			std::shared_ptr<NonTerminal>,		// lhs
 			std::vector<std::shared_ptr<Symbol>>,	// rule
-			std::size_t>							// cursor
+			std::size_t>				// cursor
 		>;
 		t_collection collection;
 
@@ -390,9 +391,7 @@ protected:
 		static std::set<std::string> memo_rules;
 		std::set<std::string> cur_memo_rules;
 
-		auto gethash = []
-			(const auto& lhs, const auto& rulerhs, std::size_t cursor) 
-				-> std::string
+		auto gethash = [](const auto& lhs, const auto& rulerhs, std::size_t cursor) -> std::string
 		{
 			// TODO: use a real hash function
 			std::string hash;
@@ -448,6 +447,7 @@ protected:
 
 		// global numbering of rules
 		static std::size_t rulectr = 0;
+		static std::size_t memorulectr = 0;
 
 		const auto memoIter = memo_rules.find(hash);
 		if(memoIter == memo_rules.end())
@@ -481,7 +481,7 @@ protected:
 		else
 		{
 			// TODO, like output below
-			std::size_t memorulenum = rulectr++;
+			std::size_t memorulenum = memorulectr++;
 			std::cout << "memo item " << memorulenum << ": " << *memoIter << std::endl;
 		}
 
@@ -495,6 +495,8 @@ protected:
 		{
 			std::cout << " (transition from item " << rulefrom
 				<< " with symbol " << *symTransition << ")";
+
+			m_transitions[rulefrom].push_back(std::make_pair(rulenum, *symTransition));
 		}
 
 		if(collection.size())
@@ -580,17 +582,87 @@ protected:
 			}
 			else
 			{
-				std::size_t memorulenum = rulectr++;
+				std::size_t memorulenum = memorulectr++;
 				std::cout << "memo item " << memorulenum;
 				std::cout << " (transition from item " << rulenum
-					<< " with symbol " << trans << "): " 
-					<< "\n\tsame as the following transition from item " << memoIter->second << ":\n"
+					<< " with symbol " << trans << "): "
+					<< "\n\tsame as the following transition from item " 
+					<< memoIter->second << ":\n"
 					<< memoIter->first << "\n"	// TODO: format output
 					<< std::endl;
 
+				const auto iter = m_transitions.find(memoIter->second);
+				if(iter == m_transitions.end() || iter->second.size() == 0)
+				{
+					std::cerr << "Referenced invalid transition." << std::endl;
+					exit(-1);
+					//continue;
+				}
+
+				std::optional<std::size_t> rule_to;
+				for(const auto& pair : iter->second)
+				{
+					// match production ident
+					if(pair.second == trans)
+					{
+						rule_to = pair.first;
+						break;
+					}
+				}
+
+				if(!rule_to)
+				{
+					std::cerr << "Referenced invalid transition (2)." << std::endl;
+					exit(-1);
+					//continue;
+				}
+
+				// fill in transition rulenum -> memo_to into m_transitions
+				m_transitions[rulenum].push_back(std::make_pair(*rule_to, trans));
 			}
 		}
 		// --------------------------------------------------------------------
+	}
+
+
+	void WriteGraph(const std::string& file)
+	{
+		std::ofstream ofstr(file);
+		if(!ofstr)
+			return;
+
+		ofstr << "digraph G_lr1\n{\n";
+
+
+		// write states
+		std::set<std::size_t> states;
+		for(const auto& pair : m_transitions)
+		{
+			states.insert(pair.first);
+
+			for(const auto& vecelem : pair.second)
+				states.insert(vecelem.first);
+		}
+
+		for(std::size_t state : states)
+			ofstr << "\t" << state << " [label=\"" << state << "\"];\n";
+
+
+		// write transitions
+		ofstr << "\n";
+		for(const auto& pair : m_transitions)
+		{
+			std::size_t state_from = pair.first;
+			for(const auto& [state_to, prod] : pair.second)
+				ofstr << "\t" << state_from << " -> " << state_to << " [label=\"" << prod << "\"];\n";
+		}
+
+
+		ofstr << "}" << std::endl;
+		ofstr.flush();
+		ofstr.close();
+
+		std::system("dot -Tsvg tmp.graph -o tmp.svg");
 	}
 
 
@@ -609,6 +681,8 @@ public:
 
 		// calculate the LR collection
 		CalcLRCollection({{start}}, {{start->GetRule(0)}}, {{0}});
+
+		WriteGraph("tmp.graph");
 	}
 
 	LR1() = delete;
@@ -633,6 +707,10 @@ private:
 
 	// per-rile first sets
 	std::map<std::string, std::vector<std::set<std::shared_ptr<Symbol>>>> m_first_perrule;
+
+	// for graph generation
+	// transitions: [state_from, [state_to, production]]
+	std::map<std::size_t, std::vector<std::pair<std::size_t, std::string>>> m_transitions;
 };
 
 
@@ -696,7 +774,6 @@ std::ostream& operator<<(std::ostream& ostr, const LR1& lr1)
 
 
 // ----------------------------------------------------------------------------
-
 
 int main()
 {
