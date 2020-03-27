@@ -9,9 +9,11 @@
  *	- https://en.wikipedia.org/wiki/LR_parser
  *	- https://www.cs.uaf.edu/~cs331/notes/FirstFollow.pdf
  *	- https://de.wikipedia.org/wiki/LL(k)-Grammatik
+ *	- "Compilerbau Teil 1", ISBN: 3-486-25294-1, 1999, p. 267
  */
 
 #include <vector>
+#include <unordered_map>
 #include <map>
 #include <set>
 #include <tuple>
@@ -680,7 +682,7 @@ public:
 			CalcFollow(nonterms, start, nonterm);
 
 		// calculate the LR collection
-		CalcLRCollection({{start}}, {{start->GetRule(0)}}, {{0}});
+		CalcLRCollection({{start}}, {{start->GetRule(0)}}, {0});
 
 		WriteGraph("tmp.graph");
 	}
@@ -781,6 +783,7 @@ int main()
 	g_end = std::make_shared<Terminal>("end", false, true);
 
 	constexpr int example = 0;
+	constexpr bool bSimplifiedGrammar = 0;
 
 	if constexpr(example == 0)
 	{
@@ -807,21 +810,36 @@ int main()
 		start->AddRule({ add_term });
 
 		add_term->AddRule({ add_term, plus, mul_term });
-		add_term->AddRule({ add_term, minus, mul_term });
+		if(!bSimplifiedGrammar)
+			add_term->AddRule({ add_term, minus, mul_term });
 		add_term->AddRule({ mul_term });
 
-		mul_term->AddRule({ mul_term, mult, pow_term });
-		mul_term->AddRule({ mul_term, div, pow_term });
-		mul_term->AddRule({ mul_term, mod, pow_term });
-		mul_term->AddRule({ pow_term });
+		if(bSimplifiedGrammar)
+		{
+			mul_term->AddRule({ mul_term, mult, factor });
+		}
+		else
+		{
+			mul_term->AddRule({ mul_term, mult, pow_term });
+			mul_term->AddRule({ mul_term, div, pow_term });
+			mul_term->AddRule({ mul_term, mod, pow_term });
+		}
+
+		if(bSimplifiedGrammar)
+			mul_term->AddRule({ factor });
+		else
+			mul_term->AddRule({ pow_term });
 
 		pow_term->AddRule({ pow_term, pow, factor });
 		pow_term->AddRule({ factor });
 
 		factor->AddRule({ bracket_open, add_term, bracket_close });
-		factor->AddRule({ ident, bracket_open, bracket_close });			// function call
-		factor->AddRule({ ident, bracket_open, add_term, bracket_close });			// function call
-		factor->AddRule({ ident, bracket_open, add_term, comma, add_term, bracket_close });	// function call
+		if(!bSimplifiedGrammar)
+		{
+			factor->AddRule({ ident, bracket_open, bracket_close });			// function call
+			factor->AddRule({ ident, bracket_open, add_term, bracket_close });			// function call
+			factor->AddRule({ ident, bracket_open, add_term, comma, add_term, bracket_close });	// function call
+		}
 		factor->AddRule({ sym });
 
 

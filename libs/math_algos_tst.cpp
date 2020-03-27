@@ -4,7 +4,7 @@
  * @date 9-dec-17
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -fPIC -I/usr/include/qt5 -o math_algos_tst math_algos_tst.cpp -std=c++17 -fconcepts -lQt5Core -lQt5Gui
+ * g++ -fPIC -I/usr/include/qt5 -o math_algos_tst math_algos_tst.cpp -std=c++2a -fconcepts -lQt5Core -lQt5Gui
  */
 
 #include <iostream>

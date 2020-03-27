@@ -8,6 +8,7 @@
  *
  * References:
  *  * https://en.wikipedia.org/wiki/Canonical_LR_parser
+ *  * "Compilerbau Teil 1", ISBN: 3-486-25294-1, 1999, p. 266-267
  *
  * g++ -std=c++17 -o lr1_expr lr1_expr.cpp lex.cpp
  */
@@ -165,21 +166,21 @@ static bool match(int expected)
 // (state, non-term symbol) -> state
 std::map<std::tuple<int, int>, int> g_mapJump
 {{
-	{{0, NONTERM_ADD_TERM}, 11}, {{0, NONTERM_MUL_TERM}, 10}, {{0, NONTERM_FACTOR}, 3},
-	{{2, NONTERM_ADD_TERM}, 4}, {{2, NONTERM_MUL_TERM}, 10}, {{2, NONTERM_FACTOR}, 3},
-	{{5, NONTERM_MUL_TERM}, 6}, {{5, NONTERM_FACTOR}, 3},
+	{{0, NONTERM_ADD_TERM}, 11}, {{0, NONTERM_MUL_TERM}, 10}, {{0, NONTERM_FACTOR}, 2},
+	{{1, NONTERM_ADD_TERM}, 4}, {{1, NONTERM_MUL_TERM}, 10}, {{1, NONTERM_FACTOR}, 2},
+	{{5, NONTERM_MUL_TERM}, 6}, {{5, NONTERM_FACTOR}, 2},
 	{{7, NONTERM_FACTOR}, 8},
 }};
 
 // (state, term symbol) -> state
 std::map<std::tuple<int, int>, int> g_mapActionShift
 {{
-	{{0, TOK_REAL}, 1}, {{0, '('}, 2},
-	{{2, TOK_REAL}, 1}, {{2, '('}, 2},
+	{{0, TOK_REAL}, 3}, {{0, '('}, 1},
+	{{1, TOK_REAL}, 3}, {{1, '('}, 1},
 	{{4, '+'}, 5}, {{4, ')'}, 9},
-	{{5, TOK_REAL}, 1}, {{5, '('}, 2},
+	{{5, TOK_REAL}, 3}, {{5, '('}, 1},
 	{{6, '*'}, 7},
-	{{7, TOK_REAL}, 1}, {{7, '('}, 2},
+	{{7, TOK_REAL}, 3}, {{7, '('}, 1},
 	{{10, '*'}, 7},
 	{{11, '+'}, 5},
 }};
@@ -187,8 +188,8 @@ std::map<std::tuple<int, int>, int> g_mapActionShift
 // (state, term symbol) -> production rule number
 std::map<std::tuple<int, int>, int> g_mapActionReduce
 {{
-	{{1, '+'}, 6}, {{1, '*'}, 6}, {{1, ')'}, 6}, {{1, TOK_END}, 6},
-	{{3, '+'}, 5}, {{3, '*'}, 5}, {{3, ')'}, 5}, {{3, TOK_END}, 5},
+	{{3, '+'}, 6}, {{3, '*'}, 6}, {{3, ')'}, 6}, {{3, TOK_END}, 6},
+	{{2, '+'}, 5}, {{2, '*'}, 5}, {{2, ')'}, 5}, {{2, TOK_END}, 5},
 	{{6, '+'}, 2}, {{6, ')'}, 2}, {{6, TOK_END}, 2},
 	{{8, '+'}, 4}, {{8, '*'}, 4}, {{8, ')'}, 4}, {{8, TOK_END}, 4},
 	{{9, '+'}, 7}, {{9, '*'}, 7}, {{9, ')'}, 7}, {{9, TOK_END}, 7},
@@ -198,9 +199,9 @@ std::map<std::tuple<int, int>, int> g_mapActionReduce
 // first symbol: lhs, further symbols: rhs
 std::vector<std::shared_ptr<Symbol>> g_rules[] =
 {
-	/*0*/ {},
+	/*0*/ {},	// dummy, as rule indices are 1-based
 
-	/*1*/ {},	// accepting transition
+	/*1*/ {},	// accepting transition to start symbol of extended grammar
 
 	/*2*/ { std::make_shared<NonTerminal>(NONTERM_ADD_TERM),
 			std::make_shared<NonTerminal>(NONTERM_ADD_TERM),
