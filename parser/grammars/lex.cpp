@@ -126,7 +126,7 @@ int yylex()
 	}
 	if(longest_matching.size() > 1)
 	{
-		std::cerr << "Warning: Ambigous match in lexer for token \""
+		std::cerr << "Warning: Ambiguous match in lexer for token \""
 			<< longest_input << "\"." << std::endl;
 	}
 	if(longest_matching.size())
