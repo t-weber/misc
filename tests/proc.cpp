@@ -64,7 +64,7 @@ int main()
 	{
 		// Each process has their own copy of the data.
 		// The pointers seemingly point to the same address, but
-		// are actually in a different process space.
+		// are actually in different process spaces.
 		std::cout << "pid: " << std::dec << a.get_pid();
 		std::cout << ", ptr: " << std::hex << a.pointer();
 		std::cout << ", data: " << std::dec << a.data();

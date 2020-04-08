@@ -129,11 +129,49 @@ void tstCov()
 	std::shared_ptr<BaseType> b3 = y->tstCovRetShared();
 }
 
+
+
 // ----------------------------------------------------------------------------
+// test priority queue
+// ----------------------------------------------------------------------------
+
+
+#include <queue>
+#include <deque>
+
+template<template<class...> class t_queue, template<class...> class t_cmp>
+void tstQueue()
+{
+	t_queue<double, std::deque<double>, t_cmp<double>> qu;
+
+	qu.push(5.);
+	qu.push(2.);
+	qu.push(10.);
+	qu.push(0.);
+
+	while(1)
+	{
+		if(qu.empty()) break;
+		std::cout << qu.top() << ", ";
+		qu.pop();
+	}
+
+	std::cout << std::endl;
+}
+
+
+// ----------------------------------------------------------------------------
+
 
 
 int main()
 {
 	tstCov();
+
+	std::cout << std::endl;
+
+	tstQueue<std::priority_queue, std::less>();
+	tstQueue<std::priority_queue, std::greater>();
+
 	return 0;
 }
