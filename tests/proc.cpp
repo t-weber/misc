@@ -30,13 +30,15 @@ public:
 		else if(pid == 0)
 		{
 			*ptr = 123;
-			std::cout << "In child process." << std::endl;
-			//exit(0);
+			std::cout << "In child process " << getpid() << "." << std::endl;
+			//std::exit(0);	// no destructors called for child process.
+			//std::abort();
 		}
 		else
 		{
 			*ptr = 987;
-			std::cout << "Spawned child process with id " << pid << std::endl;
+			std::cout << "In main process " << getpid()
+				<< ": Spawned child process with id " << pid << "." << std::endl;
 		}
 	}
 
@@ -48,7 +50,7 @@ public:
 
 	~A()
 	{
-		std::cout << "In " << __func__ << std::endl;
+		std::cout << "Process " << getpid() << ": In " << __func__ << std::endl;
 		std::cout << "use_count: " << ptr.use_count() << std::endl;
 	}
 };
@@ -65,7 +67,8 @@ int main()
 		// are actually in a different process space.
 		std::cout << "pid: " << std::dec << a.get_pid();
 		std::cout << ", ptr: " << std::hex << a.pointer();
-		std::cout << ", data: " << std::dec << a.data() << std::endl;
+		std::cout << ", data: " << std::dec << a.data();
+		std::cout << "." << std::endl;
 	}
 
 	return 0;

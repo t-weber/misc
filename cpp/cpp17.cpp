@@ -4,7 +4,7 @@
  * @date 11-nov-17
  * @license: see 'LICENSE.EUPL' file
  *
- * gcc -o cpp17 cpp17.cpp -std=c++17 -lstdc++
+ * g++ -std=c++17 -o cpp17 cpp17.cpp
  */
 
 #include <iostream>
@@ -13,6 +13,8 @@
 #include <string_view>
 #include <type_traits>
 #include <array>
+#include <optional>
+#include <variant>
 #include <any>
 #include <algorithm>
 #include <functional>
@@ -99,6 +101,7 @@ int main()
 	// --------------------------------------------------------------------
 
 
+
 	// --------------------------------------------------------------------
 	// new if statement
 	if(std::ifstream ifstr("./cpp17.cpp"); ifstr.is_open())
@@ -112,6 +115,7 @@ int main()
 		std::cout << "File could not be opened." << std::endl;
 	}
 	// --------------------------------------------------------------------
+
 
 
 	// --------------------------------------------------------------------
@@ -246,6 +250,42 @@ int main()
 		// erase_if
 		std::experimental::erase_if(str, [](char c)->bool { return c == 'E'; });
 		std::cout << str << std::endl;
+	}
+	// --------------------------------------------------------------------
+
+
+
+	// --------------------------------------------------------------------
+	// optional
+	{
+		auto opt = std::make_optional<int>(987654);
+		if(opt)
+			std::cout << *opt << std::endl;
+	}
+	// --------------------------------------------------------------------
+
+
+
+	// --------------------------------------------------------------------
+	// variant
+	{
+		std::variant<int, char, std::string> var, var2;
+
+		var = 'X';
+		std::cout << std::get<char>(var) << std::endl;
+
+		var = "123";
+		std::cout << std::get<2>(var) << ", " << std::get<std::string>(var) << std::endl;
+
+		var = 123;
+		std::cout << std::get<0>(var) << std::endl;
+
+		std::cout << std::holds_alternative<std::string>(var) << ", "
+			<< *std::get_if<int>(&var) << std::endl;
+
+		var2 = "345";
+		std::swap(var, var2);
+		std::cout << std::get<int>(var2) << std::endl;
 	}
 	// --------------------------------------------------------------------
 

@@ -11,6 +11,7 @@
 #include <boost/algorithm/string.hpp>
 #include <iostream>
 #include <stack>
+#include <variant>
 #include <cmath>
 
 using t_real = double;
@@ -40,7 +41,8 @@ t_cont<t_str> tokenise(const t_str& _str, const t_str& strSeparators=" \t")
 
 void run(std::istream& istr)
 {
-	std::stack<t_real> stack;
+	// TODO: include other types
+	std::stack<std::variant<t_real>> stack;
 
 	const std::string white{" \t"};
 	std::string line;
@@ -72,49 +74,49 @@ void run(std::istream& istr)
 
 		else if(tokens[0] == "UMIN")
 		{
-			t_real val = stack.top(); stack.pop();
+			t_real val = std::get<t_real>(stack.top()); stack.pop();
 			stack.push(-val);
 		}
 
 		else if(tokens[0] == "ADD")
 		{
-			t_real val1 = stack.top(); stack.pop();
-			t_real val0 = stack.top(); stack.pop();
+			t_real val1 = std::get<t_real>(stack.top()); stack.pop();
+			t_real val0 = std::get<t_real>(stack.top()); stack.pop();
 			stack.push(val0 + val1);
 		}
 
 		else if(tokens[0] == "SUB")
 		{
-			t_real val1 = stack.top(); stack.pop();
-			t_real val0 = stack.top(); stack.pop();
+			t_real val1 = std::get<t_real>(stack.top()); stack.pop();
+			t_real val0 = std::get<t_real>(stack.top()); stack.pop();
 			stack.push(val0 - val1);
 		}
 
 		else if(tokens[0] == "MUL")
 		{
-			t_real val1 = stack.top(); stack.pop();
-			t_real val0 = stack.top(); stack.pop();
+			t_real val1 = std::get<t_real>(stack.top()); stack.pop();
+			t_real val0 = std::get<t_real>(stack.top()); stack.pop();
 			stack.push(val0 * val1);
 		}
 
 		else if(tokens[0] == "DIV")
 		{
-			t_real val1 = stack.top(); stack.pop();
-			t_real val0 = stack.top(); stack.pop();
+			t_real val1 = std::get<t_real>(stack.top()); stack.pop();
+			t_real val0 = std::get<t_real>(stack.top()); stack.pop();
 			stack.push(val0 / val1);
 		}
 
 		else if(tokens[0] == "MOD")
 		{
-			t_real val1 = stack.top(); stack.pop();
-			t_real val0 = stack.top(); stack.pop();
+			t_real val1 = std::get<t_real>(stack.top()); stack.pop();
+			t_real val0 = std::get<t_real>(stack.top()); stack.pop();
 			stack.push(std::fmod(val0, val1));
 		}
 
 		else if(tokens[0] == "POW")
 		{
-			t_real val1 = stack.top(); stack.pop();
-			t_real val0 = stack.top(); stack.pop();
+			t_real val1 = std::get<t_real>(stack.top()); stack.pop();
+			t_real val0 = std::get<t_real>(stack.top()); stack.pop();
 			stack.push(std::pow(val0, val1));
 		}
 
@@ -143,7 +145,7 @@ void run(std::istream& istr)
 			int argCnt = std::stoi(tokens[2]);
 			if(argCnt==1 && tokens[1]=="sin")
 			{
-				t_real val = stack.top(); stack.pop();
+				t_real val = std::get<t_real>(stack.top()); stack.pop();
 				stack.push(std::sin(val));
 			}
 			else
@@ -157,7 +159,7 @@ void run(std::istream& istr)
 	std::cout << "End of program. Stack contents:\n";
 	while(stack.size())
 	{
-		t_real val = stack.top();
+		t_real val = std::get<t_real>(stack.top());
 		std::cout << val << std::endl;
 		stack.pop();
 	}
