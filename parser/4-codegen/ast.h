@@ -9,6 +9,7 @@
 #define __AST_H__
 
 #include <memory>
+#include <string>
 #include <iostream>
 
 
@@ -26,27 +27,30 @@ class ASTCall;
 class ASTAssign;
 
 
+using t_astret = std::string;
+
+
 /**
  * ast visitor
  */
 class ASTVisitor
 {
 public:
-	virtual void visit(const ASTUMinus* ast) = 0;
-	virtual void visit(const ASTPlus* ast) = 0;
-	virtual void visit(const ASTMinus* ast) = 0;
-	virtual void visit(const ASTMult* ast) = 0;
-	virtual void visit(const ASTDiv* ast) = 0;
-	virtual void visit(const ASTMod* ast) = 0;
-	virtual void visit(const ASTPow* ast) = 0;
-	virtual void visit(const ASTConst* ast) = 0;
-	virtual void visit(const ASTVar* ast) = 0;
-	virtual void visit(const ASTCall* ast) = 0;
-	virtual void visit(const ASTAssign* ast) = 0;
+	virtual t_astret visit(const ASTUMinus* ast) = 0;
+	virtual t_astret visit(const ASTPlus* ast) = 0;
+	virtual t_astret visit(const ASTMinus* ast) = 0;
+	virtual t_astret visit(const ASTMult* ast) = 0;
+	virtual t_astret visit(const ASTDiv* ast) = 0;
+	virtual t_astret visit(const ASTMod* ast) = 0;
+	virtual t_astret visit(const ASTPow* ast) = 0;
+	virtual t_astret visit(const ASTConst* ast) = 0;
+	virtual t_astret visit(const ASTVar* ast) = 0;
+	virtual t_astret visit(const ASTCall* ast) = 0;
+	virtual t_astret visit(const ASTAssign* ast) = 0;
 };
 
 
-#define ASTVISITOR_ACCEPT virtual void accept(ASTVisitor* visitor) const override { visitor->visit(this); }
+#define ASTVISITOR_ACCEPT virtual t_astret accept(ASTVisitor* visitor) const override { return visitor->visit(this); }
 
 
 /**
@@ -55,7 +59,7 @@ public:
 class AST
 {
 public:
-	virtual void accept(ASTVisitor* visitor) const = 0;
+	virtual t_astret accept(ASTVisitor* visitor) const = 0;
 };
 
 

@@ -11,6 +11,7 @@
 #include "ast.h"
 #include "parser.h"
 #include "zeroac.h"
+#include "threeac.h"
 
 
 /**
@@ -51,6 +52,9 @@ extern yy::Parser::symbol_type yylex(yy::ParserContext &context)
 
 int main()
 {
+	bool b0AC = 1;
+	bool b3AC = 1;
+
 	yy::ParserContext ctx;
 	yy::Parser parser(ctx);
 	int res = parser.parse();
@@ -59,13 +63,31 @@ int main()
 		return res;
 
 
-	ZeroAC zeroac;
 
-	std::cout << "# Zero-address code:\n";
-	for(auto iter=ctx.GetStatements().rbegin(); iter!=ctx.GetStatements().rend(); ++iter)
+	if(b0AC)
 	{
-		(*iter)->accept(&zeroac);
-		std::cout << std::endl;
+		ZeroAC zeroac;
+
+		std::cout << "# Zero-address code:\n";
+		for(auto iter=ctx.GetStatements().rbegin(); iter!=ctx.GetStatements().rend(); ++iter)
+		{
+			(*iter)->accept(&zeroac);
+			std::cout << std::endl;
+		}
+	}
+
+
+
+	if(b3AC)
+	{
+		ThreeAC threeac;
+
+		std::cout << "\n# Three-address code:\n";
+		for(auto iter=ctx.GetStatements().rbegin(); iter!=ctx.GetStatements().rend(); ++iter)
+		{
+			(*iter)->accept(&threeac);
+			std::cout << std::endl;
+		}
 	}
 
 	return 0;
