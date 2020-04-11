@@ -77,7 +77,7 @@ public:
 
 	virtual void visit(const ASTVar* ast) override
 	{
-		(*m_ostr) << "PUSHVAR " << ast->GetIdent() << "\n";
+		(*m_ostr) << "PUSHVAL " << ast->GetIdent() << "\n";
 	}
 
 
@@ -104,7 +104,7 @@ public:
 	virtual void visit(const ASTAssign* ast) override
 	{
 		ast->GetExpr()->accept(this);
-		(*m_ostr) << "ADDR " << ast->GetIdent() << "\n";
+		(*m_ostr) << "PUSHVAR " << ast->GetIdent() << "\n";
 		(*m_ostr) << "ASSIGN\n";
 	}
 

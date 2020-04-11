@@ -5,12 +5,13 @@
  * @license: see 'LICENSE.GPL' file
  *
  * Test:
- * 	echo -e "(2+3)*(4-5)" | ./parser | ./vm_0ac
+ *	echo -e "x = (2+3)*(4-5)\n y=x*x+x" | ./parser | ./vm_0ac
  */
 
 #include <boost/algorithm/string.hpp>
 #include <iostream>
 #include <stack>
+#include <unordered_map>
 #include <variant>
 #include <cmath>
 
@@ -41,8 +42,13 @@ t_cont<t_str> tokenise(const t_str& _str, const t_str& strSeparators=" \t")
 
 void run(std::istream& istr)
 {
-	// TODO: include other types
-	std::stack<std::variant<t_real>> stack;
+	std::unordered_map<std::string, t_real> syms =
+	{{
+		{ "pi", M_PI },
+	}};
+
+	std::stack<std::variant<t_real, std::string>> stack;
+
 
 	const std::string white{" \t"};
 	std::string line;
@@ -70,6 +76,41 @@ void run(std::istream& istr)
 
 			t_real val = std::stod(tokens[1]);
 			stack.push(val);
+		}
+
+		else if(tokens[0] == "PUSHVAL")
+		{
+			if(tokens.size() < 2)
+			{
+				std::cerr << "Need variable name to push." << std::endl;
+				continue;
+			}
+
+			auto iter = syms.find(tokens[1]);
+			if(iter != syms.end())
+				stack.push(iter->second);
+			else
+				std::cerr << "Unknown variable: " << tokens[1] << "." << std::endl;
+		}
+
+		else if(tokens[0] == "PUSHVAR")
+		{
+			if(tokens.size() < 2)
+			{
+				std::cerr << "Need variable name to push." << std::endl;
+				continue;
+			}
+
+			std::string var = tokens[1];
+			stack.emplace(std::move(var));
+		}
+
+		else if(tokens[0] == "ASSIGN")
+		{
+			std::string var = std::get<std::string>(stack.top()); stack.pop();
+			t_real val = std::get<t_real>(stack.top()); stack.pop();
+
+			syms[var] = val;
 		}
 
 		else if(tokens[0] == "UMIN")
@@ -120,20 +161,6 @@ void run(std::istream& istr)
 			stack.push(std::pow(val0, val1));
 		}
 
-		else if(tokens[0] == "PUSHVAR")
-		{
-			if(tokens.size() < 2)
-			{
-				std::cerr << "Need variable name to push." << std::endl;
-				continue;
-			}
-
-			if(tokens[1] == "pi")
-				stack.push(M_PI);
-			else
-				std::cerr << "Unknown variable: " << tokens[1] << "." << std::endl;
-		}
-
 		else if(tokens[0] == "CALL")
 		{
 			if(tokens.size() < 3)
@@ -156,12 +183,21 @@ void run(std::istream& istr)
 	}
 
 
-	std::cout << "End of program. Stack contents:\n";
-	while(stack.size())
+	std::cout << "End of program.\n";
+
+	std::cout << "\nSymbols:\n";
+	for(const auto& sym : syms)
+		std::cout << "\t" << sym.first << " = " << sym.second << std::endl;
+
+	if(!stack.empty())
 	{
-		t_real val = std::get<t_real>(stack.top());
-		std::cout << val << std::endl;
-		stack.pop();
+		std::cout << "\nStack contents:\n";
+		while(stack.size())
+		{
+			t_real val = std::get<t_real>(stack.top());
+			std::cout << "\t" << val << std::endl;
+			stack.pop();
+		}
 	}
 }
 
