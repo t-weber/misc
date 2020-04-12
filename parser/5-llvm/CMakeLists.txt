@@ -49,18 +49,10 @@ message("Bison output header: ${BISON_parser_impl_OUTPUT_HEADER}")
 
 
 add_executable(parser
-	parser.cpp parser.h ast.h zeroac.h threeac.h
+	parser.cpp parser.h ast.h llasm.h
 	${FLEX_lexer_impl_OUTPUTS}
 	${BISON_parser_impl_OUTPUT_SOURCE} ${BISON_parser_impl_OUTPUT_HEADER}
 )
 
 #add_dependencies(parser parser_impl lexer_impl)
 target_link_libraries(parser)
-
-
-
-add_executable(vm_0ac
-	vm_0ac.cpp
-)
-
-target_link_libraries(vm_0ac)

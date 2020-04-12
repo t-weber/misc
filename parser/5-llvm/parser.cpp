@@ -5,13 +5,15 @@
  * @license: see 'LICENSE.GPL' file
  *
  * Test:
- * echo -e "(2+3)*(4-5)\n1+2" | ./parser
+ *   ./parser test.prog > test.asm
+ *   llvm-as test.asm && lli test.asm.bc
  */
+
+#include <fstream>
 
 #include "ast.h"
 #include "parser.h"
-#include "zeroac.h"
-#include "threeac.h"
+#include "llasm.h"
 
 
 /**
@@ -26,7 +28,7 @@ void yy::Lexer::LexerError(const char* err)
 /**
  * Lexer message
  */
-void yy::Lexer::LexerOutput(const char* str, int len)
+void yy::Lexer::LexerOutput(const char* str, int /*len*/)
 {
 	std::cerr << "Lexer output: " << str << std::endl;
 }
@@ -50,12 +52,19 @@ extern yy::Parser::symbol_type yylex(yy::ParserContext &context)
 }
 
 
-int main()
+int main(int argc, char** argv)
 {
-	bool b0AC = 1;
-	bool b3AC = 1;
+	if(argc <= 1)
+	{
+		std::cerr << "Please specify a program." << std::endl;
+		return -1;
+	}
 
-	yy::ParserContext ctx;
+	std::ifstream ifstr{argv[1]};
+
+
+	// parsing
+	yy::ParserContext ctx{ifstr};
 	yy::Parser parser(ctx);
 	int res = parser.parse();
 
@@ -63,30 +72,13 @@ int main()
 		return res;
 
 
-	if(b0AC)
+	// code generation
+	LLAsm llasm;
+	auto stmts = ctx.GetStatements()->GetStatementList();
+	for(auto iter=stmts.rbegin(); iter!=stmts.rend(); ++iter)
 	{
-		ZeroAC zeroac;
-
-		std::cout << "# Zero-address code:\n";
-		for(auto iter=ctx.GetStatements().rbegin(); iter!=ctx.GetStatements().rend(); ++iter)
-		{
-			(*iter)->accept(&zeroac);
-			std::cout << std::endl;
-		}
-		std::cout << "END" << std::endl;
-	}
-
-
-	if(b3AC)
-	{
-		ThreeAC threeac;
-
-		std::cout << "\n\n# Three-address code:\n";
-		for(auto iter=ctx.GetStatements().rbegin(); iter!=ctx.GetStatements().rend(); ++iter)
-		{
-			(*iter)->accept(&threeac);
-			std::cout << std::endl;
-		}
+		(*iter)->accept(&llasm);
+		std::cout << std::endl;
 	}
 
 	return 0;

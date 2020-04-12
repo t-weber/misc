@@ -180,11 +180,14 @@ void run(std::istream& istr)
 				std::cerr << "Unknown function: " << tokens[1] << "." << std::endl;
 			}
 		}
+		else if(tokens[0] == "END")
+		{
+			break;
+		}
 	}
 
 
 	std::cout << "End of program.\n";
-
 	std::cout << "\nSymbols:\n";
 	for(const auto& sym : syms)
 		std::cout << "\t" << sym.first << " = " << sym.second << std::endl;
