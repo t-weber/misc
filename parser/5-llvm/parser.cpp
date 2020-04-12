@@ -5,8 +5,7 @@
  * @license: see 'LICENSE.GPL' file
  *
  * Test:
- *   ./parser test.prog > test.asm
- *   llvm-as test.asm && lli test.asm.bc
+ *   ./parser test/test.prog > test.asm && llvm-as test.asm && lli test.asm.bc
  */
 
 #include <fstream>
@@ -73,12 +72,46 @@ int main(int argc, char** argv)
 
 
 	// code generation
+
 	LLAsm llasm;
 	auto stmts = ctx.GetStatements()->GetStatementList();
 	for(auto iter=stmts.rbegin(); iter!=stmts.rend(); ++iter)
 	{
 		(*iter)->accept(&llasm);
 		std::cout << std::endl;
+	}
+
+	// additional code to make it run
+	{
+		std::string strStartup= R"START(
+; -----------------------------------------------------------------------------
+; imported libc functions
+declare double @pow(double, double)
+declare i8* @gcvt(double, i32, i8*)
+declare i8 @puts(i8*)
+declare i8 @putchar(i8)
+; -----------------------------------------------------------------------------
+
+; main entry point for llvm
+define i32 @main()
+{
+	; call entry function
+	%val = call double @start()
+
+	; convert to string
+	%strval = alloca [64 x i8]
+	%strvalptr = bitcast [64 x i8]* %strval to i8*
+	call i8* @gcvt(double %val, i32 6, i8* %strvalptr)
+
+	; output string
+	call i8 @puts(i8* %strvalptr)
+	;call i8 @putchar(i8 10)
+
+	ret i32 0
+}
+)START";
+
+		std::cout << strStartup << std::endl;
 	}
 
 	return 0;

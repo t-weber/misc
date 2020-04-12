@@ -93,7 +93,7 @@ public:
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
 		std::string var = get_tmp_var();
-		(*m_ostr) << var << " = fpow double " << term1 << ", " << term2 << "\n";
+		(*m_ostr) << var << " = call double @pow(double " << term1 << ", double " << term2 << ")\n";
 		return var;
 	}
 
@@ -164,7 +164,7 @@ public:
 			if(idx < argnames.size()-1)
 				(*m_ostr) << ", ";
 		}
-		(*m_ostr) << ")\n{\nentry:\n";
+		(*m_ostr) << ")\n{\n";
 
 		// return result of last expression
 		t_astret lastres = ast->GetStatements()->accept(this);
@@ -181,6 +181,9 @@ public:
 		t_astret expr = ast->GetExpr()->accept(this);
 		std::string var = std::string{"%"} + ast->GetIdent();
 
+		// hack: cannot directly assign variables
+		if(expr.length() && expr[0] == '%')
+			expr = "fadd double " + expr + ", 0.";
 		(*m_ostr) << var << " = " << expr << "\n";
 		return var;
 	}

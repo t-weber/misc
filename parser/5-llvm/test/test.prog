@@ -1,9 +1,9 @@
 func f(x y)
 {
-	z = x*y + 1;
+	z = x^(y+1) - 2;
 }
 
-func main()
+func start()
 {
-	f(3, 5);
+	f(2, 3);
 }
