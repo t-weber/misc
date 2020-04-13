@@ -59,6 +59,7 @@
 %token<std::string> IDENT
 %token<double> REAL
 %token FUNC
+%token VAR
 %token IF THEN ELSE
 %token EQU NEQ GT LT GEQ LEQ
 %token AND OR
@@ -69,6 +70,7 @@
 %type<std::shared_ptr<AST>> expr
 %type<std::shared_ptr<AST>> statement
 %type<std::shared_ptr<ASTStmts>> statements
+%type<std::shared_ptr<ASTVarDecl>> variables
 %type<std::shared_ptr<ASTArgs>> arguments
 %type<std::shared_ptr<ASTStmts>> block
 %type<std::shared_ptr<AST>> function
@@ -104,6 +106,12 @@ program
 statements[res]
 	: statement[stmt] statements[lst]	{ $lst->AddStatement($stmt); $res = $lst; }
 	| /* epsilon */						{ $res = std::make_shared<ASTStmts>(); }
+	;
+
+
+variables[res]
+	: IDENT[name] variables[lst]	{ $lst->AddVariable($name); $res = $lst; }
+	| /* epsilon */					{ $res = std::make_shared<ASTVarDecl>(); }
 	;
 
 
@@ -172,6 +180,7 @@ expr[res]
 
 	// assignment
 	| IDENT[ident] '=' expr[term]			{ $res = std::make_shared<ASTAssign>($ident, $term); }
+	| VAR variables[vars]					{ $res = $vars; }
 	;
 
 %%

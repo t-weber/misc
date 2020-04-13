@@ -5,7 +5,7 @@
  * @license: see 'LICENSE.GPL' file
  *
  * Test:
- *   ./parser test/test.prog > test.asm && llvm-as test.asm && lli test.asm.bc
+ *   ./parser test/fibo.prog > test.asm && llvm-as test.asm && lli test.asm.bc
  */
 
 #include <fstream>

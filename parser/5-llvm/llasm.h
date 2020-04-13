@@ -76,6 +76,7 @@ public:
 	{
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
+
 		std::string var = get_tmp_var();
 		(*m_ostr) << var << " = frem double " << term1 << ", " << term2 << "\n";
 		return var;
@@ -86,6 +87,7 @@ public:
 	{
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
+
 		std::string var = get_tmp_var();
 		(*m_ostr) << var << " = call double @pow(double " << term1 << ", double " << term2 << ")\n";
 		return var;
@@ -101,7 +103,11 @@ public:
 	virtual t_astret visit(const ASTVar* ast) override
 	{
 		std::string var = std::string{"%"} + ast->GetIdent();
-		return var;
+
+		std::string retvar = get_tmp_var();
+		(*m_ostr) << retvar << " = load double, double* " << var << "\n";
+
+		return retvar;
 	}
 
 
@@ -140,6 +146,20 @@ public:
 	}
 
 
+	virtual t_astret visit(const ASTVarDecl* ast) override
+	{
+		auto vars = ast->GetVariables();
+		for(auto iter=vars.rbegin(); iter!=vars.rend(); ++iter)
+		{
+			const std::string var = std::string{"%"} + *iter;
+
+			(*m_ostr) << var << " = alloca double\n";
+		}
+
+		return t_astret{};
+	}
+
+
 	virtual t_astret visit(const ASTArgs*) override
 	{
 		return t_astret{};
@@ -153,12 +173,24 @@ public:
 		auto argnames = ast->GetArgNames();
 		for(std::size_t idx=0; idx<argnames.size(); ++idx)
 		{
-			const std::string& arg = argnames[idx];
+			const std::string arg = std::string{"f_"} + argnames[idx];
 			(*m_ostr) << "double %" << arg;
 			if(idx < argnames.size()-1)
 				(*m_ostr) << ", ";
 		}
 		(*m_ostr) << ")\n{\n";
+
+
+		// create local copies of the arguments
+		for(std::size_t idx=0; idx<argnames.size(); ++idx)
+		{
+			const std::string arg = std::string{"f_"} + argnames[idx];
+			const std::string& argcpy = argnames[idx];
+
+			(*m_ostr) << "%" << argcpy << " = alloca double\n";
+			(*m_ostr) << "store double %" << arg << ", double* %" << argcpy << "\n";
+		}
+
 
 		// return result of last expression
 		t_astret lastres = ast->GetStatements()->accept(this);
@@ -174,12 +206,12 @@ public:
 	{
 		t_astret expr = ast->GetExpr()->accept(this);
 		std::string var = std::string{"%"} + ast->GetIdent();
+		(*m_ostr) << "store double " << expr << ", double* " << var << "\n";
 
-		// hack: cannot directly assign variables
-		if(expr.length() && expr[0] == '%')
-			expr = "fadd double " + expr + ", 0.";
-		(*m_ostr) << var << " = " << expr << "\n";
-		return var;
+		// return a r-value if the variable is further needed
+		std::string retvar = get_tmp_var();
+		(*m_ostr) << retvar << " = load double, double* " << var << "\n";
+		return retvar;
 	}
 
 

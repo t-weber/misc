@@ -27,6 +27,7 @@ class ASTPow;
 class ASTConst;
 class ASTVar;
 class ASTStmts;
+class ASTVarDecl;
 class ASTArgs;
 class ASTFunc;
 class ASTCall;
@@ -54,6 +55,7 @@ public:
 	virtual t_astret visit(const ASTConst* ast) = 0;
 	virtual t_astret visit(const ASTVar* ast) = 0;
 	virtual t_astret visit(const ASTStmts* ast) = 0;
+	virtual t_astret visit(const ASTVarDecl* ast) = 0;
 	virtual t_astret visit(const ASTArgs* ast) = 0;
 	virtual t_astret visit(const ASTFunc* ast) = 0;
 	virtual t_astret visit(const ASTCall* ast) = 0;
@@ -219,6 +221,29 @@ public:
 
 private:
 	std::list<std::shared_ptr<AST>> m_stmts;
+};
+
+
+class ASTVarDecl : public AST
+{
+public:
+	ASTVarDecl() : m_vars{}
+	{}
+
+	void AddVariable(const std::string& var)
+	{
+		m_vars.push_back(var);
+	}
+
+	const std::list<std::string>& GetVariables() const
+	{
+		return m_vars;
+	}
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::list<std::string> m_vars;
 };
 
 

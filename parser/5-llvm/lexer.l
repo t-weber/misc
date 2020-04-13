@@ -49,6 +49,8 @@ ident	[A-Za-z_]+[A-Za-z0-9_]*
 "or"		{ return yy::Parser::make_OR(); }
 "not"		{ return yy::Parser::make_NOT(); }
 
+"var"		{ return yy::Parser::make_VAR(); }
+
 "="			{ return yytext[0]; }
 
 "func"		{ return yy::Parser::make_FUNC(); }

@@ -1,0 +1,17 @@
+func fibo(n)
+{
+	var ret;
+
+	if n <= 2 then
+		ret = 1;
+	else
+		ret = fibo(n-1) + fibo(n-2);
+
+	ret;		
+}
+
+
+func start()
+{
+	fibo(7);
+}
