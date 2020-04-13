@@ -87,6 +87,11 @@ int main(int argc, char** argv)
 ; -----------------------------------------------------------------------------
 ; imported libc functions
 declare double @pow(double, double)
+declare double @sin(double)
+declare double @cos(double)
+declare double @sqrt(double)
+declare double @exp(double)
+
 declare i8* @gcvt(double, i32, i8*)
 declare i8 @puts(i8*)
 declare i8 @putchar(i8)

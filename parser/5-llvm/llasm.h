@@ -27,6 +27,14 @@ protected:
 		return var;
 	}
 
+	std::string get_label()
+	{
+		std::string lab{"l_"};
+		lab += std::to_string(m_labelCount);
+		++m_labelCount;
+		return lab;
+	}
+
 
 public:
 	virtual t_astret visit(const ASTUMinus* ast) override
@@ -43,17 +51,10 @@ public:
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
 		std::string var = get_tmp_var();
-		(*m_ostr) << var << " = fadd double " << term1 << ", " << term2 << "\n";
-		return var;
-	}
 
+		std::string op = ast->IsInverted() ? "fsub" : "fadd";
+		(*m_ostr) << var << " = " << op << " double " << term1 << ", " << term2 << "\n";
 
-	virtual t_astret visit(const ASTMinus* ast) override
-	{
-		t_astret term1 = ast->GetTerm1()->accept(this);
-		t_astret term2 = ast->GetTerm2()->accept(this);
-		std::string var = get_tmp_var();
-		(*m_ostr) << var << " = fsub double " << term1 << ", " << term2 << "\n";
 		return var;
 	}
 
@@ -63,17 +64,10 @@ public:
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
 		std::string var = get_tmp_var();
-		(*m_ostr) << var << " = fmul double " << term1 << ", " << term2 << "\n";
-		return var;
-	}
 
+		std::string op = ast->IsInverted() ? "fdiv" : "fmul";
+		(*m_ostr) << var << " = " << op << " double " << term1 << ", " << term2 << "\n";
 
-	virtual t_astret visit(const ASTDiv* ast) override
-	{
-		t_astret term1 = ast->GetTerm1()->accept(this);
-		t_astret term2 = ast->GetTerm2()->accept(this);
-		std::string var = get_tmp_var();
-		(*m_ostr) << var << " = fdiv double " << term1 << ", " << term2 << "\n";
 		return var;
 	}
 
@@ -189,10 +183,63 @@ public:
 	}
 
 
+	virtual t_astret visit(const ASTComp* ast) override
+	{
+		t_astret term1 = ast->GetTerm1()->accept(this);
+		t_astret term2 = ast->GetTerm2()->accept(this);
+
+		std::string var = get_tmp_var();
+		std::string op;
+		switch(ast->GetOp())
+		{
+			case ASTComp::EQU: op = "oeq"; break;
+			case ASTComp::NEQ: op = "one"; break;
+			case ASTComp::GT: op = "ogt"; break;
+			case ASTComp::LT: op = "olt"; break;
+			case ASTComp::GEQ: op = "oge"; break;
+			case ASTComp::LEQ: op = "ole"; break;
+		}
+
+		(*m_ostr) << var << " = fcmp " << op << " double " << term1 << ", " << term2 << "\n";
+		return var;
+	}
+
+
+	virtual t_astret visit(const ASTCond* ast) override
+	{
+		t_astret cond = ast->GetCond()->accept(this);
+
+		std::string labelIf = get_label();
+		std::string labelElse = ast->HasElse() ? get_label() : "";
+		std::string labelEnd = get_label();
+
+		if(ast->HasElse())
+			(*m_ostr) << "br i1 " << cond << ", label %" << labelIf << ", label %" << labelElse << "\n";
+		else
+			(*m_ostr) << "br i1 " << cond << ", label %" << labelIf << ", label %" << labelEnd << "\n";
+
+		(*m_ostr) << labelIf << ":  ; if branch\n";
+		ast->GetIf()->accept(this);
+		(*m_ostr) << "br label %" << labelEnd << "\n";
+
+		if(ast->HasElse())
+		{
+			(*m_ostr) << labelElse << ":  ; else branch\n";
+			ast->GetElse()->accept(this);
+			(*m_ostr) << "br label %" << labelEnd << "\n";
+		}
+
+		(*m_ostr) << labelEnd << ":  ; endif\n";
+
+		return t_astret{};
+	}
+
+
 private:
 	std::ostream* m_ostr = &std::cout;
 
-	std::size_t m_varCount = 0;	// # of tmp vars
+	std::size_t m_varCount = 0;		// # of tmp vars
+	std::size_t m_labelCount = 0;	// # of labels
 };
 
 

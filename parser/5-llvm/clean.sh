@@ -6,3 +6,6 @@ rm -f parser_defs.h
 rm -f stack.hh
 rm -f lexer_impl.cpp
 rm -f lexer_impl.h
+
+rm -rf test.asm
+rm -rf test.asm.bc

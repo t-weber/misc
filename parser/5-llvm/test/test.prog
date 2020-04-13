@@ -1,7 +1,17 @@
 func f(x y)
 {
-	z = x^(y+1) - 2;
+	z = x^(y+1) - cos(0);
+
+	if z > 500 then
+	{
+	}
+	else
+	{
+	}
+
+	ret = z-1;
 }
+
 
 func start()
 {

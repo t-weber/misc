@@ -59,6 +59,10 @@
 %token<std::string> IDENT
 %token<double> REAL
 %token FUNC
+%token IF THEN ELSE
+%token EQU NEQ GT LT GEQ LEQ
+%token AND OR
+%token NOT
 
 
 // nonterminals
@@ -74,11 +78,20 @@
 // see: https://en.wikipedia.org/wiki/Order_of_operations
 %left ','
 %right '='
+%left OR
+%left AND
+%left GT LT GEQ LEQ
+%left EQU NEQ
 %left '+' '-'
 %left '*' '/' '%'
 %right UNARY_OP
 %right '^'
 %left '(' '[' '{'
+
+// for the if/else r/s conflict shift "else"
+// see: https://www.gnu.org/software/bison/manual/html_node/Non-Operators.html
+%precedence IF THEN
+%precedence ELSE
 
 
 %%
@@ -96,7 +109,14 @@ statements[res]
 
 statement[res]
 	: expr[term] ';'			{ $res = $term; }
+	| block[blk]				{ $res = $blk; }
+
 	| function[func]			{ $res = $func;  }
+
+	| IF expr[cond] THEN statement[if_stmt] {
+		$res = std::make_shared<ASTCond>($cond, $if_stmt); }
+	| IF expr[cond] THEN statement[if_stmt] ELSE statement[else_stmt] {
+		$res = std::make_shared<ASTCond>($cond, $if_stmt, $else_stmt); }
 	;
 
 
@@ -113,7 +133,7 @@ arguments[res]
 
 
 block[res]
-	: '{' statements[stmts] '}' 		{ $res = $stmts; }
+	: '{' statements[stmts] '}'		{ $res = $stmts; }
 	;
 
 
@@ -121,16 +141,24 @@ expr[res]
 	: '(' expr[term] ')'				{ $res = $term; }
 
 	// unary expressions
-	| '+' expr[term]	%prec UNARY_OP		{ $res = $term; }
-	| '-' expr[term]	%prec UNARY_OP		{ $res = std::make_shared<ASTUMinus>($term); }
+	| '+' expr[term] %prec UNARY_OP		{ $res = $term; }
+	| '-' expr[term] %prec UNARY_OP		{ $res = std::make_shared<ASTUMinus>($term); }
 
 	// binary expressions
-	| expr[term1] '+' expr[term2]			{ $res = std::make_shared<ASTPlus>($term1, $term2); }
-	| expr[term1] '-' expr[term2]			{ $res = std::make_shared<ASTMinus>($term1, $term2); }
-	| expr[term1] '*' expr[term2]			{ $res = std::make_shared<ASTMult>($term1, $term2); }
-	| expr[term1] '/' expr[term2]			{ $res = std::make_shared<ASTDiv>($term1, $term2); }
+	| expr[term1] '+' expr[term2]			{ $res = std::make_shared<ASTPlus>($term1, $term2, 0); }
+	| expr[term1] '-' expr[term2]			{ $res = std::make_shared<ASTPlus>($term1, $term2, 1); }
+	| expr[term1] '*' expr[term2]			{ $res = std::make_shared<ASTMult>($term1, $term2, 0); }
+	| expr[term1] '/' expr[term2]			{ $res = std::make_shared<ASTMult>($term1, $term2, 1); }
 	| expr[term1] '%' expr[term2]			{ $res = std::make_shared<ASTMod>($term1, $term2); }
 	| expr[term1] '^' expr[term2]			{ $res = std::make_shared<ASTPow>($term1, $term2); }
+
+	// comparison expressions
+	| expr[term1] EQU expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::EQU); }
+	| expr[term1] NEQ expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::NEQ); }
+	| expr[term1] GT expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GT); }
+	| expr[term1] LT expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LT); }
+	| expr[term1] GEQ expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GEQ); }
+	| expr[term1] LEQ expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LEQ); }
 
 	// constant
 	| REAL[num]					{ $res = std::make_shared<ASTConst>($num); }

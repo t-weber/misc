@@ -38,9 +38,23 @@ ident	[A-Za-z_]+[A-Za-z0-9_]*
 "{"|"}"		{ return yytext[0]; }
 "["|"]"		{ return yytext[0]; }
 ","			{ return yytext[0]; }
+
+"=="		{ return yy::Parser::make_EQU(); }
+"<>"		{ return yy::Parser::make_NEQ(); }
+">="		{ return yy::Parser::make_GEQ(); }
+"<="		{ return yy::Parser::make_LEQ(); }
+">"			{ return yy::Parser::make_GT(); }
+"<"			{ return yy::Parser::make_LT(); }
+"and"		{ return yy::Parser::make_AND(); }
+"or"		{ return yy::Parser::make_OR(); }
+"not"		{ return yy::Parser::make_NOT(); }
+
 "="			{ return yytext[0]; }
 
 "func"		{ return yy::Parser::make_FUNC(); }
+"if"		{ return yy::Parser::make_IF(); }
+"then"		{ return yy::Parser::make_THEN(); }
+"else"		{ return yy::Parser::make_ELSE(); }
 
 {real}		{ return yy::Parser::make_REAL(std::stod(yytext)); }
 {ident}		{ return yy::Parser::make_IDENT(yytext); }

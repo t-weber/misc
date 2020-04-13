@@ -31,6 +31,8 @@ class ASTArgs;
 class ASTFunc;
 class ASTCall;
 class ASTAssign;
+class ASTComp;
+class ASTCond;
 
 
 using t_astret = std::string;
@@ -46,9 +48,7 @@ public:
 
 	virtual t_astret visit(const ASTUMinus* ast) = 0;
 	virtual t_astret visit(const ASTPlus* ast) = 0;
-	virtual t_astret visit(const ASTMinus* ast) = 0;
 	virtual t_astret visit(const ASTMult* ast) = 0;
-	virtual t_astret visit(const ASTDiv* ast) = 0;
 	virtual t_astret visit(const ASTMod* ast) = 0;
 	virtual t_astret visit(const ASTPow* ast) = 0;
 	virtual t_astret visit(const ASTConst* ast) = 0;
@@ -58,6 +58,8 @@ public:
 	virtual t_astret visit(const ASTFunc* ast) = 0;
 	virtual t_astret visit(const ASTCall* ast) = 0;
 	virtual t_astret visit(const ASTAssign* ast) = 0;
+	virtual t_astret visit(const ASTComp* ast) = 0;
+	virtual t_astret visit(const ASTCond* ast) = 0;
 };
 
 
@@ -79,7 +81,7 @@ class ASTUMinus : public AST
 {
 public:
 	ASTUMinus(std::shared_ptr<AST> term)
-	: term(term)
+	: term{term}
 	{}
 
 	std::shared_ptr<AST> GetTerm() const { return term; }
@@ -94,68 +96,40 @@ private:
 class ASTPlus : public AST
 {
 public:
-	ASTPlus(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2)
-		: term1(term1), term2(term2)
+	ASTPlus(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2,
+		bool invert = 0)
+		: term1{term1}, term2{term2}, inverted{invert}
 	{}
 
 	std::shared_ptr<AST> GetTerm1() const { return term1; }
 	std::shared_ptr<AST> GetTerm2() const { return term2; }
+	bool IsInverted() const { return inverted; }
 
 	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term1, term2;
-};
-
-
-class ASTMinus : public AST
-{
-public:
-	ASTMinus(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2)
-		: term1(term1), term2(term2)
-	{}
-
-	std::shared_ptr<AST> GetTerm1() const { return term1; }
-	std::shared_ptr<AST> GetTerm2() const { return term2; }
-
-	ASTVISITOR_ACCEPT
-
-private:
-	std::shared_ptr<AST> term1, term2;
+	bool inverted = 0;
 };
 
 
 class ASTMult : public AST
 {
 public:
-	ASTMult(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2)
-		: term1(term1), term2(term2)
+	ASTMult(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2,
+		bool invert = 0)
+		: term1{term1}, term2{term2}, inverted{invert}
 	{}
 
 	std::shared_ptr<AST> GetTerm1() const { return term1; }
 	std::shared_ptr<AST> GetTerm2() const { return term2; }
+	bool IsInverted() const { return inverted; }
 
 	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term1, term2;
-};
-
-
-class ASTDiv : public AST
-{
-public:
-	ASTDiv(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2)
-		: term1(term1), term2(term2)
-	{}
-
-	std::shared_ptr<AST> GetTerm1() const { return term1; }
-	std::shared_ptr<AST> GetTerm2() const { return term2; }
-
-	ASTVISITOR_ACCEPT
-
-private:
-	std::shared_ptr<AST> term1, term2;
+	bool inverted = 0;
 };
 
 
@@ -163,7 +137,7 @@ class ASTMod : public AST
 {
 public:
 	ASTMod(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2)
-		: term1(term1), term2(term2)
+		: term1{term1}, term2{term2}
 	{}
 
 	std::shared_ptr<AST> GetTerm1() const { return term1; }
@@ -180,7 +154,7 @@ class ASTPow : public AST
 {
 public:
 	ASTPow(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2)
-		: term1(term1), term2(term2)
+		: term1{term1}, term2{term2}
 	{}
 
 	std::shared_ptr<AST> GetTerm1() const { return term1; }
@@ -197,7 +171,7 @@ class ASTConst : public AST
 {
 public:
 	ASTConst(double val)
-		: val(val)
+		: val{val}
 	{}
 
 	double GetVal() const { return val; }
@@ -213,7 +187,7 @@ class ASTVar : public AST
 {
 public:
 	ASTVar(const std::string& ident)
-		: ident(ident)
+		: ident{ident}
 	{}
 
 	const std::string& GetIdent() const { return ident; }
@@ -268,7 +242,7 @@ class ASTFunc : public AST
 {
 public:
 	ASTFunc(const std::string& ident, std::shared_ptr<ASTArgs>& args, std::shared_ptr<ASTStmts> stmts)
-		: ident(ident), argnames(args->GetArgs()), stmts(stmts)
+		: ident{ident}, argnames{args->GetArgs()}, stmts{stmts}
 	{
 		std::reverse(argnames.begin(), argnames.end());
 	}
@@ -313,7 +287,7 @@ class ASTAssign : public AST
 {
 public:
 	ASTAssign(const std::string& ident, std::shared_ptr<AST> expr)
-		: ident(ident), expr(expr)
+		: ident{ident}, expr{expr}
 	{}
 
 	const std::string& GetIdent() const { return ident; }
@@ -326,6 +300,59 @@ private:
 	std::shared_ptr<AST> expr;
 };
 
+
+class ASTComp : public AST
+{
+public:
+	enum CompOp
+	{
+		EQU, NEQ,
+		GT, LT, GEQ, LEQ
+	};
+
+public:
+	ASTComp(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2,
+		CompOp op)
+	: term1{term1}, term2{term2}, op{op}
+	{}
+
+	ASTComp(std::shared_ptr<AST> term1, CompOp op)
+	: term1{term1}, term2{nullptr}, op{op}
+	{}
+
+	std::shared_ptr<AST> GetTerm1() const { return term1; }
+	std::shared_ptr<AST> GetTerm2() const { return term2; }
+	CompOp GetOp() const { return op; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::shared_ptr<AST> term1, term2;
+	CompOp op;
+};
+
+
+class ASTCond : public AST
+{
+public:
+	ASTCond(const std::shared_ptr<AST> cond, std::shared_ptr<AST> if_stmt)
+		: cond{cond}, if_stmt{if_stmt}
+	{}
+	ASTCond(const std::shared_ptr<AST> cond, std::shared_ptr<AST> if_stmt, std::shared_ptr<AST> else_stmt)
+		: cond{cond}, if_stmt{if_stmt}, else_stmt{else_stmt}
+	{}
+
+	std::shared_ptr<AST> GetCond() const { return cond; }
+	std::shared_ptr<AST> GetIf() const { return if_stmt; }
+	std::shared_ptr<AST> GetElse() const { return else_stmt; }
+	bool HasElse() const { return else_stmt != nullptr; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::shared_ptr<AST> cond;
+	std::shared_ptr<AST> if_stmt, else_stmt;
+};
 
 
 #endif
