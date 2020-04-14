@@ -29,6 +29,7 @@ ident	[A-Za-z_]+[A-Za-z0-9_]*
 %%
 
 {white}+	/* whitespace */
+"#".*		/* comment */
 
 ";"			{ return yytext[0]; }
 "+"|"-"		{ return yytext[0]; }
@@ -49,14 +50,17 @@ ident	[A-Za-z_]+[A-Za-z0-9_]*
 "or"		{ return yy::Parser::make_OR(); }
 "not"		{ return yy::Parser::make_NOT(); }
 
-"var"		{ return yy::Parser::make_VAR(); }
-
 "="			{ return yytext[0]; }
 
+"var"		{ return yy::Parser::make_VAR(); }
 "func"		{ return yy::Parser::make_FUNC(); }
+"ret"		{ return yy::Parser::make_RET(); }
+
 "if"		{ return yy::Parser::make_IF(); }
 "then"		{ return yy::Parser::make_THEN(); }
 "else"		{ return yy::Parser::make_ELSE(); }
+"loop"		{ return yy::Parser::make_LOOP(); }
+"do"		{ return yy::Parser::make_DO(); }
 
 {real}		{ return yy::Parser::make_REAL(std::stod(yytext)); }
 {ident}		{ return yy::Parser::make_IDENT(yytext); }

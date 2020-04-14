@@ -1,0 +1,10 @@
+func start()
+{
+	var i;
+	i = 0;
+
+	loop i<16 do
+		i = i+1;
+
+	i;
+}

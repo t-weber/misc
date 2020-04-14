@@ -30,10 +30,12 @@ class ASTStmts;
 class ASTVarDecl;
 class ASTArgs;
 class ASTFunc;
+class ASTReturn;
 class ASTCall;
 class ASTAssign;
 class ASTComp;
 class ASTCond;
+class ASTLoop;
 
 
 using t_astret = std::string;
@@ -58,10 +60,12 @@ public:
 	virtual t_astret visit(const ASTVarDecl* ast) = 0;
 	virtual t_astret visit(const ASTArgs* ast) = 0;
 	virtual t_astret visit(const ASTFunc* ast) = 0;
+	virtual t_astret visit(const ASTReturn* ast) = 0;
 	virtual t_astret visit(const ASTCall* ast) = 0;
 	virtual t_astret visit(const ASTAssign* ast) = 0;
 	virtual t_astret visit(const ASTComp* ast) = 0;
 	virtual t_astret visit(const ASTCond* ast) = 0;
+	virtual t_astret visit(const ASTLoop* ast) = 0;
 };
 
 
@@ -285,6 +289,24 @@ private:
 };
 
 
+class ASTReturn : public AST
+{
+public:
+	ASTReturn(std::shared_ptr<AST> term)
+		: term{term}
+	{}
+	ASTReturn()
+	{}
+
+	std::shared_ptr<AST> GetTerm() const { return term; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::shared_ptr<AST> term;
+};
+
+
 class ASTCall : public AST
 {
 public:
@@ -377,6 +399,23 @@ public:
 private:
 	std::shared_ptr<AST> cond;
 	std::shared_ptr<AST> if_stmt, else_stmt;
+};
+
+
+class ASTLoop : public AST
+{
+public:
+	ASTLoop(const std::shared_ptr<AST> cond, std::shared_ptr<AST> stmt)
+		: cond{cond}, stmt{stmt}
+	{}
+
+	std::shared_ptr<AST> GetCond() const { return cond; }
+	std::shared_ptr<AST> GetLoopStmt() const { return stmt; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::shared_ptr<AST> cond, stmt;
 };
 
 

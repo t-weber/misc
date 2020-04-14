@@ -58,12 +58,11 @@
 // terminal symbols
 %token<std::string> IDENT
 %token<double> REAL
-%token FUNC
-%token VAR
+%token FUNC VAR RET
 %token IF THEN ELSE
+%token LOOP DO
 %token EQU NEQ GT LT GEQ LEQ
-%token AND OR
-%token NOT
+%token AND OR NOT
 
 
 // nonterminals
@@ -78,6 +77,7 @@
 
 // precedences and left/right-associativity
 // see: https://en.wikipedia.org/wiki/Order_of_operations
+%nonassoc RET
 %left ','
 %right '='
 %left OR
@@ -120,11 +120,16 @@ statement[res]
 	| block[blk]				{ $res = $blk; }
 
 	| function[func]			{ $res = $func;  }
+	| RET expr[term] ';'			{ $res = std::make_shared<ASTReturn>($term); }
+	| RET ';'				{ $res = std::make_shared<ASTReturn>(); }
 
 	| IF expr[cond] THEN statement[if_stmt] {
 		$res = std::make_shared<ASTCond>($cond, $if_stmt); }
 	| IF expr[cond] THEN statement[if_stmt] ELSE statement[else_stmt] {
 		$res = std::make_shared<ASTCond>($cond, $if_stmt, $else_stmt); }
+
+	| LOOP expr[cond] DO statement[stmt] {
+		$res = std::make_shared<ASTLoop>($cond, $stmt); }
 	;
 
 
@@ -174,7 +179,7 @@ expr[res]
 	// variable
 	| IDENT[ident]				{ $res = std::make_shared<ASTVar>($ident); }
 
-	// function call
+	// functions
 	| IDENT[ident] '(' expr[arg] ')'		{ $res = std::make_shared<ASTCall>($ident, $arg); }
 	| IDENT[ident] '(' expr[arg1] ',' expr[arg2] ')'{ $res = std::make_shared<ASTCall>($ident, $arg1, $arg2); }
 

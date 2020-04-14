@@ -192,11 +192,29 @@ public:
 		}
 
 
-		// return result of last expression
 		t_astret lastres = ast->GetStatements()->accept(this);
+
+		// return result of last expression
+		if(lastres == "") lastres = "0.";
 		(*m_ostr) << "ret double " << lastres << "\n";
 
 		(*m_ostr) << "}\n";
+
+		return t_astret{};
+	}
+
+
+	virtual t_astret visit(const ASTReturn* ast) override
+	{
+		if(ast->GetTerm())
+		{
+			t_astret term = ast->GetTerm()->accept(this);
+			(*m_ostr) << "ret double " << term << "\n";
+		}
+		else
+		{
+			(*m_ostr) << "ret double 0.\n";
+		}
 
 		return t_astret{};
 	}
@@ -267,10 +285,29 @@ public:
 	}
 
 
+	virtual t_astret visit(const ASTLoop* ast) override
+	{
+		std::string labelStart = get_label();
+		std::string labelBegin = get_label();
+		std::string labelEnd = get_label();
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelStart << ":  ; loop start\n";
+		t_astret cond = ast->GetCond()->accept(this);
+		(*m_ostr) << "br i1 " << cond << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+		(*m_ostr) << labelBegin << ":  ; loop begin\n";
+		ast->GetLoopStmt()->accept(this);
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelEnd << ":  ; loop end\n";
+		return t_astret{};
+	}
+
+
 private:
 	std::ostream* m_ostr = &std::cout;
 
-	std::size_t m_varCount = 0;		// # of tmp vars
+	std::size_t m_varCount = 0;	// # of tmp vars
 	std::size_t m_labelCount = 0;	// # of labels
 };
 
