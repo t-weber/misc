@@ -6,5 +6,5 @@ func start()
 	loop i<16 do
 		i = i+1;
 
-	i;
+	println(i);
 }

@@ -99,12 +99,11 @@ declare i8 @putchar(i8)
 
 
 ; -----------------------------------------------------------------------------
-; main entry point for llvm
-define i32 @main()
-{
-	; call entry function
-	%val = call double @start()
+; runtime functions
 
+;define void @println(double %val)
+define double @println(double %val)
+{
 	; convert to string
 	%strval = alloca [64 x i8]
 	%strvalptr = bitcast [64 x i8]* %strval to i8*
@@ -112,7 +111,18 @@ define i32 @main()
 
 	; output string
 	call i8 @puts(i8* %strvalptr)
-	;call i8 @putchar(i8 10)
+
+	ret double 0.
+}
+; -----------------------------------------------------------------------------
+
+
+; -----------------------------------------------------------------------------
+; main entry point for llvm
+define i32 @main()
+{
+	; call entry function
+	%val = call double @start()
 
 	ret i32 0
 }
