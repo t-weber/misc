@@ -111,14 +111,18 @@ public:
 	}
 
 
+	virtual t_astret visit(const ASTArgNames*) override
+	{
+		return t_astret{};
+	}
+
+
 	virtual t_astret visit(const ASTCall* ast) override
 	{
 		std::vector<t_astret> args;
 
-		if(ast->GetArg1())
-			args.push_back(ast->GetArg1()->accept(this));
-		if(ast->GetArg2())
-			args.push_back(ast->GetArg2()->accept(this));
+		for(const auto& arg : ast->GetArgumentList())
+			args.push_back(arg->accept(this));
 
 		std::string var = get_tmp_var();
 
@@ -138,9 +142,8 @@ public:
 	{
 		t_astret lastres;
 
-		auto stmts = ast->GetStatementList();
-		for(auto iter=stmts.rbegin(); iter!=stmts.rend(); ++iter)
-			lastres = (*iter)->accept(this);
+		for(const auto& stmt : ast->GetStatementList())
+			lastres = stmt->accept(this);
 
 		return lastres;
 	}
@@ -148,11 +151,9 @@ public:
 
 	virtual t_astret visit(const ASTVarDecl* ast) override
 	{
-		auto vars = ast->GetVariables();
-		for(auto iter=vars.rbegin(); iter!=vars.rend(); ++iter)
+		for(const auto& _var : ast->GetVariables())
 		{
-			const std::string var = std::string{"%"} + *iter;
-
+			const std::string var = std::string{"%"} + _var;
 			(*m_ostr) << var << " = alloca double\n";
 		}
 

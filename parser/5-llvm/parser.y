@@ -71,6 +71,7 @@
 %type<std::shared_ptr<AST>> statement
 %type<std::shared_ptr<ASTStmts>> statements
 %type<std::shared_ptr<ASTVarDecl>> variables
+%type<std::shared_ptr<ASTArgNames>> argumentnames
 %type<std::shared_ptr<ASTArgs>> arguments
 %type<std::shared_ptr<ASTStmts>> block
 %type<std::shared_ptr<AST>> function
@@ -106,7 +107,7 @@ program
 
 statements[res]
 	: statement[stmt] statements[lst]	{ $lst->AddStatement($stmt); $res = $lst; }
-	| /* epsilon */						{ $res = std::make_shared<ASTStmts>(); }
+	| /* epsilon */			{ $res = std::make_shared<ASTStmts>(); }
 	;
 
 
@@ -124,12 +125,12 @@ variables[res]
 
 
 statement[res]
-	: expr[term] ';'			{ $res = $term; }
-	| block[blk]				{ $res = $blk; }
+	: expr[term] ';'		{ $res = $term; }
+	| block[blk]			{ $res = $blk; }
 
-	| function[func]			{ $res = $func;  }
-	| RET expr[term] ';'		{ $res = std::make_shared<ASTReturn>($term); }
-	| RET ';'					{ $res = std::make_shared<ASTReturn>(); }
+	| function[func]		{ $res = $func;  }
+	| RET expr[term] ';'	{ $res = std::make_shared<ASTReturn>($term); }
+	| RET ';'				{ $res = std::make_shared<ASTReturn>(); }
 
 	| VAR variables[vars] ';'	{ $res = $vars; }
 
@@ -144,14 +145,23 @@ statement[res]
 
 
 function[res]
-	: FUNC IDENT[ident] '(' arguments[args] ')' block[blk] {
+	: FUNC IDENT[ident] '(' argumentnames[args] ')' block[blk] {
 		$res = std::make_shared<ASTFunc>($ident, $args, $blk); }
 	;
 
 
+argumentnames[res]
+	: IDENT[argname] argumentnames[lst]	{ $lst->AddArg($argname); $res = $lst; }
+	| /* epsilon */		{ $res = std::make_shared<ASTArgNames>(); }
+	;
+
+
 arguments[res]
-	: IDENT[argname] arguments[lst]	{ $lst->AddArg($argname); $res = $lst; }
-	| /* epsilon */					{ $res = std::make_shared<ASTArgs>(); }
+	: expr[arg] ',' arguments[lst]		{ $lst->AddArgument($arg); $res = $lst; }
+	| expr[arg]	{
+			$res = std::make_shared<ASTArgs>();
+			$res->AddArgument($arg);
+		}
 	;
 
 
@@ -168,34 +178,35 @@ expr[res]
 	| '-' expr[term] %prec UNARY_OP		{ $res = std::make_shared<ASTUMinus>($term); }
 
 	// binary expressions
-	| expr[term1] '+' expr[term2]			{ $res = std::make_shared<ASTPlus>($term1, $term2, 0); }
-	| expr[term1] '-' expr[term2]			{ $res = std::make_shared<ASTPlus>($term1, $term2, 1); }
-	| expr[term1] '*' expr[term2]			{ $res = std::make_shared<ASTMult>($term1, $term2, 0); }
-	| expr[term1] '/' expr[term2]			{ $res = std::make_shared<ASTMult>($term1, $term2, 1); }
-	| expr[term1] '%' expr[term2]			{ $res = std::make_shared<ASTMod>($term1, $term2); }
-	| expr[term1] '^' expr[term2]			{ $res = std::make_shared<ASTPow>($term1, $term2); }
+	| expr[term1] '+' expr[term2]		{ $res = std::make_shared<ASTPlus>($term1, $term2, 0); }
+	| expr[term1] '-' expr[term2]		{ $res = std::make_shared<ASTPlus>($term1, $term2, 1); }
+	| expr[term1] '*' expr[term2]		{ $res = std::make_shared<ASTMult>($term1, $term2, 0); }
+	| expr[term1] '/' expr[term2]		{ $res = std::make_shared<ASTMult>($term1, $term2, 1); }
+	| expr[term1] '%' expr[term2]		{ $res = std::make_shared<ASTMod>($term1, $term2); }
+	| expr[term1] '^' expr[term2]		{ $res = std::make_shared<ASTPow>($term1, $term2); }
 
 	// comparison expressions
-	| expr[term1] EQU expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::EQU); }
-	| expr[term1] NEQ expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::NEQ); }
-	| expr[term1] GT expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GT); }
-	| expr[term1] LT expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LT); }
-	| expr[term1] GEQ expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GEQ); }
-	| expr[term1] LEQ expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LEQ); }
+	| expr[term1] EQU expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::EQU); }
+	| expr[term1] NEQ expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::NEQ); }
+	| expr[term1] GT expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GT); }
+	| expr[term1] LT expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LT); }
+	| expr[term1] GEQ expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GEQ); }
+	| expr[term1] LEQ expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LEQ); }
 
 	// constant
-	| REAL[num]					{ $res = std::make_shared<ASTRealConst>($num); }
+	| REAL[num]			{ $res = std::make_shared<ASTRealConst>($num); }
 
 	// variable
-	| IDENT[ident]				{ $res = std::make_shared<ASTVar>($ident); }
+	| IDENT[ident]		{ $res = std::make_shared<ASTVar>($ident); }
 
-	// functions TODO: dynamic handling of args
-	| IDENT[ident] '(' ')'					{ $res = std::make_shared<ASTCall>($ident); }
-	| IDENT[ident] '(' expr[arg] ')'		{ $res = std::make_shared<ASTCall>($ident, $arg); }
-	| IDENT[ident] '(' expr[arg1] ',' expr[arg2] ')'{ $res = std::make_shared<ASTCall>($ident, $arg1, $arg2); }
+	// function calls
+	| IDENT[ident] '(' ')' 	{ $res = std::make_shared<ASTCall>($ident); }
+	| IDENT[ident] '(' arguments[args] ')' {
+		$res = std::make_shared<ASTCall>($ident, $args);
+	}
 
 	// assignment
-	| IDENT[ident] '=' expr[term]			{ $res = std::make_shared<ASTAssign>($ident, $term); }
+	| IDENT[ident] '=' expr[term]		{ $res = std::make_shared<ASTAssign>($ident, $term); }
 	;
 
 %%

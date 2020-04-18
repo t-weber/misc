@@ -28,9 +28,10 @@ class ASTRealConst;
 class ASTVar;
 class ASTStmts;
 class ASTVarDecl;
-class ASTArgs;
+class ASTArgNames;
 class ASTFunc;
 class ASTReturn;
+class ASTArgs;
 class ASTCall;
 class ASTAssign;
 class ASTComp;
@@ -58,9 +59,10 @@ public:
 	virtual t_astret visit(const ASTVar* ast) = 0;
 	virtual t_astret visit(const ASTStmts* ast) = 0;
 	virtual t_astret visit(const ASTVarDecl* ast) = 0;
-	virtual t_astret visit(const ASTArgs* ast) = 0;
+	virtual t_astret visit(const ASTArgNames* ast) = 0;
 	virtual t_astret visit(const ASTFunc* ast) = 0;
 	virtual t_astret visit(const ASTReturn* ast) = 0;
+	virtual t_astret visit(const ASTArgs* ast) = 0;
 	virtual t_astret visit(const ASTCall* ast) = 0;
 	virtual t_astret visit(const ASTAssign* ast) = 0;
 	virtual t_astret visit(const ASTComp* ast) = 0;
@@ -208,53 +210,53 @@ private:
 class ASTStmts : public AST
 {
 public:
-	ASTStmts() : m_stmts{}
+	ASTStmts() : stmts{}
 	{}
 
 	void AddStatement(std::shared_ptr<AST> stmt)
 	{
-		m_stmts.push_back(stmt);
+		stmts.push_front(stmt);
 	}
 
 	const std::list<std::shared_ptr<AST>>& GetStatementList() const
 	{
-		return m_stmts;
+		return stmts;
 	}
 
 	ASTVISITOR_ACCEPT
 
 private:
-	std::list<std::shared_ptr<AST>> m_stmts;
+	std::list<std::shared_ptr<AST>> stmts;
 };
 
 
 class ASTVarDecl : public AST
 {
 public:
-	ASTVarDecl() : m_vars{}
+	ASTVarDecl() : vars{}
 	{}
 
 	void AddVariable(const std::string& var)
 	{
-		m_vars.push_back(var);
+		vars.push_front(var);
 	}
 
 	const std::list<std::string>& GetVariables() const
 	{
-		return m_vars;
+		return vars;
 	}
 
 	ASTVISITOR_ACCEPT
 
 private:
-	std::list<std::string> m_vars;
+	std::list<std::string> vars;
 };
 
 
-class ASTArgs : public AST
+class ASTArgNames : public AST
 {
 public:
-	ASTArgs() : argnames{}
+	ASTArgNames() : argnames{}
 	{}
 
 	void AddArg(const std::string& argname) { argnames.push_back(argname); }
@@ -270,7 +272,7 @@ private:
 class ASTFunc : public AST
 {
 public:
-	ASTFunc(const std::string& ident, std::shared_ptr<ASTArgs>& args, std::shared_ptr<ASTStmts> stmts)
+	ASTFunc(const std::string& ident, std::shared_ptr<ASTArgNames>& args, std::shared_ptr<ASTStmts> stmts)
 		: ident{ident}, argnames{args->GetArgs()}, stmts{stmts}
 	{
 		std::reverse(argnames.begin(), argnames.end());
@@ -307,30 +309,48 @@ private:
 };
 
 
+class ASTArgs : public AST
+{
+public:
+	ASTArgs() : args{}
+	{}
+
+	void AddArgument(std::shared_ptr<AST> arg)
+	{
+		args.push_front(arg);
+	}
+
+	const std::list<std::shared_ptr<AST>>& GetArgumentList() const
+	{
+		return args;
+	}
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::list<std::shared_ptr<AST>> args;
+};
+
+
 class ASTCall : public AST
 {
 public:
 	ASTCall(const std::string& ident)
-		: ident{ident}, arg1{nullptr}, arg2{nullptr}
+		: ident{ident}, args{std::make_shared<ASTArgs>()}
 	{}
 
-	ASTCall(const std::string& ident, std::shared_ptr<AST> arg)
-		: ident{ident}, arg1{arg}, arg2{nullptr}
-	{}
-
-	ASTCall(const std::string& ident, std::shared_ptr<AST> arg1, std::shared_ptr<AST> arg2)
-		: ident{ident}, arg1{arg1}, arg2{arg2}
+	ASTCall(const std::string& ident, std::shared_ptr<ASTArgs> args)
+		: ident{ident}, args{args}
 	{}
 
 	const std::string& GetIdent() const { return ident; }
-	std::shared_ptr<AST> GetArg1() const { return arg1; }
-	std::shared_ptr<AST> GetArg2() const { return arg2; }
+	const std::list<std::shared_ptr<AST>>& GetArgumentList() const { return args->GetArgumentList(); }
 
 	ASTVISITOR_ACCEPT
 
 private:
 	std::string ident;
-	std::shared_ptr<AST> arg1, arg2;
+	std::shared_ptr<ASTArgs> args;
 };
 
 
@@ -362,13 +382,12 @@ public:
 	};
 
 public:
-	ASTComp(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2,
-		CompOp op)
-	: term1{term1}, term2{term2}, op{op}
+	ASTComp(std::shared_ptr<AST> term1, std::shared_ptr<AST> term2, CompOp op)
+		: term1{term1}, term2{term2}, op{op}
 	{}
 
 	ASTComp(std::shared_ptr<AST> term1, CompOp op)
-	: term1{term1}, term2{nullptr}, op{op}
+		: term1{term1}, term2{nullptr}, op{op}
 	{}
 
 	std::shared_ptr<AST> GetTerm1() const { return term1; }
