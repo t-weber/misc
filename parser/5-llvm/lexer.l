@@ -20,14 +20,15 @@
 %}
 
 
-white	[ \t\n]
-num	[0-9]
+white	[ \t\r]
+num		[0-9]
 real	{num}+(\.{num}*)?
 ident	[A-Za-z_]+[A-Za-z0-9_]*
 
 
 %%
 
+"\n"		{ IncCurLine(); }
 {white}+	/* whitespace */
 "#".*		/* comment */
 
@@ -64,5 +65,8 @@ ident	[A-Za-z_]+[A-Za-z0-9_]*
 
 {real}		{ return yy::Parser::make_REAL(std::stod(yytext)); }
 {ident}		{ return yy::Parser::make_IDENT(yytext); }
+"\""[^\"]*"\""	{
+	std::string str{yytext+1, yytext+yyleng-1};
+	return yy::Parser::make_STRING(str); }
 
 %%

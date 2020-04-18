@@ -26,6 +26,9 @@ namespace yy
 	 */
 	class Lexer : public yyFlexLexer
 	{
+	private:
+		std::size_t m_curline = 1;
+
 	public:
 		Lexer() : yyFlexLexer(std::cin, std::cerr) {}
 		Lexer(std::istream& istr) : yyFlexLexer(istr, std::cerr) {}
@@ -35,6 +38,9 @@ namespace yy
 
 		virtual void LexerOutput(const char* str, int len) override;
 		virtual void LexerError(const char* err) override;
+
+		void IncCurLine() { ++m_curline; }
+		std::size_t GetCurLine() const { return m_curline; }
 	};
 
 
@@ -52,20 +58,12 @@ namespace yy
 			m_lex{istr}, m_statements{}
 		{}
 
-		yy::Lexer& GetLexer()
-		{
-			return m_lex;
-		}
+		yy::Lexer& GetLexer() { return m_lex; }
 
-		void SetStatements(std::shared_ptr<ASTStmts> stmts)
-		{
-			m_statements = stmts;
-		}
+		void SetStatements(std::shared_ptr<ASTStmts> stmts) { m_statements = stmts; }
+		const std::shared_ptr<ASTStmts> GetStatements() const { return m_statements; }
 
-		const std::shared_ptr<ASTStmts> GetStatements() const
-		{
-			return m_statements;
-		}
+		std::size_t GetCurLine() const { return m_lex.GetCurLine(); }
 	};
 }
 

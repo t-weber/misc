@@ -58,6 +58,7 @@
 // terminal symbols
 %token<std::string> IDENT
 %token<double> REAL
+%token<std::string> STRING
 %token FUNC VAR RET
 %token IF THEN ELSE
 %token LOOP DO
@@ -110,8 +111,15 @@ statements[res]
 
 
 variables[res]
-	: IDENT[name] variables[lst]	{ $lst->AddVariable($name); $res = $lst; }
-	| /* epsilon */					{ $res = std::make_shared<ASTVarDecl>(); }
+	: IDENT[name] ',' variables[lst] {
+			$lst->AddVariable($name);
+			$res = $lst;
+		}
+	| IDENT[name] {
+			$res = std::make_shared<ASTVarDecl>();
+			$res->AddVariable($name);
+			$res = $res;
+		}
 	;
 
 
@@ -120,8 +128,10 @@ statement[res]
 	| block[blk]				{ $res = $blk; }
 
 	| function[func]			{ $res = $func;  }
-	| RET expr[term] ';'			{ $res = std::make_shared<ASTReturn>($term); }
-	| RET ';'				{ $res = std::make_shared<ASTReturn>(); }
+	| RET expr[term] ';'		{ $res = std::make_shared<ASTReturn>($term); }
+	| RET ';'					{ $res = std::make_shared<ASTReturn>(); }
+
+	| VAR variables[vars] ';'	{ $res = $vars; }
 
 	| IF expr[cond] THEN statement[if_stmt] {
 		$res = std::make_shared<ASTCond>($cond, $if_stmt); }
@@ -174,18 +184,18 @@ expr[res]
 	| expr[term1] LEQ expr[term2]			{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LEQ); }
 
 	// constant
-	| REAL[num]					{ $res = std::make_shared<ASTConst>($num); }
+	| REAL[num]					{ $res = std::make_shared<ASTRealConst>($num); }
 
 	// variable
 	| IDENT[ident]				{ $res = std::make_shared<ASTVar>($ident); }
 
-	// functions
+	// functions TODO: dynamic handling of args
+	| IDENT[ident] '(' ')'					{ $res = std::make_shared<ASTCall>($ident); }
 	| IDENT[ident] '(' expr[arg] ')'		{ $res = std::make_shared<ASTCall>($ident, $arg); }
 	| IDENT[ident] '(' expr[arg1] ',' expr[arg2] ')'{ $res = std::make_shared<ASTCall>($ident, $arg1, $arg2); }
 
 	// assignment
 	| IDENT[ident] '=' expr[term]			{ $res = std::make_shared<ASTAssign>($ident, $term); }
-	| VAR variables[vars]					{ $res = $vars; }
 	;
 
 %%

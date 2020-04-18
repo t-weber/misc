@@ -24,7 +24,7 @@ class ASTMult;
 class ASTDiv;
 class ASTMod;
 class ASTPow;
-class ASTConst;
+class ASTRealConst;
 class ASTVar;
 class ASTStmts;
 class ASTVarDecl;
@@ -54,7 +54,7 @@ public:
 	virtual t_astret visit(const ASTMult* ast) = 0;
 	virtual t_astret visit(const ASTMod* ast) = 0;
 	virtual t_astret visit(const ASTPow* ast) = 0;
-	virtual t_astret visit(const ASTConst* ast) = 0;
+	virtual t_astret visit(const ASTRealConst* ast) = 0;
 	virtual t_astret visit(const ASTVar* ast) = 0;
 	virtual t_astret visit(const ASTStmts* ast) = 0;
 	virtual t_astret visit(const ASTVarDecl* ast) = 0;
@@ -173,10 +173,10 @@ private:
 };
 
 
-class ASTConst : public AST
+class ASTRealConst : public AST
 {
 public:
-	ASTConst(double val)
+	ASTRealConst(double val)
 		: val{val}
 	{}
 
@@ -310,6 +310,10 @@ private:
 class ASTCall : public AST
 {
 public:
+	ASTCall(const std::string& ident)
+		: ident{ident}, arg1{nullptr}, arg2{nullptr}
+	{}
+
 	ASTCall(const std::string& ident, std::shared_ptr<AST> arg)
 		: ident{ident}, arg1{arg}, arg2{nullptr}
 	{}

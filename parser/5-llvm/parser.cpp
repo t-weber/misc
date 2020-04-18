@@ -20,7 +20,8 @@
  */
 void yy::Lexer::LexerError(const char* err)
 {
-	std::cerr << "Lexer error: " << err << std::endl;
+	std::cerr << "Lexer error in line " << GetCurLine()
+		<< ": " << err << "." << std::endl;
 }
 
 
@@ -29,7 +30,8 @@ void yy::Lexer::LexerError(const char* err)
  */
 void yy::Lexer::LexerOutput(const char* str, int /*len*/)
 {
-	std::cerr << "Lexer output: " << str << std::endl;
+	std::cerr << "Lexer output (line " << GetCurLine()
+		<< "): " << str << "." << std::endl;
 }
 
 
@@ -38,7 +40,8 @@ void yy::Lexer::LexerOutput(const char* str, int /*len*/)
  */
 void yy::Parser::error(const std::string& err)
 {
-	std::cerr << "Parser error: " << err << std::endl;
+	std::cerr << "Parser error in line " << context.GetCurLine()
+		<< ": " << err << "." << std::endl;
 }
 
 

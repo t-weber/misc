@@ -94,7 +94,7 @@ public:
 	}
 
 
-	virtual t_astret visit(const ASTConst* ast) override
+	virtual t_astret visit(const ASTRealConst* ast) override
 	{
 		return std::to_string(ast->GetVal());
 	}
