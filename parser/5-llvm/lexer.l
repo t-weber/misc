@@ -53,7 +53,11 @@ ident	[A-Za-z_]+[A-Za-z0-9_]*
 
 "="			{ return yytext[0]; }
 
-"var"		{ return yy::Parser::make_VAR(); }
+"scalar"|"var"	{ return yy::Parser::make_SCALARDECL(); }
+"vec"		{ return yy::Parser::make_VECTORDECL(); }
+"mat"		{ return yy::Parser::make_MATRIXDECL(); }
+"str"		{ return yy::Parser::make_STRINGDECL(); }
+
 "func"		{ return yy::Parser::make_FUNC(); }
 "ret"		{ return yy::Parser::make_RET(); }
 

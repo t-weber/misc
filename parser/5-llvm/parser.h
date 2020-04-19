@@ -12,10 +12,12 @@
 
 #include <iostream>
 #include <string>
+#include <array>
 
 #include <FlexLexer.h>
 
 #include "ast.h"
+#include "sym.h"
 #include "parser_defs.h"
 
 
@@ -53,6 +55,13 @@ namespace yy
 		yy::Lexer m_lex;
 		std::shared_ptr<ASTStmts> m_statements;
 
+		SymTab m_symbols;
+
+		// information about currently parsed symbol
+		std::vector<std::string> m_curscope;
+		SymbolType m_symtype = SymbolType::SCALAR;
+		std::array<unsigned int, 2> m_symdims = {0, 0};
+
 	public:
 		ParserContext(std::istream& istr = std::cin) :
 			m_lex{istr}, m_statements{}
@@ -60,8 +69,55 @@ namespace yy
 
 		yy::Lexer& GetLexer() { return m_lex; }
 
+		// --------------------------------------------------------------------
 		void SetStatements(std::shared_ptr<ASTStmts> stmts) { m_statements = stmts; }
 		const std::shared_ptr<ASTStmts> GetStatements() const { return m_statements; }
+		// --------------------------------------------------------------------
+
+		// --------------------------------------------------------------------
+		// current function scope
+		const std::vector<std::string>& GetScope() const { return m_curscope; }
+		std::string GetScopeName() const
+		{
+			std::string name;
+			for(const std::string& scope : m_curscope)
+				name += scope + "::";	// scope name separator
+			return name;
+		}
+
+		void EnterScope(const std::string& name) { m_curscope.push_back(name); }
+		void LeaveScope(const std::string& name)
+		{
+			const std::string& curscope = *m_curscope.rbegin();
+
+			if(curscope != name)
+			{
+				std::cerr << "Error in line " << GetCurLine()
+					<< ": Trying to leave scope " << name
+					<< ", but the top scope is " <<curscope << ".";
+			}
+
+			m_curscope.pop_back();
+		}
+		// --------------------------------------------------------------------
+
+		// --------------------------------------------------------------------
+		void AddSymbol(const std::string& name, bool bUseScope=true)
+		{
+			std::string symbol_with_scope = bUseScope ? GetScopeName() + name : name;
+			m_symbols.AddSymbol(symbol_with_scope, name, m_symtype, m_symdims);
+		}
+
+		// type of current symbol
+		void SetSymType(SymbolType ty) { m_symtype = ty; }
+
+		// dimensions of vector and matrix symbols
+		void SetSymDims(unsigned int dim1, unsigned int dim2=0)
+		{
+			m_symdims[0] = dim1;
+			m_symdims[1] = dim2;
+		}
+		// --------------------------------------------------------------------
 
 		std::size_t GetCurLine() const { return m_lex.GetCurLine(); }
 	};

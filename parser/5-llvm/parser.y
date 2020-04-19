@@ -28,6 +28,7 @@
 %code requires
 {
 	#include "ast.h"
+	#include "sym.h"
 }
 
 // after inclusion of definitions header
@@ -59,7 +60,8 @@
 %token<std::string> IDENT
 %token<double> REAL
 %token<std::string> STRING
-%token FUNC VAR RET
+%token FUNC RET
+%token SCALARDECL VECTORDECL MATRIXDECL STRINGDECL
 %token IF THEN ELSE
 %token LOOP DO
 %token EQU NEQ GT LT GEQ LEQ
@@ -115,11 +117,13 @@ variables[res]
 	: IDENT[name] ',' variables[lst] {
 			$lst->AddVariable($name);
 			$res = $lst;
+			context.AddSymbol($name);
 		}
 	| IDENT[name] {
 			$res = std::make_shared<ASTVarDecl>();
 			$res->AddVariable($name);
 			$res = $res;
+			context.AddSymbol($name);
 		}
 	;
 
@@ -132,7 +136,29 @@ statement[res]
 	| RET expr[term] ';'	{ $res = std::make_shared<ASTReturn>($term); }
 	| RET ';'				{ $res = std::make_shared<ASTReturn>(); }
 
-	| VAR variables[vars] ';'	{ $res = $vars; }
+	// variable declarations
+	| SCALARDECL {
+			context.SetSymType(SymbolType::SCALAR);
+		}
+		variables[vars] ';'	{ $res = $vars; }
+	| VECTORDECL REAL[dim] {
+			context.SetSymType(SymbolType::VECTOR);
+			context.SetSymDims(unsigned($dim));
+		}
+		variables[vars] ';' {
+			$res = $vars;
+		}
+	| MATRIXDECL REAL[dim1] REAL[dim2] {
+			context.SetSymType(SymbolType::MATRIX);
+			context.SetSymDims(unsigned($dim1), unsigned($dim2));
+		}
+		variables[vars] ';' {
+			$res = $vars;
+		}
+	| STRINGDECL {
+			context.SetSymType(SymbolType::STRING);
+		}
+		variables[vars] ';'	{ $res = $vars; }
 
 	| IF expr[cond] THEN statement[if_stmt] {
 		$res = std::make_shared<ASTCond>($cond, $if_stmt); }
@@ -145,8 +171,13 @@ statement[res]
 
 
 function[res]
-	: FUNC IDENT[ident] '(' argumentnames[args] ')' block[blk] {
-		$res = std::make_shared<ASTFunc>($ident, $args, $blk); }
+	: FUNC IDENT[ident] {
+			context.EnterScope($ident);
+		}
+		'(' argumentnames[args] ')' block[blk] {
+			$res = std::make_shared<ASTFunc>($ident, $args, $blk);
+			context.LeaveScope($ident);
+		}
 	;
 
 
