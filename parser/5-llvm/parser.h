@@ -102,11 +102,14 @@ namespace yy
 		// --------------------------------------------------------------------
 
 		// --------------------------------------------------------------------
-		void AddSymbol(const std::string& name, bool bUseScope=true)
+		std::string AddSymbol(const std::string& name, bool bUseScope=true)
 		{
 			std::string symbol_with_scope = bUseScope ? GetScopeName() + name : name;
 			m_symbols.AddSymbol(symbol_with_scope, name, m_symtype, m_symdims);
+			return symbol_with_scope;
 		}
+
+		const SymTab& GetSymbols() const { return m_symbols; }
 
 		// type of current symbol
 		void SetSymType(SymbolType ty) { m_symtype = ty; }

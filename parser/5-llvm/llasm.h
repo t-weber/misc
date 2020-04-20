@@ -14,6 +14,7 @@
 #define __LLASM_H__
 
 #include "ast.h"
+#include "sym.h"
 
 
 class LLAsm : public ASTVisitor
@@ -21,7 +22,7 @@ class LLAsm : public ASTVisitor
 protected:
 	std::string get_tmp_var()
 	{
-		std::string var{"%t_"};
+		std::string var{"%__tmp_"};
 		var += std::to_string(m_varCount);
 		++m_varCount;
 		return var;
@@ -29,17 +30,35 @@ protected:
 
 	std::string get_label()
 	{
-		std::string lab{"l_"};
+		std::string lab{"__lab_"};
 		lab += std::to_string(m_labelCount);
 		++m_labelCount;
 		return lab;
 	}
 
+	/**
+	 * get local name of a symbol decorated with scope information
+	 */
+	const t_astret& get_sym_name(const t_astret& name)
+	{
+		const Symbol* sym = nullptr;
+		if(m_syms)
+			sym = m_syms->FindSymbol(name);
+		if(sym == nullptr)
+			return name;	// not in symbol table -> maybe a temporary variable
+
+		return sym->name;
+	}
+
 
 public:
+	LLAsm(const SymTab* syms) : m_syms{syms}
+	{}
+
+
 	virtual t_astret visit(const ASTUMinus* ast) override
 	{
-		t_astret term = ast->GetTerm()->accept(this);
+		t_astret term = get_sym_name(ast->GetTerm()->accept(this));
 		std::string var = get_tmp_var();
 		(*m_ostr) << var << " = fneg double " << term << "\n";
 		return var;
@@ -48,8 +67,8 @@ public:
 
 	virtual t_astret visit(const ASTPlus* ast) override
 	{
-		t_astret term1 = ast->GetTerm1()->accept(this);
-		t_astret term2 = ast->GetTerm2()->accept(this);
+		t_astret term1 = get_sym_name(ast->GetTerm1()->accept(this));
+		t_astret term2 = get_sym_name(ast->GetTerm2()->accept(this));
 		std::string var = get_tmp_var();
 
 		std::string op = ast->IsInverted() ? "fsub" : "fadd";
@@ -61,8 +80,8 @@ public:
 
 	virtual t_astret visit(const ASTMult* ast) override
 	{
-		t_astret term1 = ast->GetTerm1()->accept(this);
-		t_astret term2 = ast->GetTerm2()->accept(this);
+		t_astret term1 = get_sym_name(ast->GetTerm1()->accept(this));
+		t_astret term2 = get_sym_name(ast->GetTerm2()->accept(this));
 		std::string var = get_tmp_var();
 
 		std::string op = ast->IsInverted() ? "fdiv" : "fmul";
@@ -74,8 +93,8 @@ public:
 
 	virtual t_astret visit(const ASTMod* ast) override
 	{
-		t_astret term1 = ast->GetTerm1()->accept(this);
-		t_astret term2 = ast->GetTerm2()->accept(this);
+		t_astret term1 = get_sym_name(ast->GetTerm1()->accept(this));
+		t_astret term2 = get_sym_name(ast->GetTerm2()->accept(this));
 
 		std::string var = get_tmp_var();
 		(*m_ostr) << var << " = frem double " << term1 << ", " << term2 << "\n";
@@ -85,8 +104,8 @@ public:
 
 	virtual t_astret visit(const ASTPow* ast) override
 	{
-		t_astret term1 = ast->GetTerm1()->accept(this);
-		t_astret term2 = ast->GetTerm2()->accept(this);
+		t_astret term1 = get_sym_name(ast->GetTerm1()->accept(this));
+		t_astret term2 = get_sym_name(ast->GetTerm2()->accept(this));
 
 		std::string var = get_tmp_var();
 		(*m_ostr) << var << " = call double @pow(double " << term1 << ", double " << term2 << ")\n";
@@ -102,7 +121,7 @@ public:
 
 	virtual t_astret visit(const ASTVar* ast) override
 	{
-		std::string var = std::string{"%"} + ast->GetIdent();
+		std::string var = std::string{"%"} + get_sym_name(ast->GetIdent());
 
 		std::string retvar = get_tmp_var();
 		(*m_ostr) << retvar << " = load double, double* " << var << "\n";
@@ -122,7 +141,7 @@ public:
 		std::vector<t_astret> args;
 
 		for(const auto& arg : ast->GetArgumentList())
-			args.push_back(arg->accept(this));
+			args.push_back(get_sym_name(arg->accept(this)));
 
 		std::string var = get_tmp_var();
 
@@ -143,7 +162,7 @@ public:
 		t_astret lastres;
 
 		for(const auto& stmt : ast->GetStatementList())
-			lastres = stmt->accept(this);
+			lastres = get_sym_name(stmt->accept(this));
 
 		return lastres;
 	}
@@ -153,7 +172,7 @@ public:
 	{
 		for(const auto& _var : ast->GetVariables())
 		{
-			const std::string var = std::string{"%"} + _var;
+			const std::string var = std::string{"%"} + get_sym_name(_var);
 			(*m_ostr) << var << " = alloca double\n";
 		}
 
@@ -193,7 +212,7 @@ public:
 		}
 
 
-		t_astret lastres = ast->GetStatements()->accept(this);
+		t_astret lastres = get_sym_name(ast->GetStatements()->accept(this));
 
 		// return result of last expression
 		if(lastres == "") lastres = "0.";
@@ -209,7 +228,7 @@ public:
 	{
 		if(ast->GetTerm())
 		{
-			t_astret term = ast->GetTerm()->accept(this);
+			t_astret term = get_sym_name(ast->GetTerm()->accept(this));
 			(*m_ostr) << "ret double " << term << "\n";
 		}
 		else
@@ -223,7 +242,7 @@ public:
 
 	virtual t_astret visit(const ASTAssign* ast) override
 	{
-		t_astret expr = ast->GetExpr()->accept(this);
+		t_astret expr = get_sym_name(ast->GetExpr()->accept(this));
 		std::string var = std::string{"%"} + ast->GetIdent();
 		(*m_ostr) << "store double " << expr << ", double* " << var << "\n";
 
@@ -236,8 +255,8 @@ public:
 
 	virtual t_astret visit(const ASTComp* ast) override
 	{
-		t_astret term1 = ast->GetTerm1()->accept(this);
-		t_astret term2 = ast->GetTerm2()->accept(this);
+		t_astret term1 = get_sym_name(ast->GetTerm1()->accept(this));
+		t_astret term2 = get_sym_name(ast->GetTerm2()->accept(this));
 
 		std::string var = get_tmp_var();
 		std::string op;
@@ -258,7 +277,7 @@ public:
 
 	virtual t_astret visit(const ASTCond* ast) override
 	{
-		t_astret cond = ast->GetCond()->accept(this);
+		t_astret cond = get_sym_name(ast->GetCond()->accept(this));
 
 		std::string labelIf = get_label();
 		std::string labelElse = ast->HasElse() ? get_label() : "";
@@ -294,7 +313,7 @@ public:
 
 		(*m_ostr) << "br label %" << labelStart << "\n";
 		(*m_ostr) << labelStart << ":  ; loop start\n";
-		t_astret cond = ast->GetCond()->accept(this);
+		t_astret cond = get_sym_name(ast->GetCond()->accept(this));
 		(*m_ostr) << "br i1 " << cond << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
 
 		(*m_ostr) << labelBegin << ":  ; loop begin\n";
@@ -310,6 +329,8 @@ private:
 
 	std::size_t m_varCount = 0;	// # of tmp vars
 	std::size_t m_labelCount = 0;	// # of labels
+
+	const SymTab* m_syms = nullptr;
 };
 
 

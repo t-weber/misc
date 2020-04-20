@@ -115,15 +115,15 @@ statements[res]
 
 variables[res]
 	: IDENT[name] ',' variables[lst] {
-			$lst->AddVariable($name);
+			std::string symName = context.AddSymbol($name);
+			$lst->AddVariable(symName);
 			$res = $lst;
-			context.AddSymbol($name);
 		}
 	| IDENT[name] {
+			std::string symName = context.AddSymbol($name);
 			$res = std::make_shared<ASTVarDecl>();
-			$res->AddVariable($name);
+			$res->AddVariable(symName);
 			$res = $res;
-			context.AddSymbol($name);
 		}
 	;
 

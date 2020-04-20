@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <iostream>
 
 
 enum class SymbolType
@@ -40,6 +41,24 @@ public:
 	{
 		Symbol sym{.name = name, .ty = ty, .dims=dims};
 		m_syms.insert(std::make_pair(name_with_scope, sym));
+	}
+
+
+	const Symbol* FindSymbol(const std::string& name) const
+	{
+		auto iter = m_syms.find(name);
+		if(iter == m_syms.end())
+			return nullptr;
+		return &iter->second;
+	}
+
+
+	friend std::ostream& operator<<(std::ostream& ostr, const SymTab& tab)
+	{
+		for(const auto& pair : tab.m_syms)
+			ostr << pair.first << " -> " << pair.second.name << "\n";
+
+		return ostr;
 	}
 
 

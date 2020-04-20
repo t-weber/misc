@@ -73,10 +73,12 @@ int main(int argc, char** argv)
 	if(res != 0)
 		return res;
 
+	//std::cout << ctx.GetSymbols() << std::endl;
+
 
 	// code generation
 
-	LLAsm llasm;
+	LLAsm llasm{&ctx.GetSymbols()};
 	auto stmts = ctx.GetStatements()->GetStatementList();
 	for(auto iter=stmts.rbegin(); iter!=stmts.rend(); ++iter)
 	{
