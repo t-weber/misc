@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <iostream>
 
+#include "sym.h"
+
 
 class AST;
 class ASTUMinus;
@@ -39,7 +41,7 @@ class ASTCond;
 class ASTLoop;
 
 
-using t_astret = std::string;
+using t_astret = const Symbol*;
 
 
 /**

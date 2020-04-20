@@ -29,18 +29,22 @@ struct Symbol
 	std::string name;
 	SymbolType ty;
 	std::array<unsigned int, 2> dims;
+
+	bool tmp = false;	// temporary variable?
 };
 
 
 class SymTab
 {
 public:
-	void AddSymbol(const std::string& name_with_scope,
+	const Symbol* AddSymbol(const std::string& name_with_scope,
 		const std::string& name, SymbolType ty,
-		const std::array<unsigned int, 2>& dims)
+		const std::array<unsigned int, 2>& dims,
+		bool is_temp=false)
 	{
-		Symbol sym{.name = name, .ty = ty, .dims=dims};
-		m_syms.insert(std::make_pair(name_with_scope, sym));
+		Symbol sym{.name = name, .ty = ty, .dims=dims, .tmp = is_temp};
+		auto pair = m_syms.insert_or_assign(name_with_scope, sym);
+		return &pair.first->second;
 	}
 
 

@@ -110,6 +110,7 @@ namespace yy
 		}
 
 		const SymTab& GetSymbols() const { return m_symbols; }
+		SymTab& GetSymbols() { return m_symbols; }
 
 		// type of current symbol
 		void SetSymType(SymbolType ty) { m_symtype = ty; }
