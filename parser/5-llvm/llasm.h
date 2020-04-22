@@ -287,7 +287,7 @@ public:
 
 	virtual t_astret visit(const ASTArgNames*) override
 	{
-		return t_astret{};
+		return nullptr;
 	}
 
 
@@ -342,7 +342,13 @@ public:
 
 	virtual t_astret visit(const ASTArgs*) override
 	{
-		return t_astret{};
+		return nullptr;
+	}
+
+
+	virtual t_astret visit(const ASTTypeDecl*) override
+	{
+		return nullptr;
 	}
 
 
@@ -355,7 +361,7 @@ public:
 		auto argnames = ast->GetArgNames();
 		for(std::size_t idx=0; idx<argnames.size(); ++idx)
 		{
-			const std::string arg = std::string{"f_"} + argnames[idx];
+			const std::string arg = std::string{"f_"} + argnames[idx].first;
 			(*m_ostr) << "double %" << arg;
 			if(idx < argnames.size()-1)
 				(*m_ostr) << ", ";
@@ -367,8 +373,8 @@ public:
 		for(std::size_t idx=0; idx<argnames.size(); ++idx)
 		{
 			// TODO: argument types
-			const std::string arg = std::string{"f_"} + argnames[idx];
-			t_astret symcpy = get_tmp_var(SymbolType::SCALAR, nullptr, &argnames[idx]);
+			const std::string arg = std::string{"f_"} + argnames[idx].first;
+			t_astret symcpy = get_tmp_var(SymbolType::SCALAR, nullptr, &argnames[idx].first);
 
 			(*m_ostr) << "%" << symcpy->name << " = alloca double\n";
 			(*m_ostr) << "store double %" << arg << ", double* %" << symcpy->name << "\n";

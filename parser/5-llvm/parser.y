@@ -73,10 +73,12 @@
 %type<std::shared_ptr<AST>> statement
 %type<std::shared_ptr<ASTStmts>> statements
 %type<std::shared_ptr<ASTVarDecl>> variables
+%type<std::shared_ptr<ASTArgNames>> all_argumentnames
 %type<std::shared_ptr<ASTArgNames>> argumentnames
 %type<std::shared_ptr<ASTArgs>> arguments
 %type<std::shared_ptr<ASTStmts>> block
 %type<std::shared_ptr<AST>> function
+%type<std::shared_ptr<ASTTypeDecl>> typedecl
 
 
 // precedences and left/right-associativity
@@ -129,12 +131,12 @@ variables[res]
 
 
 statement[res]
-	: expr[term] ';'		{ $res = $term; }
-	| block[blk]			{ $res = $blk; }
+	: expr[term] ';'	{ $res = $term; }
+	| block[blk]		{ $res = $blk; }
 
-	| function[func]		{ $res = $func;  }
+	| function[func]	{ $res = $func;  }
 	| RET expr[term] ';'	{ $res = std::make_shared<ASTReturn>($term); }
-	| RET ';'				{ $res = std::make_shared<ASTReturn>(); }
+	| RET ';'		{ $res = std::make_shared<ASTReturn>(); }
 
 	// variable declarations
 	| SCALARDECL {
@@ -171,19 +173,39 @@ statement[res]
 
 
 function[res]
-	: FUNC IDENT[ident] {
+	: FUNC typedecl[rettype] IDENT[ident] {
 			context.EnterScope($ident);
 		}
-		'(' argumentnames[args] ')' block[blk] {
-			$res = std::make_shared<ASTFunc>($ident, $args, $blk);
+		'(' all_argumentnames[args] ')' block[blk] {
+			$res = std::make_shared<ASTFunc>($ident, $rettype, $args, $blk);
 			context.LeaveScope($ident);
 		}
 	;
 
 
+typedecl[res]
+	: SCALARDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::SCALAR); }
+	| VECTORDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::VECTOR); }
+	| MATRIXDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::MATRIX); }
+	| STRINGDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::STRING); }
+	;
+
+
+all_argumentnames[res]
+	: argumentnames[args]	{ $res = $args; }
+	| /*epsilon*/		{ $res = std::make_shared<ASTArgNames>(); }
+	;
+
+
 argumentnames[res]
-	: IDENT[argname] argumentnames[lst]	{ $lst->AddArg($argname); $res = $lst; }
-	| /* epsilon */		{ $res = std::make_shared<ASTArgNames>(); }
+	: typedecl[ty] IDENT[argname] ',' argumentnames[lst] {
+			$lst->AddArg($argname, $ty->GetType());
+			$res = $lst;
+		}
+	| typedecl[ty] IDENT[argname] {
+			$res = std::make_shared<ASTArgNames>();
+			$res->AddArg($argname, $ty->GetType()); 
+		}
 	;
 
 
@@ -231,7 +253,7 @@ expr[res]
 	| IDENT[ident]		{ $res = std::make_shared<ASTVar>($ident); }
 
 	// function calls
-	| IDENT[ident] '(' ')' 	{ $res = std::make_shared<ASTCall>($ident); }
+	| IDENT[ident] '(' ')'	{ $res = std::make_shared<ASTCall>($ident); }
 	| IDENT[ident] '(' arguments[args] ')' {
 		$res = std::make_shared<ASTCall>($ident, $args);
 	}

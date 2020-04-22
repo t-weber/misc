@@ -31,6 +31,7 @@ class ASTVar;
 class ASTStmts;
 class ASTVarDecl;
 class ASTArgNames;
+class ASTTypeDecl;
 class ASTFunc;
 class ASTReturn;
 class ASTArgs;
@@ -62,6 +63,7 @@ public:
 	virtual t_astret visit(const ASTStmts* ast) = 0;
 	virtual t_astret visit(const ASTVarDecl* ast) = 0;
 	virtual t_astret visit(const ASTArgNames* ast) = 0;
+	virtual t_astret visit(const ASTTypeDecl* ast) = 0;
 	virtual t_astret visit(const ASTFunc* ast) = 0;
 	virtual t_astret visit(const ASTReturn* ast) = 0;
 	virtual t_astret visit(const ASTArgs* ast) = 0;
@@ -261,34 +263,59 @@ public:
 	ASTArgNames() : argnames{}
 	{}
 
-	void AddArg(const std::string& argname) { argnames.push_back(argname); }
-	const std::vector<std::string>& GetArgs() const { return argnames; }
+	void AddArg(const std::string& argname, SymbolType ty)
+	{
+		argnames.push_back(std::make_pair(argname, ty));
+	}
+
+	const std::vector<std::pair<std::string, SymbolType>>& GetArgs() const
+	{
+		return argnames;
+	}
 
 	ASTVISITOR_ACCEPT
 
 private:
-	std::vector<std::string> argnames;
+	std::vector<std::pair<std::string, SymbolType>> argnames;
+};
+
+
+class ASTTypeDecl : public AST
+{
+public:
+	ASTTypeDecl(SymbolType ty) : ty{ty}
+	{}
+
+	SymbolType GetType() const { return ty; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	SymbolType ty;
 };
 
 
 class ASTFunc : public AST
 {
 public:
-	ASTFunc(const std::string& ident, std::shared_ptr<ASTArgNames>& args, std::shared_ptr<ASTStmts> stmts)
-		: ident{ident}, argnames{args->GetArgs()}, stmts{stmts}
+	ASTFunc(const std::string& ident, std::shared_ptr<ASTTypeDecl>& rettype,
+		std::shared_ptr<ASTArgNames>& args, std::shared_ptr<ASTStmts> stmts)
+		: ident{ident}, rettype{rettype}, argnames{args->GetArgs()}, stmts{stmts}
 	{
 		std::reverse(argnames.begin(), argnames.end());
 	}
 
 	const std::string& GetIdent() const { return ident; }
-	const std::vector<std::string>& GetArgNames() const { return argnames; }
+	SymbolType GetRetType() const { rettype->GetType(); }
+	const std::vector<std::pair<std::string, SymbolType>>& GetArgNames() const { return argnames; }
 	std::shared_ptr<ASTStmts> GetStatements() const { return stmts; }
 
 	ASTVISITOR_ACCEPT
 
 private:
 	std::string ident;
-	std::vector<std::string> argnames;
+	std::shared_ptr<ASTTypeDecl> rettype;
+	std::vector<std::pair<std::string, SymbolType>> argnames;
 	std::shared_ptr<ASTStmts> stmts;
 };
 
