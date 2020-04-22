@@ -192,7 +192,8 @@ public:
 		t_astret term = ast->GetTerm()->accept(this);
 
 		t_astret var = get_tmp_var(term->ty, &term->dims);
-		(*m_ostr) << "%" << var->name << " = fneg double %" << term->name << "\n";
+		(*m_ostr) << "%" << var->name << " = fneg " << get_type_name(term->ty)
+			<< " %" << term->name << "\n";
 		return var;
 	}
 
@@ -354,15 +355,16 @@ public:
 
 	virtual t_astret visit(const ASTFunc* ast) override
 	{
-		// TODO: other return and arg types
-
-		(*m_ostr) << "define double @" << ast->GetIdent() << "(";
+		std::string rettype = get_type_name(ast->GetRetType());
+		(*m_ostr) << "define " << rettype << " @" << ast->GetIdent() << "(";
 
 		auto argnames = ast->GetArgNames();
 		for(std::size_t idx=0; idx<argnames.size(); ++idx)
 		{
-			const std::string arg = std::string{"f_"} + argnames[idx].first;
-			(*m_ostr) << "double %" << arg;
+			const auto& [argname, argtype] = argnames[idx];
+
+			const std::string arg = std::string{"f_"} + argname;
+			(*m_ostr) << get_type_name(argtype) << " %" << arg;
 			if(idx < argnames.size()-1)
 				(*m_ostr) << ", ";
 		}
@@ -372,12 +374,18 @@ public:
 		// create local copies of the arguments
 		for(std::size_t idx=0; idx<argnames.size(); ++idx)
 		{
-			// TODO: argument types
-			const std::string arg = std::string{"f_"} + argnames[idx].first;
-			t_astret symcpy = get_tmp_var(SymbolType::SCALAR, nullptr, &argnames[idx].first);
+			const auto& [argname, argtype] = argnames[idx];
 
-			(*m_ostr) << "%" << symcpy->name << " = alloca double\n";
-			(*m_ostr) << "store double %" << arg << ", double* %" << symcpy->name << "\n";
+			if(argtype == SymbolType::SCALAR)
+			{
+				const std::string arg = std::string{"f_"} + argname;
+				t_astret symcpy = get_tmp_var(SymbolType::SCALAR, nullptr, &argname);
+
+				(*m_ostr) << "%" << symcpy->name << " = alloca double\n";
+				(*m_ostr) << "store double %" << arg << ", double* %" << symcpy->name << "\n";
+			}
+
+			// TODO: other argument types
 		}
 
 
@@ -385,9 +393,9 @@ public:
 
 		// return result of last expression
 		if(lastres)
-			(*m_ostr) << "ret double %" << lastres->name << "\n";
+			(*m_ostr) << "ret " << rettype << " %" << lastres->name << "\n";
 		else
-			(*m_ostr) << "ret double 0." << lastres << "\n";
+			(*m_ostr) << "ret " << rettype << " 0." << lastres << "\n";
 
 		(*m_ostr) << "}\n";
 
@@ -404,7 +412,7 @@ public:
 		}
 		else
 		{
-			(*m_ostr) << "ret double 0.\n";
+			(*m_ostr) << "ret void\n";
 		}
 
 		return nullptr;

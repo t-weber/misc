@@ -306,7 +306,7 @@ public:
 	}
 
 	const std::string& GetIdent() const { return ident; }
-	SymbolType GetRetType() const { rettype->GetType(); }
+	SymbolType GetRetType() const { return rettype->GetType(); }
 	const std::vector<std::pair<std::string, SymbolType>>& GetArgNames() const { return argnames; }
 	std::shared_ptr<ASTStmts> GetStatements() const { return stmts; }
 
