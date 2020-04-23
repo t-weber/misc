@@ -79,22 +79,47 @@ protected:
 
 
 	/**
+	 * convert symbol to another type
+	 */
+	t_astret convert_sym(t_astret sym, SymbolType ty_to)
+	{
+		// already the correct type
+		if(sym->ty == ty_to)
+			return sym;
+
+		std::string op;
+		if(sym->ty == SymbolType::INT and ty_to == SymbolType::SCALAR)
+			op = "sitofp";
+		else if(sym->ty == SymbolType::SCALAR and ty_to == SymbolType::INT)
+			op = "fptosi";
+
+		if(op == "")
+			throw std::runtime_error("Invalid type conversion.");
+
+		std::string from = get_type_name(sym->ty);
+		std::string to = get_type_name(ty_to);
+
+		t_astret var = get_tmp_var(ty_to, &sym->dims);
+		(*m_ostr) << "%" << var->name << " = " << op << " " << from << "%" << sym->name << " to " << to << "\n";
+
+		return var;
+	}
+
+
+	/**
 	 * get the corresponding data type name
 	 */
 	std::string get_type_name(SymbolType ty)
 	{
-		if(ty == SymbolType::SCALAR)
-			return "double";
-		else if(ty == SymbolType::VECTOR)
-			return "double*";
-		else if(ty == SymbolType::MATRIX)
-			return "double*";
-		else if(ty == SymbolType::STRING)
-			return "i8*";
-		else if(ty == SymbolType::INT)
-			return "i64";
-		else if(ty == SymbolType::VOID)
-			return "void";
+		switch(ty)
+		{
+			case SymbolType::SCALAR: return "double";
+			case SymbolType::VECTOR: return "double*";
+			case SymbolType::MATRIX: return "double*";
+			case SymbolType::STRING: return "i8*";
+			case SymbolType::INT: return "i64";
+			case SymbolType::VOID: return "void";
+		}
 
 		std::cerr << "Error: Unknown symbol type." << std::endl;
 		return "invalid";
@@ -109,10 +134,18 @@ public:
 	virtual t_astret visit(const ASTUMinus* ast) override
 	{
 		t_astret term = ast->GetTerm()->accept(this);
-
 		t_astret var = get_tmp_var(term->ty, &term->dims);
-		(*m_ostr) << "%" << var->name << " = fneg " << get_type_name(term->ty)
-			<< " %" << term->name << "\n";
+
+		if(term->ty == SymbolType::SCALAR)
+		{
+			(*m_ostr) << "%" << var->name << " = fneg " << get_type_name(term->ty)
+				<< " %" << term->name << "\n";
+		}
+		else if(term->ty == SymbolType::INT)
+		{
+			(*m_ostr) << "%" << var->name << " = sub " << get_type_name(term->ty) << " "
+				<< "0, %" << term->name << "\n";
+		}
 		return var;
 	}
 
@@ -121,8 +154,16 @@ public:
 	{
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
+
+		// cast if needed
 		SymbolType ty = term1->ty;
+		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
+			ty = SymbolType::SCALAR;
 		t_astret var = get_tmp_var(ty, &term1->dims);
+
+		term1 = convert_sym(term1, ty);
+		term2 = convert_sym(term2, ty);
+
 
 		std::string op = ast->IsInverted() ? "sub" : "add";
 		if(ty == SymbolType::SCALAR)
@@ -139,12 +180,22 @@ public:
 	{
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
+
+		// cast if needed
 		SymbolType ty = term1->ty;
+		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
+			ty = SymbolType::SCALAR;
 		t_astret var = get_tmp_var(ty, &term1->dims);
+
+		term1 = convert_sym(term1, ty);
+		term2 = convert_sym(term2, ty);
+
 
 		std::string op = ast->IsInverted() ? "div" : "mul";
 		if(ty == SymbolType::SCALAR)
 			op = "f" + op;
+		else if(ty == SymbolType::INT && ast->IsInverted())
+			op = "s" + op;
 
 		(*m_ostr) << "%" << var->name << " = " << op << " "
 			<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
@@ -157,15 +208,25 @@ public:
 	{
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
+
+		// cast if needed
 		SymbolType ty = term1->ty;
+		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
+			ty = SymbolType::SCALAR;
 		t_astret var = get_tmp_var(ty, &term1->dims);
+
+		term1 = convert_sym(term1, ty);
+		term2 = convert_sym(term2, ty);
+
 
 		std::string op = "rem";
 		if(ty == SymbolType::SCALAR)
 			op = "f" + op;
+		else if(ty == SymbolType::INT)
+			op = "s" + op;
 
 		(*m_ostr) << "%" << var->name << " = " << op << " "
-			<< get_type_name(term1->ty) << " %" << term1->name << ", %" << term2->name << "\n";
+			<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
 		return var;
 	}
 
@@ -174,11 +235,20 @@ public:
 	{
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
-		t_astret var = get_tmp_var(term1->ty, &term1->dims);
+
+		// cast if needed
+		SymbolType ty = term1->ty;
+		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
+			ty = SymbolType::SCALAR;
+		t_astret var = get_tmp_var(ty, &term1->dims);
+
+		term1 = convert_sym(term1, ty);
+		term2 = convert_sym(term2, ty);
+
 
 		(*m_ostr) << "%" << var->name << " = call double @pow("
-			<< get_type_name(term1->ty) << " %" << term1->name << ", "
-			<< get_type_name(term2->ty) << " %" << term2->name << ")\n";
+			<< get_type_name(ty) << " %" << term1->name << ", "
+			<< get_type_name(ty) << " %" << term2->name << ")\n";
 		return var;
 	}
 
@@ -391,6 +461,11 @@ public:
 	{
 		t_astret expr = ast->GetExpr()->accept(this);
 		std::string var = ast->GetIdent();
+		t_astret sym = get_sym(var);
+
+		// cast if needed
+		if(expr->ty != sym->ty)
+			expr = convert_sym(expr, sym->ty);
 
 		if(expr->ty == SymbolType::SCALAR || expr->ty == SymbolType::INT)
 		{
@@ -414,7 +489,16 @@ public:
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
 
-		t_astret var = get_tmp_var(term1->ty, &term1->dims);
+		// cast if needed
+		SymbolType ty = term1->ty;
+		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
+			ty = SymbolType::SCALAR;
+		t_astret var = get_tmp_var(ty, &term1->dims);
+
+		term1 = convert_sym(term1, ty);
+		term2 = convert_sym(term2, ty);
+
+
 		std::string op;
 		switch(ast->GetOp())
 		{
@@ -427,7 +511,7 @@ public:
 		}
 
 		std::string cmpop;
-		switch(term1->ty)
+		switch(ty)
 		{
 			case SymbolType::SCALAR:
 			{
@@ -446,7 +530,7 @@ public:
 		}
 
 		(*m_ostr) << "%" << var->name << " = " << cmpop << " " << op << " "
-			<< get_type_name(term1->ty) << " %" << term1->name << ", %" << term2->name << "\n";
+			<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
 		return var;
 	}
 
