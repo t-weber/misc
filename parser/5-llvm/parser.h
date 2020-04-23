@@ -69,10 +69,12 @@ namespace yy
 
 		yy::Lexer& GetLexer() { return m_lex; }
 
+
 		// --------------------------------------------------------------------
 		void SetStatements(std::shared_ptr<ASTStmts> stmts) { m_statements = stmts; }
 		const std::shared_ptr<ASTStmts> GetStatements() const { return m_statements; }
 		// --------------------------------------------------------------------
+
 
 		// --------------------------------------------------------------------
 		// current function scope
@@ -101,11 +103,24 @@ namespace yy
 		}
 		// --------------------------------------------------------------------
 
+
 		// --------------------------------------------------------------------
 		std::string AddSymbol(const std::string& name, bool bUseScope=true)
 		{
 			std::string symbol_with_scope = bUseScope ? GetScopeName() + name : name;
+			//std::cout << "symbol " << name << " -> " << symbol_with_scope << std::endl;
+
 			m_symbols.AddSymbol(symbol_with_scope, name, m_symtype, m_symdims);
+			return symbol_with_scope;
+		}
+
+		std::string AddFunc(const std::string& name, SymbolType rettype, bool bUseScope=true)
+		{
+			std::string symbol_with_scope = bUseScope ? GetScopeName() + name : name;
+			//std::cout << "func " << name << " -> " << symbol_with_scope << std::endl;
+
+			std::array<unsigned int, 2> retdims;		// TODO
+			m_symbols.AddFunc(symbol_with_scope, name, rettype, retdims);
 			return symbol_with_scope;
 		}
 
@@ -122,6 +137,7 @@ namespace yy
 			m_symdims[1] = dim2;
 		}
 		// --------------------------------------------------------------------
+
 
 		std::size_t GetCurLine() const { return m_lex.GetCurLine(); }
 	};

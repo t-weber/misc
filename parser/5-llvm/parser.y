@@ -36,6 +36,7 @@
 {
 	#include "parser.h"
 	#include <cmath>
+	#include <cstdint>
 }
 
 
@@ -59,9 +60,10 @@
 // terminal symbols
 %token<std::string> IDENT
 %token<double> REAL
+%token<std::int64_t> INT
 %token<std::string> STRING
 %token FUNC RET
-%token SCALARDECL VECTORDECL MATRIXDECL STRINGDECL
+%token SCALARDECL VECTORDECL MATRIXDECL STRINGDECL INTDECL
 %token IF THEN ELSE
 %token LOOP DO
 %token EQU NEQ GT LT GEQ LEQ
@@ -77,7 +79,7 @@
 %type<std::shared_ptr<ASTArgNames>> argumentnames
 %type<std::shared_ptr<ASTArgs>> arguments
 %type<std::shared_ptr<ASTStmts>> block
-%type<std::shared_ptr<AST>> function
+%type<std::shared_ptr<ASTFunc>> function
 %type<std::shared_ptr<ASTTypeDecl>> typedecl
 
 
@@ -161,6 +163,10 @@ statement[res]
 			context.SetSymType(SymbolType::STRING);
 		}
 		variables[vars] ';'	{ $res = $vars; }
+	| INTDECL {
+			context.SetSymType(SymbolType::INT);
+		}
+		variables[vars] ';'	{ $res = $vars; }
 
 	| IF expr[cond] THEN statement[if_stmt] {
 		$res = std::make_shared<ASTCond>($cond, $if_stmt); }
@@ -178,7 +184,19 @@ function[res]
 		}
 		'(' all_argumentnames[args] ')' block[blk] {
 			$res = std::make_shared<ASTFunc>($ident, $rettype, $args, $blk);
+
 			context.LeaveScope($ident);
+			context.AddFunc($ident, $rettype->GetType());
+		}
+	| FUNC IDENT[ident] {
+			context.EnterScope($ident);
+		}
+		'(' all_argumentnames[args] ')' block[blk] {
+			auto rettype = std::make_shared<ASTTypeDecl>(SymbolType::VOID);
+			$res = std::make_shared<ASTFunc>($ident, rettype, $args, $blk);
+
+			context.LeaveScope($ident);
+			context.AddFunc($ident, SymbolType::VOID);
 		}
 	;
 
@@ -188,6 +206,7 @@ typedecl[res]
 	| VECTORDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::VECTOR); }
 	| MATRIXDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::MATRIX); }
 	| STRINGDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::STRING); }
+	| INTDECL		{ $res = std::make_shared<ASTTypeDecl>(SymbolType::INT); }
 	;
 
 
@@ -246,8 +265,9 @@ expr[res]
 	| expr[term1] GEQ expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GEQ); }
 	| expr[term1] LEQ expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LEQ); }
 
-	// constant
+	// constants
 	| REAL[num]			{ $res = std::make_shared<ASTRealConst>($num); }
+	| INT[num]			{ $res = std::make_shared<ASTIntConst>($num); }
 
 	// variable
 	| IDENT[ident]		{ $res = std::make_shared<ASTVar>($ident); }

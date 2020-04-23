@@ -57,109 +57,24 @@ protected:
 	 */
 	t_astret get_sym(const std::string& name) const
 	{
+		std::string scoped_name;
+		for(const std::string& scope : m_curscope)
+			scoped_name += scope + "::";	// scope name separator
+		scoped_name += name;
+
 		const Symbol* sym = nullptr;
 		if(m_syms)
-			sym = m_syms->FindSymbol(name);
+		{
+			sym = m_syms->FindSymbol(scoped_name);
+
+			// try global scope instead
+			if(!sym)
+				sym = m_syms->FindSymbol(name);
+		}
 
 		if(sym==nullptr)
-			std::cerr << "Error: \"" << name << "\" does not have an associated symbol." << std::endl;
+			std::cerr << "Error: \"" << scoped_name << "\" does not have an associated symbol." << std::endl;
 		return sym;
-	}
-
-
-	/**
-	 * ty1 + ty2 -> type
-	 */
-	SymbolType get_combined_type_plus(const Symbol* sym1, const Symbol* sym2)
-	{
-		SymbolType ty1 = sym1->ty;
-		SymbolType ty2 = sym2->ty;
-
-		if(ty1 == SymbolType::SCALAR && ty2 == SymbolType::SCALAR)
-			return SymbolType::SCALAR;
-		if(ty1 == SymbolType::SCALAR && ty2 == SymbolType::VECTOR)
-			throw std::runtime_error{"Invalid operation."};
-		if(ty1 == SymbolType::SCALAR && ty2 == SymbolType::MATRIX)
-			throw std::runtime_error{"Invalid operation."};
-		if(ty1 == SymbolType::SCALAR && ty2 == SymbolType::STRING)
-				return SymbolType::STRING;
-
-		if(ty1 == SymbolType::VECTOR && ty2 == SymbolType::SCALAR)
-			throw std::runtime_error{"Invalid operation."};
-		if(ty1 == SymbolType::VECTOR && ty2 == SymbolType::VECTOR)
-			return SymbolType::VECTOR;
-		if(ty1 == SymbolType::VECTOR && ty2 == SymbolType::MATRIX)
-			throw std::runtime_error{"Invalid operation."};
-		if(ty1 == SymbolType::VECTOR && ty2 == SymbolType::STRING)
-			return SymbolType::STRING;
-
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::SCALAR)
-			throw std::runtime_error{"Invalid operation."};
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::VECTOR)
-			throw std::runtime_error{"Invalid operation."};
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::MATRIX)
-			return SymbolType::MATRIX;
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::STRING)
-			return SymbolType::STRING;
-
-		if(ty1 == SymbolType::STRING && ty2 == SymbolType::SCALAR)
-			return SymbolType::STRING;
-		if(ty1 == SymbolType::STRING && ty2 == SymbolType::VECTOR)
-			return SymbolType::STRING;
-		if(ty1 == SymbolType::STRING && ty2 == SymbolType::MATRIX)
-			return SymbolType::STRING;
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::STRING)
-			return SymbolType::STRING;
-
-		throw std::runtime_error{"Invalid operation."};
-	}
-
-
-	/**
-	 * ty1 * ty2 -> type
-	 */
-	SymbolType get_combined_type_mult(const Symbol* sym1, const Symbol* sym2)
-	{
-		SymbolType ty1 = sym1->ty;
-		SymbolType ty2 = sym2->ty;
-
-		if(ty1 == SymbolType::SCALAR && ty2 == SymbolType::SCALAR)
-			return SymbolType::SCALAR;
-		if(ty1 == SymbolType::SCALAR && ty2 == SymbolType::VECTOR)
-			return SymbolType::VECTOR;
-		if(ty1 == SymbolType::SCALAR && ty2 == SymbolType::MATRIX)
-			return SymbolType::MATRIX;
-		if(ty1 == SymbolType::SCALAR && ty2 == SymbolType::STRING)
-			return SymbolType::STRING;
-
-		if(ty1 == SymbolType::VECTOR && ty2 == SymbolType::SCALAR)
-			return SymbolType::VECTOR;
-		if(ty1 == SymbolType::VECTOR && ty2 == SymbolType::VECTOR)
-			return SymbolType::SCALAR;
-		if(ty1 == SymbolType::VECTOR && ty2 == SymbolType::MATRIX)
-			return SymbolType::VECTOR;
-		if(ty1 == SymbolType::VECTOR && ty2 == SymbolType::STRING)
-			throw std::runtime_error{"Invalid operation."};
-
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::SCALAR)
-			return SymbolType::MATRIX;
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::VECTOR)
-			return SymbolType::VECTOR;
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::MATRIX)
-			return SymbolType::MATRIX;
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::STRING)
-			throw std::runtime_error{"Invalid operation."};
-
-		if(ty1 == SymbolType::STRING && ty2 == SymbolType::SCALAR)
-			return SymbolType::STRING;
-		if(ty1 == SymbolType::STRING && ty2 == SymbolType::VECTOR)
-			throw std::runtime_error{"Invalid operation."};
-		if(ty1 == SymbolType::STRING && ty2 == SymbolType::MATRIX)
-			throw std::runtime_error{"Invalid operation."};
-		if(ty1 == SymbolType::MATRIX && ty2 == SymbolType::STRING)
-			throw std::runtime_error{"Invalid operation."};
-
-		throw std::runtime_error{"Invalid operation."};
 	}
 
 
@@ -176,6 +91,10 @@ protected:
 			return "double*";
 		else if(ty == SymbolType::STRING)
 			return "i8*";
+		else if(ty == SymbolType::INT)
+			return "i64";
+		else if(ty == SymbolType::VOID)
+			return "void";
 
 		std::cerr << "Error: Unknown symbol type." << std::endl;
 		return "invalid";
@@ -202,10 +121,13 @@ public:
 	{
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
-		SymbolType ty = get_combined_type_plus(term1, term2);
+		SymbolType ty = term1->ty;
 		t_astret var = get_tmp_var(ty, &term1->dims);
 
-		std::string op = ast->IsInverted() ? "fsub" : "fadd";
+		std::string op = ast->IsInverted() ? "sub" : "add";
+		if(ty == SymbolType::SCALAR)
+			op = "f" + op;
+
 		(*m_ostr) << "%" << var->name << " = " << op << " "
 			<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
 
@@ -217,10 +139,13 @@ public:
 	{
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
-		SymbolType ty = get_combined_type_mult(term1, term2);
+		SymbolType ty = term1->ty;
 		t_astret var = get_tmp_var(ty, &term1->dims);
 
-		std::string op = ast->IsInverted() ? "fdiv" : "fmul";
+		std::string op = ast->IsInverted() ? "div" : "mul";
+		if(ty == SymbolType::SCALAR)
+			op = "f" + op;
+
 		(*m_ostr) << "%" << var->name << " = " << op << " "
 			<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
 
@@ -232,9 +157,14 @@ public:
 	{
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
-		t_astret var = get_tmp_var(term1->ty, &term1->dims);
+		SymbolType ty = term1->ty;
+		t_astret var = get_tmp_var(ty, &term1->dims);
 
-		(*m_ostr) << "%" << var->name << " = frem "
+		std::string op = "rem";
+		if(ty == SymbolType::SCALAR)
+			op = "f" + op;
+
+		(*m_ostr) << "%" << var->name << " = " << op << " "
 			<< get_type_name(term1->ty) << " %" << term1->name << ", %" << term2->name << "\n";
 		return var;
 	}
@@ -268,15 +198,34 @@ public:
 	}
 
 
+	virtual t_astret visit(const ASTIntConst* ast) override
+	{
+		std::int64_t val = ast->GetVal();
+
+		// TODO: find a better way to assign a temporary variable
+		t_astret retvar = get_tmp_var(SymbolType::INT);
+		t_astret retvar2 = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << retvar->name << " = alloca i64\n";
+		(*m_ostr) << "store i64 " << val << ", i64* %" << retvar->name << "\n";
+		(*m_ostr) << "%" << retvar2->name << " = load i64, i64* %" << retvar->name << "\n";
+
+		return retvar2;
+	}
+
+
 	virtual t_astret visit(const ASTVar* ast) override
 	{
 		t_astret sym = get_sym(ast->GetIdent());
+		if(sym == nullptr)
+			throw std::runtime_error("Symbol not in symbol table.");
+
 		std::string var = std::string{"%"} + sym->name;
 
-		if(sym->ty == SymbolType::SCALAR)
+		if(sym->ty == SymbolType::SCALAR || sym->ty == SymbolType::INT)
 		{
 			t_astret retvar = get_tmp_var(sym->ty, &sym->dims);
-			(*m_ostr) << "%" << retvar->name << " = load double, double* " << var << "\n";
+			std::string ty = get_type_name(sym->ty);
+			(*m_ostr) << "%" << retvar->name << " = load " << ty  << ", " << ty << "* " << var << "\n";
 			return retvar;
 		}
 
@@ -294,15 +243,23 @@ public:
 
 	virtual t_astret visit(const ASTCall* ast) override
 	{
+		const std::string& funcname = ast->GetIdent();
+		t_astret func = get_sym(funcname);
+		if(func == nullptr)
+			throw std::runtime_error("Function not in symbol table.");
+
 		std::vector<t_astret> args;
 
 		for(const auto& arg : ast->GetArgumentList())
 			args.push_back(arg->accept(this));
 
 		// TODO: other return types
-		t_astret var = get_tmp_var(SymbolType::SCALAR);
+		t_astret retvar = get_tmp_var(func->retty);
+		std::string retty = get_type_name(func->retty);
 
-		(*m_ostr) << "%" << var->name << " = call double @" << ast->GetIdent() << "(";
+		if(func->retty != SymbolType::VOID)
+			(*m_ostr) << "%" << retvar->name << " = ";
+		(*m_ostr) << "call " << retty << " @" << funcname << "(";
 		for(std::size_t idx=0; idx<args.size(); ++idx)
 		{
 			(*m_ostr) << get_type_name(args[idx]->ty) << " %" << args[idx]->name;
@@ -310,7 +267,7 @@ public:
 				(*m_ostr) << ", ";
 		}
 		(*m_ostr) << ")\n";
-		return var;
+		return retvar;
 	}
 
 
@@ -330,9 +287,10 @@ public:
 		for(const auto& _var : ast->GetVariables())
 		{
 			t_astret sym = get_sym(_var);
+			std::string ty = get_type_name(sym->ty);
 
-			if(sym->ty == SymbolType::SCALAR)
-				(*m_ostr) << "%" << sym->name << " = alloca double\n";
+			if(sym->ty == SymbolType::SCALAR || sym->ty == SymbolType::INT)
+				(*m_ostr) << "%" << sym->name << " = alloca " << ty << "\n";
 
 			// TODO: other types
 		}
@@ -355,6 +313,8 @@ public:
 
 	virtual t_astret visit(const ASTFunc* ast) override
 	{
+		m_curscope.push_back(ast->GetIdent());
+
 		std::string rettype = get_type_name(ast->GetRetType());
 		(*m_ostr) << "define " << rettype << " @" << ast->GetIdent() << "(";
 
@@ -376,13 +336,14 @@ public:
 		{
 			const auto& [argname, argtype] = argnames[idx];
 
-			if(argtype == SymbolType::SCALAR)
+			if(argtype == SymbolType::SCALAR || argtype == SymbolType::INT)
 			{
 				const std::string arg = std::string{"f_"} + argname;
-				t_astret symcpy = get_tmp_var(SymbolType::SCALAR, nullptr, &argname);
+				t_astret symcpy = get_tmp_var(argtype, nullptr, &argname);
 
-				(*m_ostr) << "%" << symcpy->name << " = alloca double\n";
-				(*m_ostr) << "store double %" << arg << ", double* %" << symcpy->name << "\n";
+				std::string ty = get_type_name(argtype);
+				(*m_ostr) << "%" << symcpy->name << " = alloca " << ty << "\n";
+				(*m_ostr) << "store " << ty << " %" << arg << ", " << ty << "* %" << symcpy->name << "\n";
 			}
 
 			// TODO: other argument types
@@ -391,14 +352,21 @@ public:
 
 		t_astret lastres = ast->GetStatements()->accept(this);
 
-		// return result of last expression
-		if(lastres)
-			(*m_ostr) << "ret " << rettype << " %" << lastres->name << "\n";
+		if(ast->GetRetType() == SymbolType::VOID)
+		{
+			(*m_ostr) << "ret void\n";
+		}
 		else
-			(*m_ostr) << "ret " << rettype << " 0." << lastres << "\n";
+		{
+			// return result of last expression
+			if(lastres)
+				(*m_ostr) << "ret " << rettype << " %" << lastres->name << "\n";
+			else
+				(*m_ostr) << "ret " << rettype << " 0" << "\n";
+		}
 
 		(*m_ostr) << "}\n";
-
+		m_curscope.pop_back();
 		return nullptr;
 	}
 
@@ -424,15 +392,14 @@ public:
 		t_astret expr = ast->GetExpr()->accept(this);
 		std::string var = ast->GetIdent();
 
-		if(expr->ty == SymbolType::SCALAR)
+		if(expr->ty == SymbolType::SCALAR || expr->ty == SymbolType::INT)
 		{
-			(*m_ostr) << "store " << get_type_name(expr->ty) << " %" << expr->name
-				<< ", double* %" << var << "\n";
+			std::string ty = get_type_name(expr->ty);
+			(*m_ostr) << "store " << ty << " %" << expr->name << ", "<< ty << "* %" << var << "\n";
 
 			// return a r-value if the variable is further needed
 			t_astret retvar = get_tmp_var(expr->ty, &expr->dims);
-			(*m_ostr) << "%" << retvar->name << " = load "
-				<< get_type_name(expr->ty) << ", double* %" << var << "\n";
+			(*m_ostr) << "%" << retvar->name << " = load " << ty << ", " << ty << "* %" << var << "\n";
 
 			return retvar;
 		}
@@ -447,22 +414,38 @@ public:
 		t_astret term1 = ast->GetTerm1()->accept(this);
 		t_astret term2 = ast->GetTerm2()->accept(this);
 
-		if(term1->ty != SymbolType::SCALAR || term2->ty != SymbolType::SCALAR)
-			throw std::runtime_error{"Only scalar values can be compared."};
-
 		t_astret var = get_tmp_var(term1->ty, &term1->dims);
 		std::string op;
 		switch(ast->GetOp())
 		{
-			case ASTComp::EQU: op = "oeq"; break;
-			case ASTComp::NEQ: op = "one"; break;
-			case ASTComp::GT: op = "ogt"; break;
-			case ASTComp::LT: op = "olt"; break;
-			case ASTComp::GEQ: op = "oge"; break;
-			case ASTComp::LEQ: op = "ole"; break;
+			case ASTComp::EQU: op = "eq"; break;
+			case ASTComp::NEQ: op = "ne"; break;
+			case ASTComp::GT: op = "gt"; break;
+			case ASTComp::LT: op = "lt"; break;
+			case ASTComp::GEQ: op = "ge"; break;
+			case ASTComp::LEQ: op = "le"; break;
 		}
 
-		(*m_ostr) << "%" << var->name << " = fcmp " << op << " "
+		std::string cmpop;
+		switch(term1->ty)
+		{
+			case SymbolType::SCALAR:
+			{
+				cmpop = "fcmp";
+				op = "o" + op;
+				break;
+			}
+			case SymbolType::INT:
+			{
+				cmpop = "icmp";
+				if(op != "eq" && op != "ne")
+					op = "s" + op;	// signed
+				break;
+			}
+			// TODO: other types
+		}
+
+		(*m_ostr) << "%" << var->name << " = " << cmpop << " " << op << " "
 			<< get_type_name(term1->ty) << " %" << term1->name << ", %" << term2->name << "\n";
 		return var;
 	}
@@ -522,6 +505,8 @@ private:
 
 	std::size_t m_varCount = 0;	// # of tmp vars
 	std::size_t m_labelCount = 0;	// # of labels
+
+	std::vector<std::string> m_curscope;
 
 	SymTab* m_syms = nullptr;
 };

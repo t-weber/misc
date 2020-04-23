@@ -1,16 +1,16 @@
-func scalar test_loop()
+func test_loop()
 {
-	var i;
+	int i;
 	i = 0;
 
 	loop i<16 do
 		i = i+1;
 
-	println(i);
+	iprintln(i);
 }
 
 
-func scalar test_args(scalar i, scalar j, scalar k)
+func test_args(scalar i, scalar j, scalar k)
 {
 	println(i);
 	println(j);
@@ -18,8 +18,8 @@ func scalar test_args(scalar i, scalar j, scalar k)
 }
 
 
-func scalar start()
+func start()
 {
 	test_loop();
-	test_args(12, 34, 56);
+	test_args(12., 34., 56.);
 }

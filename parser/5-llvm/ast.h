@@ -14,6 +14,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <cstdint>
 
 #include "sym.h"
 
@@ -27,6 +28,7 @@ class ASTDiv;
 class ASTMod;
 class ASTPow;
 class ASTRealConst;
+class ASTIntConst;
 class ASTVar;
 class ASTStmts;
 class ASTVarDecl;
@@ -59,6 +61,7 @@ public:
 	virtual t_astret visit(const ASTMod* ast) = 0;
 	virtual t_astret visit(const ASTPow* ast) = 0;
 	virtual t_astret visit(const ASTRealConst* ast) = 0;
+	virtual t_astret visit(const ASTIntConst* ast) = 0;
 	virtual t_astret visit(const ASTVar* ast) = 0;
 	virtual t_astret visit(const ASTStmts* ast) = 0;
 	virtual t_astret visit(const ASTVarDecl* ast) = 0;
@@ -182,8 +185,7 @@ private:
 class ASTRealConst : public AST
 {
 public:
-	ASTRealConst(double val)
-		: val{val}
+	ASTRealConst(double val) : val{val}
 	{}
 
 	double GetVal() const { return val; }
@@ -192,6 +194,21 @@ public:
 
 private:
 	double val{};
+};
+
+
+class ASTIntConst : public AST
+{
+public:
+	ASTIntConst(std::int64_t val) : val{val}
+	{}
+
+	std::int64_t GetVal() const { return val; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::int64_t val{};
 };
 
 

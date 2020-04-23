@@ -1,4 +1,4 @@
-func scalar fibo(scalar n)
+func int fibo(int n)
 {
 	if n <= 2 then
 		ret 1;
@@ -7,7 +7,7 @@ func scalar fibo(scalar n)
 }
 
 
-func scalar fac(scalar n)
+func int fac(int n)
 {
 	if( n<= 1) then
 		ret 1;
@@ -16,8 +16,8 @@ func scalar fac(scalar n)
 }
 
 
-func scalar start()
+func start()
 {
-	println(fac(5));
-	println(fibo(16));
+	iprintln(fac(5));
+	iprintln(fibo(16));
 }

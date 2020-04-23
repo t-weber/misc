@@ -23,6 +23,7 @@
 white	[ \t\r]
 num		[0-9]
 real	{num}+(\.{num}*)?
+int		{num}+
 ident	[A-Za-z_]+[A-Za-z0-9_]*
 
 
@@ -57,6 +58,7 @@ ident	[A-Za-z_]+[A-Za-z0-9_]*
 "vec"		{ return yy::Parser::make_VECTORDECL(); }
 "mat"		{ return yy::Parser::make_MATRIXDECL(); }
 "str"		{ return yy::Parser::make_STRINGDECL(); }
+"int"		{ return yy::Parser::make_INTDECL(); }
 
 "func"		{ return yy::Parser::make_FUNC(); }
 "ret"		{ return yy::Parser::make_RET(); }
@@ -67,6 +69,7 @@ ident	[A-Za-z_]+[A-Za-z0-9_]*
 "loop"		{ return yy::Parser::make_LOOP(); }
 "do"		{ return yy::Parser::make_DO(); }
 
+{int}		{ return yy::Parser::make_INT(std::stol(yytext)); }
 {real}		{ return yy::Parser::make_REAL(std::stod(yytext)); }
 {ident}		{ return yy::Parser::make_IDENT(yytext); }
 "\""[^\"]*"\""	{

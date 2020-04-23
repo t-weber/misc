@@ -21,6 +21,10 @@ enum class SymbolType
 	MATRIX,
 
 	STRING,
+	INT,
+	VOID,
+
+	FUNC,
 };
 
 
@@ -29,6 +33,10 @@ struct Symbol
 	std::string name;
 	SymbolType ty;
 	std::array<unsigned int, 2> dims;
+
+	// for functions
+	SymbolType retty;
+	std::array<unsigned int, 2> retdims;
 
 	bool tmp = false;	// temporary variable?
 };
@@ -43,6 +51,16 @@ public:
 		bool is_temp=false)
 	{
 		Symbol sym{.name = name, .ty = ty, .dims=dims, .tmp = is_temp};
+		auto pair = m_syms.insert_or_assign(name_with_scope, sym);
+		return &pair.first->second;
+	}
+
+
+	const Symbol* AddFunc(const std::string& name_with_scope,
+		const std::string& name, SymbolType retty,
+		const std::array<unsigned int, 2>& retdims)
+	{
+		Symbol sym{.name = name, .ty = SymbolType::FUNC, .retty = retty, .retdims=retdims};
 		auto pair = m_syms.insert_or_assign(name_with_scope, sym);
 		return &pair.first->second;
 	}

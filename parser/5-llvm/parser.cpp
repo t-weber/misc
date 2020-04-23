@@ -67,6 +67,16 @@ int main(int argc, char** argv)
 
 	// parsing
 	yy::ParserContext ctx{ifstr};
+
+	// register runtime functions
+	ctx.AddFunc("pow", SymbolType::SCALAR);
+	ctx.AddFunc("sin", SymbolType::SCALAR);
+	ctx.AddFunc("cos", SymbolType::SCALAR);
+	ctx.AddFunc("sqrt", SymbolType::SCALAR);
+	ctx.AddFunc("exp", SymbolType::SCALAR);
+	ctx.AddFunc("println", SymbolType::VOID);
+	ctx.AddFunc("iprintln", SymbolType::VOID);
+
 	yy::Parser parser(ctx);
 	int res = parser.parse();
 
@@ -106,8 +116,7 @@ declare i8 @putchar(i8)
 ; -----------------------------------------------------------------------------
 ; runtime functions
 
-;define void @println(double %val)
-define double @println(double %val)
+define void @println(double %val)
 {
 	; convert to string
 	%strval = alloca [64 x i8]
@@ -117,8 +126,18 @@ define double @println(double %val)
 	; output string
 	call i8 @puts(i8* %strvalptr)
 
-	ret double 0.
+	ret void
 }
+
+
+define void @iprintln(i64 %val)
+{
+	%casted = sitofp i64 %val to double
+	call void @println(double %casted)
+
+	ret void
+}
+
 ; -----------------------------------------------------------------------------
 
 
@@ -127,7 +146,7 @@ define double @println(double %val)
 define i32 @main()
 {
 	; call entry function
-	%val = call double @start()
+	call void @start()
 
 	ret i32 0
 }
