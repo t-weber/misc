@@ -63,7 +63,7 @@
 %token<std::int64_t> INT
 %token<std::string> STRING
 %token FUNC RET
-%token SCALARDECL STRINGDECL INTDECL
+%token SCALARDECL VECTORDECL MATRIXDECL STRINGDECL INTDECL
 %token IF THEN ELSE
 %token LOOP DO
 %token EQU NEQ GT LT GEQ LEQ
@@ -145,6 +145,20 @@ statement[res]
 			context.SetSymType(SymbolType::SCALAR);
 		}
 		variables[vars] ';'	{ $res = $vars; }
+	| VECTORDECL REAL[dim] {
+			context.SetSymType(SymbolType::VECTOR);
+			context.SetSymDims(unsigned($dim));
+		}
+		variables[vars] ';' {
+			$res = $vars;
+		}
+	| MATRIXDECL REAL[dim1] REAL[dim2] {
+			context.SetSymType(SymbolType::MATRIX);
+			context.SetSymDims(unsigned($dim1), unsigned($dim2));
+		}
+		variables[vars] ';' {
+			$res = $vars;
+		}
 	| STRINGDECL {
 			context.SetSymType(SymbolType::STRING);
 		}
@@ -189,6 +203,8 @@ function[res]
 
 typedecl[res]
 	: SCALARDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::SCALAR); }
+	| VECTORDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::VECTOR); }
+	| MATRIXDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::MATRIX); }
 	| STRINGDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::STRING); }
 	| INTDECL		{ $res = std::make_shared<ASTTypeDecl>(SymbolType::INT); }
 	;

@@ -60,6 +60,7 @@ namespace yy
 		// information about currently parsed symbol
 		std::vector<std::string> m_curscope;
 		SymbolType m_symtype = SymbolType::SCALAR;
+		std::array<unsigned int, 2> m_symdims = {0, 0};
 
 	public:
 		ParserContext(std::istream& istr = std::cin) :
@@ -109,7 +110,7 @@ namespace yy
 			std::string symbol_with_scope = bUseScope ? GetScopeName() + name : name;
 			//std::cout << "symbol " << name << " -> " << symbol_with_scope << std::endl;
 
-			m_symbols.AddSymbol(symbol_with_scope, name, m_symtype);
+			m_symbols.AddSymbol(symbol_with_scope, name, m_symtype, m_symdims);
 			return symbol_with_scope;
 		}
 
@@ -119,7 +120,8 @@ namespace yy
 			std::string symbol_with_scope = bUseScope ? GetScopeName() + name : name;
 			//std::cout << "func " << name << " -> " << symbol_with_scope << std::endl;
 
-			m_symbols.AddFunc(symbol_with_scope, name, rettype, argtypes);
+			std::array<unsigned int, 2> retdims;		// TODO
+			m_symbols.AddFunc(symbol_with_scope, name, rettype, argtypes, retdims);
 			return symbol_with_scope;
 		}
 
@@ -128,6 +130,13 @@ namespace yy
 
 		// type of current symbol
 		void SetSymType(SymbolType ty) { m_symtype = ty; }
+
+		// dimensions of vector and matrix symbols
+		void SetSymDims(unsigned int dim1, unsigned int dim2=0)
+		{
+			m_symdims[0] = dim1;
+			m_symdims[1] = dim2;
+		}
 		// --------------------------------------------------------------------
 
 

@@ -1,0 +1,25 @@
+func test_loop()
+{
+	int i;
+	i = 0;
+
+	loop i<16 do
+		i = i+1;
+
+	println(i);
+}
+
+
+func test_args(scalar i, scalar j, scalar k)
+{
+	println(i);
+	println(j);
+	println(k);
+}
+
+
+func start()
+{
+	test_loop();
+	test_args(12., 34., 56.);
+}

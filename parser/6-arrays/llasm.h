@@ -21,6 +21,7 @@ class LLAsm : public ASTVisitor
 {
 protected:
 	t_astret get_tmp_var(SymbolType ty = SymbolType::SCALAR,
+		const std::array<unsigned int, 2>* dims = nullptr,
 		const std::string* name = nullptr)
 	{
 		std::string var;
@@ -35,7 +36,10 @@ protected:
 			++m_varCount;
 		}
 
-			return m_syms->AddSymbol(var, var, ty, true);
+		if(dims)
+			return m_syms->AddSymbol(var, var, ty, *dims, true);
+		else
+			return m_syms->AddSymbol(var, var, ty, {0,0}, true);
 	}
 
 
@@ -95,7 +99,7 @@ protected:
 		std::string from = get_type_name(sym->ty);
 		std::string to = get_type_name(ty_to);
 
-		t_astret var = get_tmp_var(ty_to);
+		t_astret var = get_tmp_var(ty_to, &sym->dims);
 		(*m_ostr) << "%" << var->name << " = " << op << " " << from << "%" << sym->name << " to " << to << "\n";
 
 		return var;
@@ -110,6 +114,8 @@ protected:
 		switch(ty)
 		{
 			case SymbolType::SCALAR: return "double";
+			case SymbolType::VECTOR: return "double*";
+			case SymbolType::MATRIX: return "double*";
 			case SymbolType::STRING: return "i8*";
 			case SymbolType::INT: return "i64";
 			case SymbolType::VOID: return "void";
@@ -128,7 +134,7 @@ public:
 	virtual t_astret visit(const ASTUMinus* ast) override
 	{
 		t_astret term = ast->GetTerm()->accept(this);
-		t_astret var = get_tmp_var(term->ty);
+		t_astret var = get_tmp_var(term->ty, &term->dims);
 
 		if(term->ty == SymbolType::SCALAR)
 		{
@@ -153,7 +159,7 @@ public:
 		SymbolType ty = term1->ty;
 		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
 			ty = SymbolType::SCALAR;
-		t_astret var = get_tmp_var(ty);
+		t_astret var = get_tmp_var(ty, &term1->dims);
 
 		term1 = convert_sym(term1, ty);
 		term2 = convert_sym(term2, ty);
@@ -179,7 +185,7 @@ public:
 		SymbolType ty = term1->ty;
 		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
 			ty = SymbolType::SCALAR;
-		t_astret var = get_tmp_var(ty);
+		t_astret var = get_tmp_var(ty, &term1->dims);
 
 		term1 = convert_sym(term1, ty);
 		term2 = convert_sym(term2, ty);
@@ -207,7 +213,7 @@ public:
 		SymbolType ty = term1->ty;
 		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
 			ty = SymbolType::SCALAR;
-		t_astret var = get_tmp_var(ty);
+		t_astret var = get_tmp_var(ty, &term1->dims);
 
 		term1 = convert_sym(term1, ty);
 		term2 = convert_sym(term2, ty);
@@ -234,7 +240,7 @@ public:
 		SymbolType ty = term1->ty;
 		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
 			ty = SymbolType::SCALAR;
-		t_astret var = get_tmp_var(ty);
+		t_astret var = get_tmp_var(ty, &term1->dims);
 
 		term1 = convert_sym(term1, ty);
 		term2 = convert_sym(term2, ty);
@@ -287,7 +293,7 @@ public:
 
 		if(sym->ty == SymbolType::SCALAR || sym->ty == SymbolType::INT)
 		{
-			t_astret retvar = get_tmp_var(sym->ty);
+			t_astret retvar = get_tmp_var(sym->ty, &sym->dims);
 			std::string ty = get_type_name(sym->ty);
 			(*m_ostr) << "%" << retvar->name << " = load " << ty  << ", " << ty << "* " << var << "\n";
 			return retvar;
@@ -396,7 +402,7 @@ public:
 			if(argtype == SymbolType::SCALAR || argtype == SymbolType::INT)
 			{
 				const std::string arg = std::string{"f_"} + argname;
-				t_astret symcpy = get_tmp_var(argtype, &argname);
+				t_astret symcpy = get_tmp_var(argtype, nullptr, &argname);
 
 				std::string ty = get_type_name(argtype);
 				(*m_ostr) << "%" << symcpy->name << " = alloca " << ty << "\n";
@@ -460,7 +466,7 @@ public:
 			(*m_ostr) << "store " << ty << " %" << expr->name << ", "<< ty << "* %" << var << "\n";
 
 			// return a r-value if the variable is further needed
-			t_astret retvar = get_tmp_var(expr->ty);
+			t_astret retvar = get_tmp_var(expr->ty, &expr->dims);
 			(*m_ostr) << "%" << retvar->name << " = load " << ty << ", " << ty << "* %" << var << "\n";
 
 			return retvar;
@@ -480,7 +486,7 @@ public:
 		SymbolType ty = term1->ty;
 		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
 			ty = SymbolType::SCALAR;
-		t_astret var = get_tmp_var(ty);
+		t_astret var = get_tmp_var(ty, &term1->dims);
 
 		term1 = convert_sym(term1, ty);
 		term2 = convert_sym(term2, ty);
