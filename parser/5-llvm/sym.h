@@ -35,6 +35,7 @@ struct Symbol
 	std::array<unsigned int, 2> dims;
 
 	// for functions
+	std::vector<SymbolType> argty;
 	SymbolType retty;
 	std::array<unsigned int, 2> retdims;
 
@@ -58,9 +59,10 @@ public:
 
 	const Symbol* AddFunc(const std::string& name_with_scope,
 		const std::string& name, SymbolType retty,
+		const std::vector<SymbolType>& argtypes,
 		const std::array<unsigned int, 2>& retdims)
 	{
-		Symbol sym{.name = name, .ty = SymbolType::FUNC, .retty = retty, .retdims=retdims};
+		Symbol sym{.name = name, .ty = SymbolType::FUNC, .argty = argtypes, .retty = retty, .retdims=retdims};
 		auto pair = m_syms.insert_or_assign(name_with_scope, sym);
 		return &pair.first->second;
 	}

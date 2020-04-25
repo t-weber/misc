@@ -56,49 +56,50 @@ extern yy::Parser::symbol_type yylex(yy::ParserContext &context)
 
 int main(int argc, char** argv)
 {
-	if(argc <= 1)
+	try
 	{
-		std::cerr << "Please specify a program." << std::endl;
-		return -1;
-	}
+		if(argc <= 1)
+		{
+			std::cerr << "Please specify a program." << std::endl;
+			return -1;
+		}
 
-	std::ifstream ifstr{argv[1]};
-
-
-	// parsing
-	yy::ParserContext ctx{ifstr};
-
-	// register runtime functions
-	ctx.AddFunc("pow", SymbolType::SCALAR);
-	ctx.AddFunc("sin", SymbolType::SCALAR);
-	ctx.AddFunc("cos", SymbolType::SCALAR);
-	ctx.AddFunc("sqrt", SymbolType::SCALAR);
-	ctx.AddFunc("exp", SymbolType::SCALAR);
-	ctx.AddFunc("println", SymbolType::VOID);
-	ctx.AddFunc("iprintln", SymbolType::VOID);
-
-	yy::Parser parser(ctx);
-	int res = parser.parse();
-
-	if(res != 0)
-		return res;
-
-	//std::cout << ctx.GetSymbols() << std::endl;
+		std::ifstream ifstr{argv[1]};
 
 
-	// code generation
+		// parsing
+		yy::ParserContext ctx{ifstr};
 
-	LLAsm llasm{&ctx.GetSymbols()};
-	auto stmts = ctx.GetStatements()->GetStatementList();
-	for(auto iter=stmts.rbegin(); iter!=stmts.rend(); ++iter)
-	{
-		(*iter)->accept(&llasm);
-		std::cout << std::endl;
-	}
+		// register runtime functions
+		ctx.AddFunc("pow", SymbolType::SCALAR, {SymbolType::SCALAR, SymbolType::SCALAR});
+		ctx.AddFunc("sin", SymbolType::SCALAR, {SymbolType::SCALAR});
+		ctx.AddFunc("cos", SymbolType::SCALAR, {SymbolType::SCALAR});
+		ctx.AddFunc("sqrt", SymbolType::SCALAR, {SymbolType::SCALAR});
+		ctx.AddFunc("exp", SymbolType::SCALAR, {SymbolType::SCALAR});
+		ctx.AddFunc("println", SymbolType::VOID, {SymbolType::SCALAR});
 
-	// additional code to make it run
-	{
-		std::string strStartup= R"START(
+		yy::Parser parser(ctx);
+		int res = parser.parse();
+
+		if(res != 0)
+			return res;
+
+		//std::cout << ctx.GetSymbols() << std::endl;
+
+
+		// code generation
+
+		LLAsm llasm{&ctx.GetSymbols()};
+		auto stmts = ctx.GetStatements()->GetStatementList();
+		for(auto iter=stmts.rbegin(); iter!=stmts.rend(); ++iter)
+		{
+			(*iter)->accept(&llasm);
+			std::cout << std::endl;
+		}
+
+		// additional code to make it run
+		{
+			std::string strStartup= R"START(
 ; -----------------------------------------------------------------------------
 ; imported libc functions
 declare double @pow(double, double)
@@ -130,14 +131,6 @@ define void @println(double %val)
 }
 
 
-define void @iprintln(i64 %val)
-{
-	%casted = sitofp i64 %val to double
-	call void @println(double %casted)
-
-	ret void
-}
-
 ; -----------------------------------------------------------------------------
 
 
@@ -153,7 +146,13 @@ define i32 @main()
 ; -----------------------------------------------------------------------------
 )START";
 
-		std::cout << "\n" << strStartup << std::endl;
+			std::cout << "\n" << strStartup << std::endl;
+		}
+	}
+	catch(const std::exception& ex)
+	{
+		std::cerr << "Error: " << ex.what() << std::endl;
+		return -1;
 	}
 
 	return 0;

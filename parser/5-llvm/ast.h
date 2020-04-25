@@ -290,6 +290,15 @@ public:
 		return argnames;
 	}
 
+	std::vector<SymbolType> GetArgTypes() const
+	{
+		std::vector<SymbolType> ty;
+		for(const auto& arg : argnames)
+			ty.push_back(arg.second);
+
+		return ty;
+	}
+
 	ASTVISITOR_ACCEPT
 
 private:

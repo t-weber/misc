@@ -287,7 +287,7 @@ public:
 	{
 		t_astret sym = get_sym(ast->GetIdent());
 		if(sym == nullptr)
-			throw std::runtime_error("Symbol not in symbol table.");
+			throw std::runtime_error("Symbol \"" + ast->GetIdent() + "\" not in symbol table.");
 
 		std::string var = std::string{"%"} + sym->name;
 
@@ -305,23 +305,28 @@ public:
 	}
 
 
-	virtual t_astret visit(const ASTArgNames*) override
-	{
-		return nullptr;
-	}
-
-
 	virtual t_astret visit(const ASTCall* ast) override
 	{
 		const std::string& funcname = ast->GetIdent();
 		t_astret func = get_sym(funcname);
 		if(func == nullptr)
-			throw std::runtime_error("Function not in symbol table.");
+			throw std::runtime_error("Function \"" + funcname + "\" not in symbol table.");
+		if(ast->GetArgumentList().size() != func->argty.size())
+			throw std::runtime_error("Invalid number of function parameters for \"" + funcname + "\".");
 
 		std::vector<t_astret> args;
 
-		for(const auto& arg : ast->GetArgumentList())
-			args.push_back(arg->accept(this));
+		std::size_t _idx=0;
+		for(const auto& curarg : ast->GetArgumentList())
+		{
+			t_astret arg = curarg->accept(this);
+
+			// cast if needed
+			t_astret arg_casted = convert_sym(arg, func->argty[_idx]);
+
+			args.push_back(arg_casted);
+			++_idx;
+		}
 
 		// TODO: other return types
 		t_astret retvar = get_tmp_var(func->retty);
@@ -365,18 +370,6 @@ public:
 			// TODO: other types
 		}
 
-		return nullptr;
-	}
-
-
-	virtual t_astret visit(const ASTArgs*) override
-	{
-		return nullptr;
-	}
-
-
-	virtual t_astret visit(const ASTTypeDecl*) override
-	{
 		return nullptr;
 	}
 
@@ -582,6 +575,15 @@ public:
 		(*m_ostr) << labelEnd << ":  ; loop end\n";
 		return nullptr;
 	}
+
+
+	// ------------------------------------------------------------------------
+	// internally handled dummy nodes
+	// ------------------------------------------------------------------------
+	virtual t_astret visit(const ASTArgNames*) override { return nullptr; }
+	virtual t_astret visit(const ASTArgs*) override { return nullptr; }
+	virtual t_astret visit(const ASTTypeDecl*) override { return nullptr; }
+	// ------------------------------------------------------------------------
 
 
 private:

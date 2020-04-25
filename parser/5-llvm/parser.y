@@ -186,7 +186,7 @@ function[res]
 			$res = std::make_shared<ASTFunc>($ident, $rettype, $args, $blk);
 
 			context.LeaveScope($ident);
-			context.AddFunc($ident, $rettype->GetType());
+			context.AddFunc($ident, $rettype->GetType(), $args->GetArgTypes());
 		}
 	| FUNC IDENT[ident] {
 			context.EnterScope($ident);
@@ -196,7 +196,7 @@ function[res]
 			$res = std::make_shared<ASTFunc>($ident, rettype, $args, $blk);
 
 			context.LeaveScope($ident);
-			context.AddFunc($ident, SymbolType::VOID);
+			context.AddFunc($ident, SymbolType::VOID, $args->GetArgTypes());
 		}
 	;
 

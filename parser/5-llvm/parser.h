@@ -114,13 +114,14 @@ namespace yy
 			return symbol_with_scope;
 		}
 
-		std::string AddFunc(const std::string& name, SymbolType rettype, bool bUseScope=true)
+		std::string AddFunc(const std::string& name, SymbolType rettype,
+			const std::vector<SymbolType>& argtypes, bool bUseScope=true)
 		{
 			std::string symbol_with_scope = bUseScope ? GetScopeName() + name : name;
 			//std::cout << "func " << name << " -> " << symbol_with_scope << std::endl;
 
 			std::array<unsigned int, 2> retdims;		// TODO
-			m_symbols.AddFunc(symbol_with_scope, name, rettype, retdims);
+			m_symbols.AddFunc(symbol_with_scope, name, rettype, argtypes, retdims);
 			return symbol_with_scope;
 		}
 

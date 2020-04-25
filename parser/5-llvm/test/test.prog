@@ -6,7 +6,7 @@ func test_loop()
 	loop i<16 do
 		i = i+1;
 
-	iprintln(i);
+	println(i);
 }
 
 
