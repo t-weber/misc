@@ -282,10 +282,10 @@ public:
 
 	void AddArg(const std::string& argname, SymbolType ty)
 	{
-		argnames.push_back(std::make_pair(argname, ty));
+		argnames.push_front(std::make_pair(argname, ty));
 	}
 
-	const std::vector<std::pair<std::string, SymbolType>>& GetArgs() const
+	const std::list<std::pair<std::string, SymbolType>>& GetArgs() const
 	{
 		return argnames;
 	}
@@ -295,14 +295,13 @@ public:
 		std::vector<SymbolType> ty;
 		for(const auto& arg : argnames)
 			ty.push_back(arg.second);
-
 		return ty;
 	}
 
 	ASTVISITOR_ACCEPT
 
 private:
-	std::vector<std::pair<std::string, SymbolType>> argnames;
+	std::list<std::pair<std::string, SymbolType>> argnames;
 };
 
 
@@ -327,13 +326,11 @@ public:
 	ASTFunc(const std::string& ident, std::shared_ptr<ASTTypeDecl>& rettype,
 		std::shared_ptr<ASTArgNames>& args, std::shared_ptr<ASTStmts> stmts)
 		: ident{ident}, rettype{rettype}, argnames{args->GetArgs()}, stmts{stmts}
-	{
-		std::reverse(argnames.begin(), argnames.end());
-	}
+	{}
 
 	const std::string& GetIdent() const { return ident; }
 	SymbolType GetRetType() const { return rettype->GetType(); }
-	const std::vector<std::pair<std::string, SymbolType>>& GetArgNames() const { return argnames; }
+	const std::list<std::pair<std::string, SymbolType>>& GetArgNames() const { return argnames; }
 	std::shared_ptr<ASTStmts> GetStatements() const { return stmts; }
 
 	ASTVISITOR_ACCEPT
@@ -341,7 +338,7 @@ public:
 private:
 	std::string ident;
 	std::shared_ptr<ASTTypeDecl> rettype;
-	std::vector<std::pair<std::string, SymbolType>> argnames;
+	std::list<std::pair<std::string, SymbolType>> argnames;
 	std::shared_ptr<ASTStmts> stmts;
 };
 

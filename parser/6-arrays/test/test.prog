@@ -6,20 +6,20 @@ func test_loop()
 	loop i<16 do
 		i = i+1;
 
-	println(i);
+	puti(i);
 }
 
 
-func test_args(scalar i, scalar j, scalar k)
+func test_args(int i, scalar j, scalar k)
 {
-	println(i);
-	println(j);
-	println(k);
+	puti(i);
+	putf(j);
+	putf(k);
 }
 
 
 func start()
 {
 	test_loop();
-	test_args(12., 34., 56.);
+	test_args(12, 34., 56.);
 }

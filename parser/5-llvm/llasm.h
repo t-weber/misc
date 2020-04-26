@@ -376,23 +376,21 @@ public:
 		(*m_ostr) << "define " << rettype << " @" << ast->GetIdent() << "(";
 
 		auto argnames = ast->GetArgNames();
-		for(std::size_t idx=0; idx<argnames.size(); ++idx)
+		std::size_t idx = 0;
+		for(const auto& [argname, argtype] : argnames)
 		{
-			const auto& [argname, argtype] = argnames[idx];
-
 			const std::string arg = std::string{"f_"} + argname;
 			(*m_ostr) << get_type_name(argtype) << " %" << arg;
 			if(idx < argnames.size()-1)
 				(*m_ostr) << ", ";
+			++idx;
 		}
 		(*m_ostr) << ")\n{\n";
 
 
 		// create local copies of the arguments
-		for(std::size_t idx=0; idx<argnames.size(); ++idx)
+		for(const auto& [argname, argtype] : argnames)
 		{
-			const auto& [argname, argtype] = argnames[idx];
-
 			if(argtype == SymbolType::SCALAR || argtype == SymbolType::INT)
 			{
 				const std::string arg = std::string{"f_"} + argname;
