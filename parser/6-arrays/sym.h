@@ -32,14 +32,14 @@ struct Symbol
 {
 	std::string name;
 	SymbolType ty;
-	std::array<unsigned int, 2> dims;
+	std::array<std::size_t, 2> dims;
 
 	// for functions
 	std::vector<SymbolType> argty;
 	SymbolType retty;
-	std::array<unsigned int, 2> retdims;
+	std::array<std::size_t, 2> retdims;
 
-	bool tmp = false;	// temporary variable?
+	bool tmp = false;	// temporary or declared variable?
 };
 
 
@@ -48,7 +48,7 @@ class SymTab
 public:
 	const Symbol* AddSymbol(const std::string& name_with_scope,
 		const std::string& name, SymbolType ty,
-		const std::array<unsigned int, 2>& dims,
+		const std::array<std::size_t, 2>& dims,
 		bool is_temp=false)
 	{
 		Symbol sym{.name = name, .ty = ty, .dims=dims, .tmp = is_temp};
@@ -60,7 +60,7 @@ public:
 	const Symbol* AddFunc(const std::string& name_with_scope,
 		const std::string& name, SymbolType retty,
 		const std::vector<SymbolType>& argtypes,
-		const std::array<unsigned int, 2>& retdims)
+		const std::array<std::size_t, 2>& retdims)
 	{
 		Symbol sym{.name = name, .ty = SymbolType::FUNC, .argty = argtypes, .retty = retty, .retdims=retdims};
 		auto pair = m_syms.insert_or_assign(name_with_scope, sym);

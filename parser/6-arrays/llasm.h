@@ -21,7 +21,7 @@ class LLAsm : public ASTVisitor
 {
 protected:
 	t_astret get_tmp_var(SymbolType ty = SymbolType::SCALAR,
-		const std::array<unsigned int, 2>* dims = nullptr,
+		const std::array<std::size_t, 2>* dims = nullptr,
 		const std::string* name = nullptr)
 	{
 		std::string var;
@@ -283,6 +283,17 @@ public:
 	}
 
 
+	virtual t_astret visit(const ASTStrConst* ast) override
+	{
+		const std::string& val = ast->GetVal();
+
+		// TODO
+		t_astret retvar = get_tmp_var(SymbolType::STRING);
+
+		return retvar;
+	}
+
+
 	virtual t_astret visit(const ASTVar* ast) override
 	{
 		t_astret sym = get_sym(ast->GetIdent());
@@ -298,10 +309,20 @@ public:
 			(*m_ostr) << "%" << retvar->name << " = load " << ty  << ", " << ty << "* " << var << "\n";
 			return retvar;
 		}
+		else if(sym->ty == SymbolType::VECTOR || sym->ty == SymbolType::MATRIX)
+		{
+			return sym;
+		}
+		else if(sym->ty == SymbolType::STRING)
+		{
+			return sym;
+		}
+		else
+		{
+			throw std::runtime_error("Invalid type for visited variable: \"" + sym->name + "\".");
+		}
 
-		// TODO: other types
 		return nullptr;
-
 	}
 
 
@@ -365,9 +386,40 @@ public:
 			std::string ty = get_type_name(sym->ty);
 
 			if(sym->ty == SymbolType::SCALAR || sym->ty == SymbolType::INT)
+			{
 				(*m_ostr) << "%" << sym->name << " = alloca " << ty << "\n";
+			}
+			else if(sym->ty == SymbolType::VECTOR || sym->ty == SymbolType::MATRIX)
+			{
+				std::size_t dim = std::get<0>(sym->dims);
+				if(sym->ty == SymbolType::MATRIX)
+					dim *= std::get<1>(sym->dims);
 
-			// TODO: other types
+				// allocate the array's memory
+				(*m_ostr) << "%__arr_" << sym->name << " = alloca [" << dim << " x double]\n";
+
+				// only use a pointer to the array
+				(*m_ostr) << "%" << sym->name << " = getelementptr [" << dim << " x double], ["
+					<< dim << " x double]* %__arr_" << sym->name << ", i64 0, i64 0\n";
+			}
+			else if(sym->ty == SymbolType::STRING)
+			{
+				std::size_t dim = std::get<0>(sym->dims);
+
+				// allocate the string's memory
+				(*m_ostr) << "%__str_" << sym->name << " = alloca [" << dim << " x i8]\n";
+
+				// only use a pointer to the string
+				(*m_ostr) << "%" << sym->name << " = getelementptr [" << dim << " x i8], ["
+					<< dim << " x i8]* %__str_" << sym->name << ", i64 0, i64 0\n";
+
+				// set first element to zero
+				(*m_ostr) << "store i8 0, i8* %"  << sym->name << "\n";
+			}
+			else
+			{
+				throw std::runtime_error("Invalid type in declaration: \"" + sym->name + "\".");
+			}
 		}
 
 		return nullptr;
@@ -468,6 +520,116 @@ public:
 			(*m_ostr) << "%" << retvar->name << " = load " << ty << ", " << ty << "* %" << var << "\n";
 
 			return retvar;
+		}
+		else if(sym->ty == SymbolType::VECTOR || sym->ty == SymbolType::MATRIX)
+		{
+			if(std::get<0>(expr->dims) != std::get<0>(sym->dims))
+				throw std::runtime_error("Dimension mismatch in assignment of \"" + sym->name + "\".");
+
+			std::size_t dim = std::get<0>(expr->dims);
+			if(expr->ty == SymbolType::MATRIX)
+			{
+				if(std::get<1>(expr->dims) != std::get<1>(sym->dims))
+					throw std::runtime_error("Dimension mismatch in assignment of \"" + sym->name + "\".");
+
+				dim *= std::get<1>(expr->dims);
+			}
+
+			// copy elements in a loop
+			std::string labelStart = get_label();
+			std::string labelBegin = get_label();
+			std::string labelEnd = get_label();
+
+			// loop counter
+			t_astret ctr = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << ctr->name << " = alloca i64\n";
+			(*m_ostr) << "store i64 0, i64* %" << ctr->name << "\n";
+
+			(*m_ostr) << "br label %" << labelStart << "\n";
+			(*m_ostr) << labelStart << ":  ; loop start\n";
+
+			// loop condition: ctr < dim
+			t_astret ctrval = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << ctrval->name << " = load i64, i64* %" << ctr->name << "\n";
+
+			t_astret cond = get_tmp_var();
+			(*m_ostr) << "%" << cond->name << " = icmp slt i64 %" << ctrval->name <<  ", " << dim << "\n";
+			(*m_ostr) << "br i1 %" << cond->name << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+			(*m_ostr) << labelBegin << ":  ; loop begin\n";
+
+			// ---------------
+			// loop statements
+			t_astret elemptr_src = get_tmp_var(SymbolType::STRING);
+			(*m_ostr) << "%" << elemptr_src->name << " = getelementptr [" << dim << " x double], ["
+				<< dim << " x double]* %__arr_" << expr->name << ", i64 0, i64 %" << ctrval->name << "\n";
+			t_astret elemptr_dst = get_tmp_var(SymbolType::STRING);
+			(*m_ostr) << "%" << elemptr_dst->name << " = getelementptr [" << dim << " x double], ["
+				<< dim << " x double]* %__arr_" << sym->name << ", i64 0, i64 %" << ctrval->name << "\n";
+			t_astret elem_src = get_tmp_var(SymbolType::STRING);
+			(*m_ostr) << "%" << elem_src->name << " = load double, double* %" << elemptr_src->name << "\n";
+
+			(*m_ostr) << "store double %" << elem_src->name << ", double* %" << elemptr_dst->name << "\n";
+
+			// increment counter
+			t_astret newctrval = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << newctrval->name << " = add i64 %" << ctrval->name << ", 1\n";
+			(*m_ostr) << "store i64 %" << newctrval->name << ", i64* %" << ctr->name << "\n";
+			// ---------------
+
+			(*m_ostr) << "br label %" << labelStart << "\n";
+			(*m_ostr) << labelEnd << ":  ; loop end\n";
+		}
+		else if(sym->ty == SymbolType::STRING)
+		{
+			std::size_t dim = std::get<0>(expr->dims);
+			if(dim != std::get<0>(sym->dims))
+				throw std::runtime_error("Dimension mismatch in assignment of \"" + sym->name + "\".");
+
+			// copy elements in a loop
+			std::string labelStart = get_label();
+			std::string labelBegin = get_label();
+			std::string labelEnd = get_label();
+
+			// loop counter
+			t_astret ctr = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << ctr->name << " = alloca i64\n";
+			(*m_ostr) << "store i64 0, i64* %" << ctr->name << "\n";
+
+			(*m_ostr) << "br label %" << labelStart << "\n";
+			(*m_ostr) << labelStart << ":  ; loop start\n";
+
+			// loop condition: ctr < dim
+			t_astret ctrval = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << ctrval->name << " = load i64, i64* %" << ctr->name << "\n";
+
+			t_astret cond = get_tmp_var();
+			(*m_ostr) << "%" << cond->name << " = icmp slt i64 %" << ctrval->name <<  ", " << dim << "\n";
+			(*m_ostr) << "br i1 %" << cond->name << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+			(*m_ostr) << labelBegin << ":  ; loop begin\n";
+
+			// ---------------
+			// loop statements
+			t_astret elemptr_src = get_tmp_var(SymbolType::STRING);
+			(*m_ostr) << "%" << elemptr_src->name << " = getelementptr [" << dim << " x i8], ["
+				<< dim << " x i8]* %__str_" << expr->name << ", i64 0, i64 %" << ctrval->name << "\n";
+			t_astret elemptr_dst = get_tmp_var(SymbolType::STRING);
+			(*m_ostr) << "%" << elemptr_dst->name << " = getelementptr [" << dim << " x i8], ["
+				<< dim << " x i8]* %__str_" << sym->name << ", i64 0, i64 %" << ctrval->name << "\n";
+			t_astret elem_src = get_tmp_var(SymbolType::STRING);
+				(*m_ostr) << "%" << elem_src->name << " = load i8, i8* %" << elemptr_src->name << "\n";
+
+			(*m_ostr) << "store i8 %" << elem_src->name << ", i8* %" << elemptr_dst->name << "\n";
+
+			// increment counter
+			t_astret newctrval = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << newctrval->name << " = add i64 %" << ctrval->name << ", 1\n";
+			(*m_ostr) << "store i64 %" << newctrval->name << ", i64* %" << ctr->name << "\n";
+			// ---------------
+
+			(*m_ostr) << "br label %" << labelStart << "\n";
+			(*m_ostr) << labelEnd << ":  ; loop end\n";
 		}
 
 		// TODO: other types
@@ -571,6 +733,7 @@ public:
 		ast->GetLoopStmt()->accept(this);
 		(*m_ostr) << "br label %" << labelStart << "\n";
 		(*m_ostr) << labelEnd << ":  ; loop end\n";
+
 		return nullptr;
 	}
 

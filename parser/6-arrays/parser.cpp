@@ -76,7 +76,7 @@ int main(int argc, char** argv)
 		ctx.AddFunc("cos", SymbolType::SCALAR, {SymbolType::SCALAR});
 		ctx.AddFunc("sqrt", SymbolType::SCALAR, {SymbolType::SCALAR});
 		ctx.AddFunc("exp", SymbolType::SCALAR, {SymbolType::SCALAR});
-		ctx.AddFunc("puts", SymbolType::VOID, {SymbolType::STRING});
+		ctx.AddFunc("put", SymbolType::VOID, {SymbolType::STRING});
 		ctx.AddFunc("putf", SymbolType::VOID, {SymbolType::SCALAR});
 		ctx.AddFunc("puti", SymbolType::VOID, {SymbolType::INT});
 
@@ -117,6 +117,13 @@ declare i8 @puts(i8*)
 ; -----------------------------------------------------------------------------
 ; runtime functions
 
+; output an int
+define void @put(i8* %val)
+{
+	call i8 @puts(i8* %val)
+	ret void
+}
+
 ; output a float
 define void @putf(double %val)
 {
@@ -140,7 +147,6 @@ define void @puti(i64 %val)
 	call void @putf(double %fval)
 	ret void
 }
-
 
 ; -----------------------------------------------------------------------------
 

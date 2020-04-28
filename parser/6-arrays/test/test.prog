@@ -18,8 +18,26 @@ func test_args(int i, scalar j, scalar k)
 }
 
 
+func test_vec()
+{
+	vec 3 v, w;
+	v = w;
+}
+
+
+func test_str()
+{
+	str i, j;
+	i = j;
+
+	put(i);
+}
+
+
 func start()
 {
 	test_loop();
 	test_args(12, 34., 56.);
+	test_vec();
+	test_str();
 }

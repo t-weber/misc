@@ -37,6 +37,8 @@
 	#include "parser.h"
 	#include <cmath>
 	#include <cstdint>
+
+	#define DEFAULT_STRING_SIZE 128
 }
 
 
@@ -127,7 +129,6 @@ variables[res]
 			std::string symName = context.AddSymbol($name);
 			$res = std::make_shared<ASTVarDecl>();
 			$res->AddVariable(symName);
-			$res = $res;
 		}
 	;
 
@@ -145,22 +146,23 @@ statement[res]
 			context.SetSymType(SymbolType::SCALAR);
 		}
 		variables[vars] ';'	{ $res = $vars; }
-	| VECTORDECL REAL[dim] {
+	| VECTORDECL INT[dim] {
 			context.SetSymType(SymbolType::VECTOR);
-			context.SetSymDims(unsigned($dim));
+			context.SetSymDims(std::size_t($dim));
 		}
 		variables[vars] ';' {
 			$res = $vars;
 		}
-	| MATRIXDECL REAL[dim1] REAL[dim2] {
+	| MATRIXDECL INT[dim1] INT[dim2] {
 			context.SetSymType(SymbolType::MATRIX);
-			context.SetSymDims(unsigned($dim1), unsigned($dim2));
+			context.SetSymDims(std::size_t($dim1), std::size_t($dim2));
 		}
 		variables[vars] ';' {
 			$res = $vars;
 		}
 	| STRINGDECL {
 			context.SetSymType(SymbolType::STRING);
+			context.SetSymDims(std::size_t(DEFAULT_STRING_SIZE));
 		}
 		variables[vars] ';'	{ $res = $vars; }
 	| INTDECL {
@@ -243,31 +245,32 @@ block[res]
 
 
 expr[res]
-	: '(' expr[term] ')'				{ $res = $term; }
+	: '(' expr[term] ')'	{ $res = $term; }
 
 	// unary expressions
 	| '+' expr[term] %prec UNARY_OP		{ $res = $term; }
 	| '-' expr[term] %prec UNARY_OP		{ $res = std::make_shared<ASTUMinus>($term); }
 
 	// binary expressions
-	| expr[term1] '+' expr[term2]		{ $res = std::make_shared<ASTPlus>($term1, $term2, 0); }
-	| expr[term1] '-' expr[term2]		{ $res = std::make_shared<ASTPlus>($term1, $term2, 1); }
-	| expr[term1] '*' expr[term2]		{ $res = std::make_shared<ASTMult>($term1, $term2, 0); }
-	| expr[term1] '/' expr[term2]		{ $res = std::make_shared<ASTMult>($term1, $term2, 1); }
-	| expr[term1] '%' expr[term2]		{ $res = std::make_shared<ASTMod>($term1, $term2); }
-	| expr[term1] '^' expr[term2]		{ $res = std::make_shared<ASTPow>($term1, $term2); }
+	| expr[term1] '+' expr[term2]	{ $res = std::make_shared<ASTPlus>($term1, $term2, 0); }
+	| expr[term1] '-' expr[term2]	{ $res = std::make_shared<ASTPlus>($term1, $term2, 1); }
+	| expr[term1] '*' expr[term2]	{ $res = std::make_shared<ASTMult>($term1, $term2, 0); }
+	| expr[term1] '/' expr[term2]	{ $res = std::make_shared<ASTMult>($term1, $term2, 1); }
+	| expr[term1] '%' expr[term2]	{ $res = std::make_shared<ASTMod>($term1, $term2); }
+	| expr[term1] '^' expr[term2]	{ $res = std::make_shared<ASTPow>($term1, $term2); }
 
 	// comparison expressions
-	| expr[term1] EQU expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::EQU); }
-	| expr[term1] NEQ expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::NEQ); }
-	| expr[term1] GT expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GT); }
-	| expr[term1] LT expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LT); }
-	| expr[term1] GEQ expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GEQ); }
-	| expr[term1] LEQ expr[term2]		{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LEQ); }
+	| expr[term1] EQU expr[term2]	{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::EQU); }
+	| expr[term1] NEQ expr[term2]	{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::NEQ); }
+	| expr[term1] GT expr[term2]	{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GT); }
+	| expr[term1] LT expr[term2]	{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LT); }
+	| expr[term1] GEQ expr[term2]	{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::GEQ); }
+	| expr[term1] LEQ expr[term2]	{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LEQ); }
 
 	// constants
-	| REAL[num]			{ $res = std::make_shared<ASTRealConst>($num); }
-	| INT[num]			{ $res = std::make_shared<ASTIntConst>($num); }
+	| REAL[num]		{ $res = std::make_shared<ASTRealConst>($num); }
+	| INT[num]		{ $res = std::make_shared<ASTIntConst>($num); }
+	| STRING[str]	{ $res = std::make_shared<ASTStrConst>($str); }
 
 	// variable
 	| IDENT[ident]		{ $res = std::make_shared<ASTVar>($ident); }

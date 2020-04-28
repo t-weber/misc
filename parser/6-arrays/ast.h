@@ -22,13 +22,12 @@
 class AST;
 class ASTUMinus;
 class ASTPlus;
-class ASTMinus;
 class ASTMult;
-class ASTDiv;
 class ASTMod;
 class ASTPow;
 class ASTRealConst;
 class ASTIntConst;
+class ASTStrConst;
 class ASTVar;
 class ASTStmts;
 class ASTVarDecl;
@@ -62,6 +61,7 @@ public:
 	virtual t_astret visit(const ASTPow* ast) = 0;
 	virtual t_astret visit(const ASTRealConst* ast) = 0;
 	virtual t_astret visit(const ASTIntConst* ast) = 0;
+	virtual t_astret visit(const ASTStrConst* ast) = 0;
 	virtual t_astret visit(const ASTVar* ast) = 0;
 	virtual t_astret visit(const ASTStmts* ast) = 0;
 	virtual t_astret visit(const ASTVarDecl* ast) = 0;
@@ -209,6 +209,21 @@ public:
 
 private:
 	std::int64_t val{};
+};
+
+
+class ASTStrConst : public AST
+{
+public:
+	ASTStrConst(const std::string& str) : val{str}
+	{}
+
+	const std::string& GetVal() const { return val; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::string val;
 };
 
 
