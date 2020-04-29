@@ -243,61 +243,6 @@ t_astret LLAsm::visit(const ASTPow* ast)
 }
 
 
-t_astret LLAsm::visit(const ASTRealConst* ast)
-{
-	double val = ast->GetVal();
-
-	// TODO: find a better way to assign a temporary variable
-	t_astret retvar = get_tmp_var(SymbolType::SCALAR);
-	t_astret retvar2 = get_tmp_var(SymbolType::SCALAR);
-	(*m_ostr) << "%" << retvar->name << " = alloca double\n";
-	(*m_ostr) << "store double " << std::scientific << val << ", double* %" << retvar->name << "\n";
-	(*m_ostr) << "%" << retvar2->name << " = load double, double* %" << retvar->name << "\n";
-
-	return retvar2;
-}
-
-
-t_astret LLAsm::visit(const ASTIntConst* ast)
-{
-	std::int64_t val = ast->GetVal();
-
-	// TODO: find a better way to assign a temporary variable
-	t_astret retvar = get_tmp_var(SymbolType::INT);
-	t_astret retvar2 = get_tmp_var(SymbolType::INT);
-	(*m_ostr) << "%" << retvar->name << " = alloca i64\n";
-	(*m_ostr) << "store i64 " << val << ", i64* %" << retvar->name << "\n";
-	(*m_ostr) << "%" << retvar2->name << " = load i64, i64* %" << retvar->name << "\n";
-
-	return retvar2;
-}
-
-
-t_astret LLAsm::visit(const ASTStrConst* ast)
-{
-	const std::string& str = ast->GetVal();
-	std::size_t dim = str.length()+1;
-
-	std::array<std::size_t, 2> dims{{dim, 0}};
-	t_astret str_mem = get_tmp_var(SymbolType::STRING, &dims);
-
-	// allocate the string's memory
-	(*m_ostr) << "%" << str_mem->name << " = alloca [" << dim << " x i8]\n";
-
-	for(std::size_t idx=0; idx<dim; ++idx)
-	{
-		t_astret ptr = get_tmp_var();
-		(*m_ostr) << "%" << ptr->name << " = getelementptr [" << dim << " x i8], ["
-			<< dim << " x i8]* %" << str_mem->name << ", i64 0, i64 " << idx << "\n";
-
-		int val = (idx<dim-1) ? str[idx] : 0;
-		(*m_ostr) << "store i8 " << val << ", i8* %"  << ptr->name << "\n";
-	}
-
-	return str_mem;
-}
-
-
 t_astret LLAsm::visit(const ASTVar* ast)
 {
 	t_astret sym = get_sym(ast->GetIdent());
@@ -746,4 +691,86 @@ t_astret LLAsm::visit(const ASTLoop* ast)
 	(*m_ostr) << labelEnd << ":  ; loop end\n";
 
 	return nullptr;
+}
+
+
+t_astret LLAsm::visit(const ASTNumConst<double>* ast)
+{
+	double val = ast->GetVal();
+
+	t_astret retvar = get_tmp_var(SymbolType::SCALAR);
+	t_astret retvar2 = get_tmp_var(SymbolType::SCALAR);
+	(*m_ostr) << "%" << retvar->name << " = alloca double\n";
+	(*m_ostr) << "store double " << std::scientific << val << ", double* %" << retvar->name << "\n";
+	(*m_ostr) << "%" << retvar2->name << " = load double, double* %" << retvar->name << "\n";
+
+	return retvar2;
+}
+
+
+t_astret LLAsm::visit(const ASTNumConst<std::int64_t>* ast)
+{
+	std::int64_t val = ast->GetVal();
+
+	t_astret retvar = get_tmp_var(SymbolType::INT);
+	t_astret retvar2 = get_tmp_var(SymbolType::INT);
+	(*m_ostr) << "%" << retvar->name << " = alloca i64\n";
+	(*m_ostr) << "store i64 " << val << ", i64* %" << retvar->name << "\n";
+	(*m_ostr) << "%" << retvar2->name << " = load i64, i64* %" << retvar->name << "\n";
+
+	return retvar2;
+}
+
+
+t_astret LLAsm::visit(const ASTStrConst* ast)
+{
+	const std::string& str = ast->GetVal();
+	std::size_t dim = str.length()+1;
+
+	std::array<std::size_t, 2> dims{{dim, 0}};
+	t_astret str_mem = get_tmp_var(SymbolType::STRING, &dims);
+
+	// allocate the string's memory
+	(*m_ostr) << "%" << str_mem->name << " = alloca [" << dim << " x i8]\n";
+
+	// set the individual chars
+	for(std::size_t idx=0; idx<dim; ++idx)
+	{
+		t_astret ptr = get_tmp_var();
+		(*m_ostr) << "%" << ptr->name << " = getelementptr [" << dim << " x i8], ["
+		<< dim << " x i8]* %" << str_mem->name << ", i64 0, i64 " << idx << "\n";
+
+		int val = (idx<dim-1) ? str[idx] : 0;
+		(*m_ostr) << "store i8 " << val << ", i8* %"  << ptr->name << "\n";
+	}
+
+	return str_mem;
+}
+
+
+t_astret LLAsm::visit(const ASTNumList<double>* ast)
+{
+	// array values and size
+	const auto& lst = ast->GetList();
+	std::size_t len = lst.size();
+	std::array<std::size_t, 2> dims{{len, 0}};
+
+	// allocate double array
+	t_astret vec_mem = get_tmp_var(SymbolType::VECTOR, &dims);
+	(*m_ostr) << "%" << vec_mem->name << " = alloca [" << len << " x double]\n";
+
+	// set the individual array elements
+	auto iter = lst.begin();
+	for(std::size_t idx=0; idx<len; ++idx)
+	{
+		t_astret ptr = get_tmp_var();
+		(*m_ostr) << "%" << ptr->name << " = getelementptr [" << len << " x double], ["
+			<< len << " x double]* %" << vec_mem->name << ", i64 0, i64 " << idx << "\n";
+
+		double val = *iter;
+		(*m_ostr) << "store double " << val << ", double* %"  << ptr->name << "\n";
+		++iter;
+	}
+
+	return vec_mem;
 }

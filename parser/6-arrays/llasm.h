@@ -29,9 +29,6 @@ public:
 	virtual t_astret visit(const ASTMult* ast) override;
 	virtual t_astret visit(const ASTMod* ast) override;
 	virtual t_astret visit(const ASTPow* ast) override;
-	virtual t_astret visit(const ASTRealConst* ast) override;
-	virtual t_astret visit(const ASTIntConst* ast) override;
-	virtual t_astret visit(const ASTStrConst* ast) override;
 	virtual t_astret visit(const ASTVar* ast) override;
 	virtual t_astret visit(const ASTCall* ast) override;
 	virtual t_astret visit(const ASTStmts* ast) override;
@@ -42,6 +39,10 @@ public:
 	virtual t_astret visit(const ASTComp* ast) override;
 	virtual t_astret visit(const ASTCond* ast) override;
 	virtual t_astret visit(const ASTLoop* ast) override;
+	virtual t_astret visit(const ASTStrConst* ast) override;
+	virtual t_astret visit(const ASTNumConst<double>* ast) override;
+	virtual t_astret visit(const ASTNumConst<std::int64_t>* ast) override;
+	virtual t_astret visit(const ASTNumList<double>* ast) override;
 
 
 	// ------------------------------------------------------------------------

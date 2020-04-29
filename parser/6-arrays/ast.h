@@ -25,8 +25,6 @@ class ASTPlus;
 class ASTMult;
 class ASTMod;
 class ASTPow;
-class ASTRealConst;
-class ASTIntConst;
 class ASTStrConst;
 class ASTVar;
 class ASTStmts;
@@ -41,6 +39,8 @@ class ASTAssign;
 class ASTComp;
 class ASTCond;
 class ASTLoop;
+template<class> class ASTNumConst;
+template<class> class ASTNumList;
 
 
 using t_astret = const Symbol*;
@@ -59,9 +59,6 @@ public:
 	virtual t_astret visit(const ASTMult* ast) = 0;
 	virtual t_astret visit(const ASTMod* ast) = 0;
 	virtual t_astret visit(const ASTPow* ast) = 0;
-	virtual t_astret visit(const ASTRealConst* ast) = 0;
-	virtual t_astret visit(const ASTIntConst* ast) = 0;
-	virtual t_astret visit(const ASTStrConst* ast) = 0;
 	virtual t_astret visit(const ASTVar* ast) = 0;
 	virtual t_astret visit(const ASTStmts* ast) = 0;
 	virtual t_astret visit(const ASTVarDecl* ast) = 0;
@@ -75,6 +72,10 @@ public:
 	virtual t_astret visit(const ASTComp* ast) = 0;
 	virtual t_astret visit(const ASTCond* ast) = 0;
 	virtual t_astret visit(const ASTLoop* ast) = 0;
+	virtual t_astret visit(const ASTStrConst* ast) = 0;
+	virtual t_astret visit(const ASTNumConst<double>* ast) = 0;
+	virtual t_astret visit(const ASTNumConst<std::int64_t>* ast) = 0;
+	virtual t_astret visit(const ASTNumList<double>* ast) = 0;
 };
 
 
@@ -179,51 +180,6 @@ public:
 
 private:
 	std::shared_ptr<AST> term1, term2;
-};
-
-
-class ASTRealConst : public AST
-{
-public:
-	ASTRealConst(double val) : val{val}
-	{}
-
-	double GetVal() const { return val; }
-
-	ASTVISITOR_ACCEPT
-
-private:
-	double val{};
-};
-
-
-class ASTIntConst : public AST
-{
-public:
-	ASTIntConst(std::int64_t val) : val{val}
-	{}
-
-	std::int64_t GetVal() const { return val; }
-
-	ASTVISITOR_ACCEPT
-
-private:
-	std::int64_t val{};
-};
-
-
-class ASTStrConst : public AST
-{
-public:
-	ASTStrConst(const std::string& str) : val{str}
-	{}
-
-	const std::string& GetVal() const { return val; }
-
-	ASTVISITOR_ACCEPT
-
-private:
-	std::string val;
 };
 
 
@@ -506,6 +462,61 @@ public:
 
 private:
 	std::shared_ptr<AST> cond, stmt;
+};
+
+
+template<class t_num>
+class ASTNumConst : public AST
+{
+public:
+	ASTNumConst(t_num val) : val{val}
+	{}
+
+	t_num GetVal() const { return val; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	t_num val{};
+};
+
+
+class ASTStrConst : public AST
+{
+public:
+	ASTStrConst(const std::string& str) : val{str}
+	{}
+
+	const std::string& GetVal() const { return val; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::string val;
+};
+
+
+template<class t_num = double>
+class ASTNumList : public AST
+{
+public:
+	ASTNumList()
+	{}
+
+	void AddNum(t_num num)
+	{
+		nums.push_front(num);
+	}
+
+	const std::list<t_num>& GetList() const
+	{
+		return nums;
+	}
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::list<t_num> nums;
 };
 
 

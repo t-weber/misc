@@ -83,6 +83,7 @@
 %type<std::shared_ptr<ASTStmts>> block
 %type<std::shared_ptr<ASTFunc>> function
 %type<std::shared_ptr<ASTTypeDecl>> typedecl
+%type<std::shared_ptr<ASTNumList<double>>> numlist
 
 
 // precedences and left/right-associativity
@@ -231,10 +232,19 @@ argumentnames[res]
 
 
 arguments[res]
-	: expr[arg] ',' arguments[lst]		{ $lst->AddArgument($arg); $res = $lst; }
+	: expr[arg] ',' arguments[lst]	{ $lst->AddArgument($arg); $res = $lst; }
 	| expr[arg]	{
 			$res = std::make_shared<ASTArgs>();
 			$res->AddArgument($arg);
+		}
+	;
+
+
+numlist[res]
+	: REAL[num] ',' numlist[lst]	{ $lst->AddNum($num); $res = $lst; }
+	| REAL[num] {
+			$res = std::make_shared<ASTNumList<double>>();
+			$res->AddNum($num);
 		}
 	;
 
@@ -268,9 +278,10 @@ expr[res]
 	| expr[term1] LEQ expr[term2]	{ $res = std::make_shared<ASTComp>($term1, $term2, ASTComp::LEQ); }
 
 	// constants
-	| REAL[num]		{ $res = std::make_shared<ASTRealConst>($num); }
-	| INT[num]		{ $res = std::make_shared<ASTIntConst>($num); }
+	| REAL[num]		{ $res = std::make_shared<ASTNumConst<double>>($num); }
+	| INT[num]		{ $res = std::make_shared<ASTNumConst<std::int64_t>>($num); }
 	| STRING[str]	{ $res = std::make_shared<ASTStrConst>($str); }
+	| '[' numlist[arr] ']'	{ $res = $arr; }
 
 	// variable
 	| IDENT[ident]		{ $res = std::make_shared<ASTVar>($ident); }
