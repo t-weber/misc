@@ -49,7 +49,7 @@ message("Bison output header: ${BISON_parser_impl_OUTPUT_HEADER}")
 
 
 add_executable(parser
-	parser.cpp parser.h ast.h sym.h llasm.h
+	parser.cpp parser.h ast.h sym.h llasm.cpp llasm.h
 	${FLEX_lexer_impl_OUTPUTS}
 	${BISON_parser_impl_OUTPUT_SOURCE} ${BISON_parser_impl_OUTPUT_HEADER}
 )
