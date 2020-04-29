@@ -285,12 +285,26 @@ public:
 
 	virtual t_astret visit(const ASTStrConst* ast) override
 	{
-		const std::string& val = ast->GetVal();
+		const std::string& str = ast->GetVal();
+		std::size_t dim = str.length()+1;
 
-		// TODO
-		t_astret retvar = get_tmp_var(SymbolType::STRING);
+		std::array<std::size_t, 2> dims{{dim, 0}};
+		t_astret str_mem = get_tmp_var(SymbolType::STRING, &dims);
 
-		return retvar;
+		// allocate the string's memory
+		(*m_ostr) << "%" << str_mem->name << " = alloca [" << dim << " x i8]\n";
+
+		for(std::size_t idx=0; idx<dim; ++idx)
+		{
+			t_astret ptr = get_tmp_var();
+			(*m_ostr) << "%" << ptr->name << " = getelementptr [" << dim << " x i8], ["
+				<< dim << " x i8]* %" << str_mem->name << ", i64 0, i64 " << idx << "\n";
+
+			int val = (idx<dim-1) ? str[idx] : 0;
+			(*m_ostr) << "store i8 " << val << ", i8* %"  << ptr->name << "\n";
+		}
+
+		return str_mem;
 	}
 
 
@@ -344,8 +358,23 @@ public:
 
 			// cast if needed
 			t_astret arg_casted = convert_sym(arg, func->argty[_idx]);
+			if(arg_casted->ty == SymbolType::STRING)
+			{
+				// string arguments are of type i8*, so use a pointer to the string's array
+				t_astret strptr = get_tmp_var(arg_casted->ty, &arg_casted->dims);
 
-			args.push_back(arg_casted);
+				(*m_ostr) << "%" << strptr->name << " = getelementptr ["
+					<< std::get<0>(arg_casted->dims) << " x i8], ["
+					<< std::get<0>(arg_casted->dims) << " x i8]* %"
+					<< arg_casted->name << ", i64 0, i64 0\n";
+
+				args.push_back(strptr);
+			}
+			else
+			{
+				args.push_back(arg_casted);
+			}
+
 			++_idx;
 		}
 
@@ -396,25 +425,22 @@ public:
 					dim *= std::get<1>(sym->dims);
 
 				// allocate the array's memory
-				(*m_ostr) << "%__arr_" << sym->name << " = alloca [" << dim << " x double]\n";
-
-				// only use a pointer to the array
-				(*m_ostr) << "%" << sym->name << " = getelementptr [" << dim << " x double], ["
-					<< dim << " x double]* %__arr_" << sym->name << ", i64 0, i64 0\n";
+				(*m_ostr) << "%" << sym->name << " = alloca [" << dim << " x double]\n";
 			}
 			else if(sym->ty == SymbolType::STRING)
 			{
 				std::size_t dim = std::get<0>(sym->dims);
 
 				// allocate the string's memory
-				(*m_ostr) << "%__str_" << sym->name << " = alloca [" << dim << " x i8]\n";
+				(*m_ostr) << "%" << sym->name << " = alloca [" << dim << " x i8]\n";
 
-				// only use a pointer to the string
-				(*m_ostr) << "%" << sym->name << " = getelementptr [" << dim << " x i8], ["
-					<< dim << " x i8]* %__str_" << sym->name << ", i64 0, i64 0\n";
+				// get a pointer to the string
+				t_astret strptr = get_tmp_var();
+				(*m_ostr) << "%" << strptr->name << " = getelementptr [" << dim << " x i8], ["
+					<< dim << " x i8]* %" << sym->name << ", i64 0, i64 0\n";
 
 				// set first element to zero
-				(*m_ostr) << "store i8 0, i8* %"  << sym->name << "\n";
+				(*m_ostr) << "store i8 0, i8* %"  << strptr->name << "\n";
 			}
 			else
 			{
@@ -514,12 +540,6 @@ public:
 		{
 			std::string ty = get_type_name(expr->ty);
 			(*m_ostr) << "store " << ty << " %" << expr->name << ", "<< ty << "* %" << var << "\n";
-
-			// return a r-value if the variable is further needed
-			t_astret retvar = get_tmp_var(expr->ty, &expr->dims);
-			(*m_ostr) << "%" << retvar->name << " = load " << ty << ", " << ty << "* %" << var << "\n";
-
-			return retvar;
 		}
 		else if(sym->ty == SymbolType::VECTOR || sym->ty == SymbolType::MATRIX)
 		{
@@ -562,10 +582,10 @@ public:
 			// loop statements
 			t_astret elemptr_src = get_tmp_var(SymbolType::STRING);
 			(*m_ostr) << "%" << elemptr_src->name << " = getelementptr [" << dim << " x double], ["
-				<< dim << " x double]* %__arr_" << expr->name << ", i64 0, i64 %" << ctrval->name << "\n";
+				<< dim << " x double]* %" << expr->name << ", i64 0, i64 %" << ctrval->name << "\n";
 			t_astret elemptr_dst = get_tmp_var(SymbolType::STRING);
 			(*m_ostr) << "%" << elemptr_dst->name << " = getelementptr [" << dim << " x double], ["
-				<< dim << " x double]* %__arr_" << sym->name << ", i64 0, i64 %" << ctrval->name << "\n";
+				<< dim << " x double]* %" << sym->name << ", i64 0, i64 %" << ctrval->name << "\n";
 			t_astret elem_src = get_tmp_var(SymbolType::STRING);
 			(*m_ostr) << "%" << elem_src->name << " = load double, double* %" << elemptr_src->name << "\n";
 
@@ -582,9 +602,11 @@ public:
 		}
 		else if(sym->ty == SymbolType::STRING)
 		{
-			std::size_t dim = std::get<0>(expr->dims);
-			if(dim != std::get<0>(sym->dims))
-				throw std::runtime_error("Dimension mismatch in assignment of \"" + sym->name + "\".");
+			std::size_t src_dim = std::get<0>(expr->dims);
+			std::size_t dst_dim = std::get<0>(sym->dims);
+			if(src_dim > dst_dim)
+				throw std::runtime_error("Buffer of string \"" + sym->name + "\" is not large enough.");
+			std::size_t dim = std::min(src_dim, dst_dim);
 
 			// copy elements in a loop
 			std::string labelStart = get_label();
@@ -612,11 +634,11 @@ public:
 			// ---------------
 			// loop statements
 			t_astret elemptr_src = get_tmp_var(SymbolType::STRING);
-			(*m_ostr) << "%" << elemptr_src->name << " = getelementptr [" << dim << " x i8], ["
-				<< dim << " x i8]* %__str_" << expr->name << ", i64 0, i64 %" << ctrval->name << "\n";
+			(*m_ostr) << "%" << elemptr_src->name << " = getelementptr [" << src_dim << " x i8], ["
+				<< src_dim << " x i8]* %" << expr->name << ", i64 0, i64 %" << ctrval->name << "\n";
 			t_astret elemptr_dst = get_tmp_var(SymbolType::STRING);
-			(*m_ostr) << "%" << elemptr_dst->name << " = getelementptr [" << dim << " x i8], ["
-				<< dim << " x i8]* %__str_" << sym->name << ", i64 0, i64 %" << ctrval->name << "\n";
+			(*m_ostr) << "%" << elemptr_dst->name << " = getelementptr [" << dst_dim << " x i8], ["
+				<< dst_dim << " x i8]* %" << sym->name << ", i64 0, i64 %" << ctrval->name << "\n";
 			t_astret elem_src = get_tmp_var(SymbolType::STRING);
 				(*m_ostr) << "%" << elem_src->name << " = load i8, i8* %" << elemptr_src->name << "\n";
 
@@ -632,8 +654,7 @@ public:
 			(*m_ostr) << labelEnd << ":  ; loop end\n";
 		}
 
-		// TODO: other types
-		return nullptr;
+		return expr;
 	}
 
 

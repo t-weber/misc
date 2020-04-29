@@ -6,15 +6,15 @@ func test_loop()
 	loop i<16 do
 		i = i+1;
 
-	puti(i);
+	putint(i);
 }
 
 
 func test_args(int i, scalar j, scalar k)
 {
-	puti(i);
-	putf(j);
-	putf(k);
+	putint(i);
+	putflt(j);
+	putflt(k);
 }
 
 
@@ -28,9 +28,12 @@ func test_vec()
 func test_str()
 {
 	str i, j;
-	i = j;
 
-	put(i);
+	i = "Test 123";
+	j = i;
+
+	putstr(i);
+	putstr(j);
 }
 
 

@@ -18,6 +18,6 @@ func int fac(int n)
 
 func start()
 {
-	puti(fac(5));
-	puti(fibo(16));
+	putint(fac(5));
+	putint(fibo(16));
 }

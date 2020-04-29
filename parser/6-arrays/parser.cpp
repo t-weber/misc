@@ -76,9 +76,9 @@ int main(int argc, char** argv)
 		ctx.AddFunc("cos", SymbolType::SCALAR, {SymbolType::SCALAR});
 		ctx.AddFunc("sqrt", SymbolType::SCALAR, {SymbolType::SCALAR});
 		ctx.AddFunc("exp", SymbolType::SCALAR, {SymbolType::SCALAR});
-		ctx.AddFunc("put", SymbolType::VOID, {SymbolType::STRING});
-		ctx.AddFunc("putf", SymbolType::VOID, {SymbolType::SCALAR});
-		ctx.AddFunc("puti", SymbolType::VOID, {SymbolType::INT});
+		ctx.AddFunc("putstr", SymbolType::VOID, {SymbolType::STRING});
+		ctx.AddFunc("putflt", SymbolType::VOID, {SymbolType::SCALAR});
+		ctx.AddFunc("putint", SymbolType::VOID, {SymbolType::INT});
 
 		yy::Parser parser(ctx);
 		int res = parser.parse();
@@ -118,14 +118,14 @@ declare i8 @puts(i8*)
 ; runtime functions
 
 ; output an int
-define void @put(i8* %val)
+define void @putstr(i8* %val)
 {
 	call i8 @puts(i8* %val)
 	ret void
 }
 
 ; output a float
-define void @putf(double %val)
+define void @putflt(double %val)
 {
 	; convert to string
 	%strval = alloca [64 x i8]
@@ -133,18 +133,18 @@ define void @putf(double %val)
 	call i8* @gcvt(double %val, i32 6, i8* %strvalptr)
 
 	; output string
-	call i8 @puts(i8* %strvalptr)
+	call void @putstr(i8* %strvalptr)
 	ret void
 }
 
 ; output an int
-define void @puti(i64 %val)
+define void @putint(i64 %val)
 {
 	; convert to float
 	%fval = sitofp i64 %val to double
 
 	; output string
-	call void @putf(double %fval)
+	call void @putflt(double %fval)
 	ret void
 }
 
