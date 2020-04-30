@@ -9,3 +9,6 @@ rm -f lexer_impl.h
 
 rm -rf test.asm
 rm -rf test.asm.bc
+rm -rf test.asm.s
+rm -rf test.asm.o
+rm -f 0

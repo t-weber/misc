@@ -145,24 +145,167 @@ t_astret LLAsm::visit(const ASTPlus* ast)
 	t_astret term1 = ast->GetTerm1()->accept(this);
 	t_astret term2 = ast->GetTerm2()->accept(this);
 
-	// cast if needed
-	SymbolType ty = term1->ty;
-	if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
-		ty = SymbolType::SCALAR;
-	t_astret var = get_tmp_var(ty, &term1->dims);
+	// array types
+	if(term1->ty == SymbolType::VECTOR || term1->ty == SymbolType::MATRIX)
+	{
+		if(term2->ty != term1->ty)
+		{
+			throw std::runtime_error("Type mismatch in addition/subtraction of \""
+				+ term1->name + "\" and \"" + term2->name + "\".");
+		}
 
-	term1 = convert_sym(term1, ty);
-	term2 = convert_sym(term2, ty);
+		if(std::get<0>(term1->dims) != std::get<0>(term2->dims))
+		{
+			throw std::runtime_error("Dimension mismatch in addition/subtraction of \""
+				+ term1->name + "\" and \"" + term2->name + "\".");
+		}
 
+		std::size_t dim = std::get<0>(term1->dims);
+		if(term1->ty == SymbolType::MATRIX)
+		{
+			throw std::runtime_error("Dimension mismatch in addition/subtraction of \""
+				+ term1->name + "\" and \"" + term2->name + "\".");
 
-	std::string op = ast->IsInverted() ? "sub" : "add";
-	if(ty == SymbolType::SCALAR)
-		op = "f" + op;
+			dim *= std::get<1>(term1->dims);
+		}
 
-	(*m_ostr) << "%" << var->name << " = " << op << " "
-		<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
+		// allocate double array for result
+		t_astret vec_mem = get_tmp_var(term1->ty, &term1->dims);
+		(*m_ostr) << "%" << vec_mem->name << " = alloca [" << dim << " x double]\n";
 
-	return var;
+		std::string op = ast->IsInverted() ? "fsub" : "fadd";
+
+		// copy elements in a loop
+		std::string labelStart = get_label();
+		std::string labelBegin = get_label();
+		std::string labelEnd = get_label();
+
+		// loop counter
+		t_astret ctr = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctr->name << " = alloca i64\n";
+		(*m_ostr) << "store i64 0, i64* %" << ctr->name << "\n";
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelStart << ":  ; loop start\n";
+
+		// loop condition: ctr < dim
+		t_astret ctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctrval->name << " = load i64, i64* %" << ctr->name << "\n";
+
+		t_astret cond = get_tmp_var();
+		(*m_ostr) << "%" << cond->name << " = icmp slt i64 %" << ctrval->name <<  ", " << dim << "\n";
+		(*m_ostr) << "br i1 %" << cond->name << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+		(*m_ostr) << labelBegin << ":  ; loop begin\n";
+
+		// ---------------
+		// loop statements
+		t_astret elemptr_src1 = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_src1->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << term1->name << ", i64 0, i64 %" << ctrval->name << "\n";
+		t_astret elemptr_src2 = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_src2->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << term2->name << ", i64 0, i64 %" << ctrval->name << "\n";
+
+		t_astret elem_src1 = get_tmp_var();
+		(*m_ostr) << "%" << elem_src1->name << " = load double, double* %" << elemptr_src1->name << "\n";
+		t_astret elem_src2 = get_tmp_var();
+		(*m_ostr) << "%" << elem_src2->name << " = load double, double* %" << elemptr_src2->name << "\n";
+
+		t_astret elemptr_dst = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_dst->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << vec_mem->name << ", i64 0, i64 %" << ctrval->name << "\n";
+
+		// add/subtract
+		t_astret elem_dst = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << elem_dst->name << " = " << op << " "
+			<< "double %" << elem_src1->name << ", %" << elem_src2->name << "\n";
+
+		// save result in array
+		(*m_ostr) << "store double %" << elem_dst->name << ", double* %" << elemptr_dst->name << "\n";
+
+		// increment counter
+		t_astret newctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << newctrval->name << " = add i64 %" << ctrval->name << ", 1\n";
+		(*m_ostr) << "store i64 %" << newctrval->name << ", i64* %" << ctr->name << "\n";
+		// ---------------
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelEnd << ":  ; loop end\n";
+
+		return vec_mem;
+	}
+
+	// concatenate strings, TODO: conversion in case one term is not of string type
+	else if(term1->ty == SymbolType::STRING || term2->ty == SymbolType::STRING)
+	{
+		/* get individual and total string lengths
+		t_astret len1 = get_tmp_var(SymbolType::INT);
+		t_astret len2 = get_tmp_var(SymbolType::INT);
+		t_astret len = get_tmp_var(SymbolType::INT);
+		t_astret len_arr = get_tmp_var(SymbolType::INT);
+
+		(*m_ostr) << "%" << len1->name << " = " << "call i64 @strlen(i8* %" << strptr1->name << ")\n";
+		(*m_ostr) << "%" << len2->name << " = " << "call i64 @strlen(i8* %" << strptr2->name << ")\n";
+		(*m_ostr) << "%" << len->name << " = " << "add %" << len1->name << ", %" << len2->name << "\n";
+		(*m_ostr) << "%" << len_arr->name << " = " << "add %" << len->name << ", 1\n";
+		*/
+
+		// get string pointers
+		t_astret strptr1 = get_tmp_var();
+		t_astret strptr2 = get_tmp_var();
+		(*m_ostr) << "%" << strptr1->name << " = getelementptr [" << std::get<0>(term1->dims) << " x i8], ["
+			<< std::get<0>(term1->dims) << " x i8]* %" << term1->name << ", i64 0, i64 0\n";
+		(*m_ostr) << "%" << strptr2->name << " = getelementptr [" << std::get<0>(term2->dims) << " x i8], ["
+			<< std::get<0>(term2->dims) << " x i8]* %" << term2->name << ", i64 0, i64 0\n";
+
+		// allocate memory for concatenated string
+		std::array<std::size_t, 2> dim{{ std::get<0>(term1->dims)+std::get<0>(term2->dims)-1, 0 }};
+		t_astret res = get_tmp_var(SymbolType::STRING, &dim);
+
+		// allocate the concatenated string's memory
+		// TODO: use actual new string size, not the (maximum) allocated sizes of the terms in "dim"
+		(*m_ostr) << "%" << res->name << " = alloca [" << std::get<0>(dim) << " x i8]\n";
+
+		// get a pointer to the concatenated string
+		t_astret resptr = get_tmp_var();
+		(*m_ostr) << "%" << resptr->name << " = getelementptr [" << std::get<0>(dim) << " x i8], ["
+			<< std::get<0>(dim) << " x i8]* %" << res->name << ", i64 0, i64 0\n";
+
+		// copy first string
+		(*m_ostr) << "call i8* @strncpy(i8* %" << resptr->name << ", i8* %" << strptr1->name
+			<< ", i64 " << std::get<0>(dim) << ")\n";
+
+		// concatenate second string
+		(*m_ostr) << "call i8* @strncat(i8* %" << resptr->name << ", i8* %" << strptr2->name
+			<< ", i64 " << std::get<0>(dim) << ")\n";
+
+		return res;
+	}
+
+	// scalar types
+	else
+	{
+		// cast if needed
+		SymbolType ty = term1->ty;
+		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
+			ty = SymbolType::SCALAR;
+		t_astret var = get_tmp_var(ty, &term1->dims);
+
+		term1 = convert_sym(term1, ty);
+		term2 = convert_sym(term2, ty);
+
+		std::string op = ast->IsInverted() ? "sub" : "add";
+		if(ty == SymbolType::SCALAR)
+			op = "f" + op;
+
+		(*m_ostr) << "%" << var->name << " = " << op << " "
+			<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
+
+		return var;
+	}
+
+	return nullptr;
 }
 
 
@@ -217,6 +360,7 @@ t_astret LLAsm::visit(const ASTMod* ast)
 
 	(*m_ostr) << "%" << var->name << " = " << op << " "
 		<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
+
 	return var;
 }
 
@@ -239,6 +383,8 @@ t_astret LLAsm::visit(const ASTPow* ast)
 	(*m_ostr) << "%" << var->name << " = call double @pow("
 		<< get_type_name(ty) << " %" << term1->name << ", "
 		<< get_type_name(ty) << " %" << term2->name << ")\n";
+
+
 	return var;
 }
 
@@ -539,8 +685,8 @@ t_astret LLAsm::visit(const ASTAssign* ast)
 	{
 		std::size_t src_dim = std::get<0>(expr->dims);
 		std::size_t dst_dim = std::get<0>(sym->dims);
-		if(src_dim > dst_dim)
-			throw std::runtime_error("Buffer of string \"" + sym->name + "\" is not large enough.");
+		//if(src_dim > dst_dim)	// TODO
+		//	throw std::runtime_error("Buffer of string \"" + sym->name + "\" is not large enough.");
 		std::size_t dim = std::min(src_dim, dst_dim);
 
 		// copy elements in a loop
@@ -568,13 +714,13 @@ t_astret LLAsm::visit(const ASTAssign* ast)
 
 		// ---------------
 		// loop statements
-		t_astret elemptr_src = get_tmp_var(SymbolType::STRING);
+		t_astret elemptr_src = get_tmp_var();
 		(*m_ostr) << "%" << elemptr_src->name << " = getelementptr [" << src_dim << " x i8], ["
 			<< src_dim << " x i8]* %" << expr->name << ", i64 0, i64 %" << ctrval->name << "\n";
-		t_astret elemptr_dst = get_tmp_var(SymbolType::STRING);
+		t_astret elemptr_dst = get_tmp_var();
 		(*m_ostr) << "%" << elemptr_dst->name << " = getelementptr [" << dst_dim << " x i8], ["
 			<< dst_dim << " x i8]* %" << sym->name << ", i64 0, i64 %" << ctrval->name << "\n";
-		t_astret elem_src = get_tmp_var(SymbolType::STRING);
+		t_astret elem_src = get_tmp_var();
 			(*m_ostr) << "%" << elem_src->name << " = load i8, i8* %" << elemptr_src->name << "\n";
 
 		(*m_ostr) << "store i8 %" << elem_src->name << ", i8* %" << elemptr_dst->name << "\n";
@@ -738,7 +884,7 @@ t_astret LLAsm::visit(const ASTStrConst* ast)
 	{
 		t_astret ptr = get_tmp_var();
 		(*m_ostr) << "%" << ptr->name << " = getelementptr [" << dim << " x i8], ["
-		<< dim << " x i8]* %" << str_mem->name << ", i64 0, i64 " << idx << "\n";
+			<< dim << " x i8]* %" << str_mem->name << ", i64 0, i64 " << idx << "\n";
 
 		int val = (idx<dim-1) ? str[idx] : 0;
 		(*m_ostr) << "store i8 " << val << ", i8* %"  << ptr->name << "\n";

@@ -6,6 +6,7 @@
  *
  * Test:
  *   ./parser test/fibo.prog > test.asm && llvm-as test.asm && lli test.asm.bc
+ *   ./parser test/test.prog > test.asm && llvm-as test.asm && llc test.asm.bc&& clang -o 0 test.asm.s
  */
 
 #include <fstream>
@@ -78,6 +79,9 @@ int main(int argc, char** argv)
 		ctx.AddFunc("exp", SymbolType::SCALAR, {SymbolType::SCALAR});
 		ctx.AddFunc("flt_to_str", SymbolType::VOID, {SymbolType::SCALAR, SymbolType::STRING, SymbolType::INT});
 		ctx.AddFunc("int_to_str", SymbolType::VOID, {SymbolType::INT, SymbolType::STRING, SymbolType::INT});
+		ctx.AddFunc("strlen", SymbolType::INT, {SymbolType::STRING});
+		ctx.AddFunc("strncpy", SymbolType::STRING, {SymbolType::STRING, SymbolType::STRING, SymbolType::INT});
+		ctx.AddFunc("strncat", SymbolType::STRING, {SymbolType::STRING, SymbolType::STRING, SymbolType::INT});
 		ctx.AddFunc("putstr", SymbolType::VOID, {SymbolType::STRING});
 		ctx.AddFunc("putflt", SymbolType::VOID, {SymbolType::SCALAR});
 		ctx.AddFunc("putint", SymbolType::VOID, {SymbolType::INT});
@@ -111,6 +115,9 @@ declare double @cos(double)
 declare double @sqrt(double)
 declare double @exp(double)
 
+declare i64 @strlen(i8*)
+declare i8* @strncpy(i8*, i8*, i64)
+declare i8* @strncat(i8*, i8*, i64)
 declare i32 @puts(i8*)
 declare i32 @snprintf(i8*, i64, i8*, ...)
 ; -----------------------------------------------------------------------------

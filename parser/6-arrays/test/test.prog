@@ -20,21 +20,31 @@ func test_args(int i, scalar j, scalar k)
 
 func test_vec()
 {
-	vec 3 v, w;
+	vec 3 v, w, x;
 	v = [1., 2., 3.];
 	v = w;
+
+	x = v + w;
 }
 
 
 func test_str()
 {
-	str i, j;
+	str i, j, k, l;
 
 	i = "Test 123";
 	j = i;
+	k = ", ";
+	l = i + k + j;
 
 	putstr(i);
 	putstr(j);
+	putstr(k);
+
+	putstr(i + k + j);
+	putstr(l);
+
+	putint(strlen(j));
 }
 
 
