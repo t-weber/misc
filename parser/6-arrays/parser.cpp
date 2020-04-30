@@ -76,6 +76,8 @@ int main(int argc, char** argv)
 		ctx.AddFunc("cos", SymbolType::SCALAR, {SymbolType::SCALAR});
 		ctx.AddFunc("sqrt", SymbolType::SCALAR, {SymbolType::SCALAR});
 		ctx.AddFunc("exp", SymbolType::SCALAR, {SymbolType::SCALAR});
+		ctx.AddFunc("flt_to_str", SymbolType::VOID, {SymbolType::SCALAR, SymbolType::STRING, SymbolType::INT});
+		ctx.AddFunc("int_to_str", SymbolType::VOID, {SymbolType::INT, SymbolType::STRING, SymbolType::INT});
 		ctx.AddFunc("putstr", SymbolType::VOID, {SymbolType::STRING});
 		ctx.AddFunc("putflt", SymbolType::VOID, {SymbolType::SCALAR});
 		ctx.AddFunc("putint", SymbolType::VOID, {SymbolType::INT});
@@ -109,18 +111,41 @@ declare double @cos(double)
 declare double @sqrt(double)
 declare double @exp(double)
 
-declare i8* @gcvt(double, i32, i8*)
-declare i8 @puts(i8*)
+declare i32 @puts(i8*)
+declare i32 @snprintf(i8*, i64, i8*, ...)
+; -----------------------------------------------------------------------------
+
+
+; -----------------------------------------------------------------------------
+; constants
+@__strfmt_g = constant [3 x i8] c"%g\00"
+@__strfmt_ld = constant [4 x i8] c"%ld\00"
 ; -----------------------------------------------------------------------------
 
 
 ; -----------------------------------------------------------------------------
 ; runtime functions
 
-; output an int
+; double -> string
+define void @flt_to_str(double %flt, i8* %strptr, i64 %len)
+{
+	%fmtptr = bitcast [3 x i8]* @__strfmt_g to i8*
+	call i32 (i8*, i64, i8*, ...) @snprintf(i8* %strptr, i64 %len, i8* %fmtptr, double %flt)
+	ret void
+}
+
+; int -> string
+define void @int_to_str(i64 %i, i8* %strptr, i64 %len)
+{
+	%fmtptr = bitcast [4 x i8]* @__strfmt_ld to i8*
+	call i32 (i8*, i64, i8*, ...) @snprintf(i8* %strptr, i64 %len, i8* %fmtptr, i64 %i)
+	ret void
+}
+
+; output a string
 define void @putstr(i8* %val)
 {
-	call i8 @puts(i8* %val)
+	call i32 (i8*) @puts(i8* %val)
 	ret void
 }
 
@@ -130,21 +155,23 @@ define void @putflt(double %val)
 	; convert to string
 	%strval = alloca [64 x i8]
 	%strvalptr = bitcast [64 x i8]* %strval to i8*
-	call i8* @gcvt(double %val, i32 6, i8* %strvalptr)
+	call void @flt_to_str(double %val, i8* %strvalptr, i64 64)
 
 	; output string
-	call void @putstr(i8* %strvalptr)
+	call void (i8*) @putstr(i8* %strvalptr)
 	ret void
 }
 
 ; output an int
 define void @putint(i64 %val)
 {
-	; convert to float
-	%fval = sitofp i64 %val to double
+	; convert to string
+	%strval = alloca [64 x i8]
+	%strvalptr = bitcast [64 x i8]* %strval to i8*
+	call void @int_to_str(i64 %val, i8* %strvalptr, i64 64)
 
 	; output string
-	call void @putflt(double %fval)
+	call void (i8*) @putstr(i8* %strvalptr)
 	ret void
 }
 

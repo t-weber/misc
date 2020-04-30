@@ -1,11 +1,13 @@
 -------------------------------------------------------------------------------
 Not all parts of this package are under the same license! See the notes in the
-individual files. Files without any external dependencies are under the 
-EUPLv1.2 (see LICENSE.EUPL). Files using Qt5 or QCustomPlot adhere to their 
-respective GPLv3 license (see LICENSE.GPL)
+individual files. For instance, files using external dependencies like Qt5 or
+QCustomPlot adhere to their respective GPLv3 license (see LICENSE.GPL).
 
 EUPL license compatibility list:
 https://joinup.ec.europa.eu/page/eupl-compatible-open-source-licences
+
+GPL license compatibility list:
+https://www.gnu.org/licenses/license-list.en.html
 -------------------------------------------------------------------------------
 
 
