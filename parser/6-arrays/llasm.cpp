@@ -78,22 +78,39 @@ t_astret LLAsm::convert_sym(t_astret sym, SymbolType ty_to)
 	if(sym->ty == ty_to)
 		return sym;
 
-	std::string op;
-	if(sym->ty == SymbolType::INT and ty_to == SymbolType::SCALAR)
-		op = "sitofp";
-	else if(sym->ty == SymbolType::SCALAR and ty_to == SymbolType::INT)
-		op = "fptosi";
+	// scalar conversions
+	if(ty_to == SymbolType::SCALAR || ty_to == SymbolType::INT)
+	{
+		std::string op;
+		if(sym->ty == SymbolType::INT && ty_to == SymbolType::SCALAR)
+			op = "sitofp";
+		else if(sym->ty == SymbolType::SCALAR && ty_to == SymbolType::INT)
+			op = "fptosi";
 
-	if(op == "")
+		if(op == "")
+			throw std::runtime_error("Invalid type conversion.");
+
+		std::string from = get_type_name(sym->ty);
+		std::string to = get_type_name(ty_to);
+
+		t_astret var = get_tmp_var(ty_to, &sym->dims);
+		(*m_ostr) << "%" << var->name << " = " << op << " " << from << "%" << sym->name << " to " << to << "\n";
+		return var;
+	}
+
+	// conversions to string
+	else if(ty_to == SymbolType::STRING)
+	{
+		// TODO
+	}
+
+	// unknown conversion
+	else
+	{
 		throw std::runtime_error("Invalid type conversion.");
+	}
 
-	std::string from = get_type_name(sym->ty);
-	std::string to = get_type_name(ty_to);
-
-	t_astret var = get_tmp_var(ty_to, &sym->dims);
-	(*m_ostr) << "%" << var->name << " = " << op << " " << from << "%" << sym->name << " to " << to << "\n";
-
-	return var;
+	return nullptr;
 }
 
 
@@ -150,20 +167,20 @@ t_astret LLAsm::visit(const ASTPlus* ast)
 	{
 		if(term2->ty != term1->ty)
 		{
-			throw std::runtime_error("Type mismatch in addition/subtraction of \""
+			throw std::runtime_error("ASTPlus: Type mismatch in addition/subtraction of \""
 				+ term1->name + "\" and \"" + term2->name + "\".");
 		}
 
 		if(std::get<0>(term1->dims) != std::get<0>(term2->dims))
 		{
-			throw std::runtime_error("Dimension mismatch in addition/subtraction of \""
+			throw std::runtime_error("ASTPlus: Dimension mismatch in addition/subtraction of \""
 				+ term1->name + "\" and \"" + term2->name + "\".");
 		}
 
 		std::size_t dim = std::get<0>(term1->dims);
 		if(term1->ty == SymbolType::MATRIX)
 		{
-			throw std::runtime_error("Dimension mismatch in addition/subtraction of \""
+			throw std::runtime_error("ASTPlus: Dimension mismatch in addition/subtraction of \""
 				+ term1->name + "\" and \"" + term2->name + "\".");
 
 			dim *= std::get<1>(term1->dims);
@@ -393,7 +410,7 @@ t_astret LLAsm::visit(const ASTVar* ast)
 {
 	t_astret sym = get_sym(ast->GetIdent());
 	if(sym == nullptr)
-		throw std::runtime_error("Symbol \"" + ast->GetIdent() + "\" not in symbol table.");
+		throw std::runtime_error("ASTVar: Symbol \"" + ast->GetIdent() + "\" not in symbol table.");
 
 	std::string var = std::string{"%"} + sym->name;
 
@@ -414,7 +431,7 @@ t_astret LLAsm::visit(const ASTVar* ast)
 	}
 	else
 	{
-		throw std::runtime_error("Invalid type for visited variable: \"" + sym->name + "\".");
+		throw std::runtime_error("ASTVar: Invalid type for visited variable: \"" + sym->name + "\".");
 	}
 
 	return nullptr;
@@ -426,9 +443,9 @@ t_astret LLAsm::visit(const ASTCall* ast)
 	const std::string& funcname = ast->GetIdent();
 	t_astret func = get_sym(funcname);
 	if(func == nullptr)
-		throw std::runtime_error("Function \"" + funcname + "\" not in symbol table.");
+		throw std::runtime_error("ASTCall: Function \"" + funcname + "\" not in symbol table.");
 	if(ast->GetArgumentList().size() != func->argty.size())
-		throw std::runtime_error("Invalid number of function parameters for \"" + funcname + "\".");
+		throw std::runtime_error("ASTCall: Invalid number of function parameters for \"" + funcname + "\".");
 
 	std::vector<t_astret> args;
 
@@ -525,7 +542,7 @@ t_astret LLAsm::visit(const ASTVarDecl* ast)
 		}
 		else
 		{
-			throw std::runtime_error("Invalid type in declaration: \"" + sym->name + "\".");
+			throw std::runtime_error("ASTVarDecl: Invalid type in declaration: \"" + sym->name + "\".");
 		}
 	}
 
@@ -542,9 +559,9 @@ t_astret LLAsm::visit(const ASTFunc* ast)
 
 	auto argnames = ast->GetArgNames();
 	std::size_t idx=0;
-	for(const auto& [argname, argtype] : argnames)
+	for(const auto& [argname, argtype, dim1, dim2] : argnames)
 	{
-		const std::string arg = std::string{"f_"} + argname;
+		const std::string arg = std::string{"__arg_"} + argname;
 		(*m_ostr) << get_type_name(argtype) << " %" << arg;
 		if(idx < argnames.size()-1)
 			(*m_ostr) << ", ";
@@ -554,23 +571,45 @@ t_astret LLAsm::visit(const ASTFunc* ast)
 
 
 	// create local copies of the arguments
-	for(const auto& [argname, argtype] : argnames)
+	for(const auto& [argname, argtype, dim1, dim2] : argnames)
 	{
+		const std::string arg = std::string{"__arg_"} + argname;
+		std::array<std::size_t, 2> argdims{{dim1, 0}};
+
+		t_astret symcpy = get_tmp_var(argtype, &argdims, &argname);
+
 		if(argtype == SymbolType::SCALAR || argtype == SymbolType::INT)
 		{
-			const std::string arg = std::string{"f_"} + argname;
-			t_astret symcpy = get_tmp_var(argtype, nullptr, &argname);
-
 			std::string ty = get_type_name(argtype);
 			(*m_ostr) << "%" << symcpy->name << " = alloca " << ty << "\n";
 			(*m_ostr) << "store " << ty << " %" << arg << ", " << ty << "* %" << symcpy->name << "\n";
 		}
+		else if(argtype == SymbolType::STRING)
+		{
+			// allocate memory for local string copy
+			(*m_ostr) << "%" << symcpy->name << " = alloca [" << std::get<0>(argdims) << " x i8]\n";
 
-		// TODO: other argument types
+			t_astret strptr = get_tmp_var();
+			(*m_ostr) << "%" << strptr->name << " = getelementptr [" << std::get<0>(argdims) << " x i8], ["
+				<< std::get<0>(argdims) << " x i8]* %" << symcpy->name << ", i64 0, i64 0\n";
+
+			// copy string
+			(*m_ostr) << "call i8* @strncpy(i8* %" << strptr->name << ", i8* %" << arg
+				<< ", i64 " << std::get<0>(argdims) << ")\n";
+		}
+		else if(argtype == SymbolType::VECTOR || argtype == SymbolType::MATRIX)
+		{
+			// TODO
+		}
+		else
+		{
+			throw std::runtime_error("ASTFunc: Argument \"" + argname + "\" has invalid type.");
+		}
 	}
 
 
 	t_astret lastres = ast->GetStatements()->accept(this);
+
 
 	if(ast->GetRetType() == SymbolType::VOID)
 	{
@@ -578,6 +617,8 @@ t_astret LLAsm::visit(const ASTFunc* ast)
 	}
 	else
 	{
+		// TODO: string and array pointers cannot be returned as they refer to the local stack
+
 		// return result of last expression
 		if(lastres)
 			(*m_ostr) << "ret " << rettype << " %" << lastres->name << "\n";
@@ -625,13 +666,13 @@ t_astret LLAsm::visit(const ASTAssign* ast)
 	else if(sym->ty == SymbolType::VECTOR || sym->ty == SymbolType::MATRIX)
 	{
 		if(std::get<0>(expr->dims) != std::get<0>(sym->dims))
-			throw std::runtime_error("Dimension mismatch in assignment of \"" + sym->name + "\".");
+			throw std::runtime_error("ASTAssign: Dimension mismatch in assignment of \"" + sym->name + "\".");
 
 		std::size_t dim = std::get<0>(expr->dims);
 		if(expr->ty == SymbolType::MATRIX)
 		{
 			if(std::get<1>(expr->dims) != std::get<1>(sym->dims))
-				throw std::runtime_error("Dimension mismatch in assignment of \"" + sym->name + "\".");
+				throw std::runtime_error("ASTAssign: Dimension mismatch in assignment of \"" + sym->name + "\".");
 
 			dim *= std::get<1>(expr->dims);
 		}
@@ -686,7 +727,7 @@ t_astret LLAsm::visit(const ASTAssign* ast)
 		std::size_t src_dim = std::get<0>(expr->dims);
 		std::size_t dst_dim = std::get<0>(sym->dims);
 		//if(src_dim > dst_dim)	// TODO
-		//	throw std::runtime_error("Buffer of string \"" + sym->name + "\" is not large enough.");
+		//	throw std::runtime_error("ASTAssign: Buffer of string \"" + sym->name + "\" is not large enough.");
 		std::size_t dim = std::min(src_dim, dst_dim);
 
 		// copy elements in a loop

@@ -206,9 +206,9 @@ function[res]
 
 typedecl[res]
 	: SCALARDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::SCALAR); }
-	| VECTORDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::VECTOR); }
-	| MATRIXDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::MATRIX); }
-	| STRINGDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::STRING); }
+	| VECTORDECL INT[dim]	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::VECTOR, $dim); }
+	| MATRIXDECL INT[dim1] INT[dim2]	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::MATRIX, $dim1, $dim2); }
+	| STRINGDECL	{ $res = std::make_shared<ASTTypeDecl>(SymbolType::STRING, DEFAULT_STRING_SIZE); }
 	| INTDECL		{ $res = std::make_shared<ASTTypeDecl>(SymbolType::INT); }
 	;
 
@@ -221,12 +221,12 @@ all_argumentnames[res]
 
 argumentnames[res]
 	: typedecl[ty] IDENT[argname] ',' argumentnames[lst] {
-			$lst->AddArg($argname, $ty->GetType());
+			$lst->AddArg($argname, $ty->GetType(), $ty->GetDim(0), $ty->GetDim(1));
 			$res = $lst;
 		}
 	| typedecl[ty] IDENT[argname] {
 			$res = std::make_shared<ASTArgNames>();
-			$res->AddArg($argname, $ty->GetType()); 
+			$res->AddArg($argname, $ty->GetType(), $ty->GetDim(0), $ty->GetDim(1));
 		}
 	;
 

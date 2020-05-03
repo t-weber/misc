@@ -251,12 +251,12 @@ public:
 	ASTArgNames() : argnames{}
 	{}
 
-	void AddArg(const std::string& argname, SymbolType ty)
+	void AddArg(const std::string& argname, SymbolType ty, std::size_t dim1=0, std::size_t dim2=0)
 	{
-		argnames.push_front(std::make_pair(argname, ty));
+		argnames.push_front(std::make_tuple(argname, ty, dim1, dim2));
 	}
 
-	const std::list<std::pair<std::string, SymbolType>>& GetArgs() const
+	const std::list<std::tuple<std::string, SymbolType, std::size_t, std::size_t>>& GetArgs() const
 	{
 		return argnames;
 	}
@@ -265,29 +265,38 @@ public:
 	{
 		std::vector<SymbolType> ty;
 		for(const auto& arg : argnames)
-			ty.push_back(arg.second);
+			ty.push_back(std::get<1>(arg));
 		return ty;
 	}
 
 	ASTVISITOR_ACCEPT
 
 private:
-	std::list<std::pair<std::string, SymbolType>> argnames;
+	std::list<std::tuple<std::string, SymbolType, std::size_t, std::size_t>> argnames;
 };
 
 
 class ASTTypeDecl : public AST
 {
 public:
-	ASTTypeDecl(SymbolType ty) : ty{ty}
+	ASTTypeDecl(SymbolType ty, std::size_t dim1=0, std::size_t dim2=0)
+		: ty{ty}, dim1{dim1}, dim2{dim2}
 	{}
 
 	SymbolType GetType() const { return ty; }
+
+	std::size_t GetDim(int i=0) const
+	{
+		if(i==0) return dim1;
+		else if(i==1) return dim2;
+		return 0;
+	}
 
 	ASTVISITOR_ACCEPT
 
 private:
 	SymbolType ty;
+	std::size_t dim1=0, dim2=0;
 };
 
 
@@ -301,7 +310,10 @@ public:
 
 	const std::string& GetIdent() const { return ident; }
 	SymbolType GetRetType() const { return rettype->GetType(); }
-	const std::list<std::pair<std::string, SymbolType>>& GetArgNames() const { return argnames; }
+
+	const std::list<std::tuple<std::string, SymbolType, std::size_t, std::size_t>>&
+	GetArgNames() const { return argnames; }
+
 	std::shared_ptr<ASTStmts> GetStatements() const { return stmts; }
 
 	ASTVISITOR_ACCEPT
@@ -309,7 +321,7 @@ public:
 private:
 	std::string ident;
 	std::shared_ptr<ASTTypeDecl> rettype;
-	std::list<std::pair<std::string, SymbolType>> argnames;
+	std::list<std::tuple<std::string, SymbolType, std::size_t, std::size_t>> argnames;
 	std::shared_ptr<ASTStmts> stmts;
 };
 

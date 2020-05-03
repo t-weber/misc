@@ -28,8 +28,10 @@ func test_vec()
 }
 
 
-func test_str()
+func test_str(str s)
 {
+	putstr(s);
+
 	str i, j, k, l;
 
 	i = "Test 123";
@@ -53,5 +55,5 @@ func start()
 	test_loop();
 	test_args(12, 34., 56.);
 	test_vec();
-	test_str();
+	test_str("XYZ");
 }
