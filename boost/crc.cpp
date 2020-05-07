@@ -80,9 +80,12 @@ T mycrc(int poly_size, T poly, T data)
 	// find starting "1"
 	for(; poly_start>=0; --poly_start)
 	{
-		if(poly & (1<<poly_start))
+		if(poly & (T{1}<<T(poly_start)))
 			break;
 	}
+
+	// real starting point with an "1"
+	poly_size = poly_start+1;
 
 	// no "1" in poly
 	if(poly_start <= 0)
