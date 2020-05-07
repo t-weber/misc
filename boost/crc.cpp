@@ -93,7 +93,7 @@ T mycrc(int poly_size, T poly, T data)
 
 	for(int i=sizeof(data)*8-1; i>=poly_size-1; --i)
 	{
-		if((data & (1<<i)) == 0)
+		if((data & (T{1}<<T(i))) == 0)
 			continue;
 		//std::cout << std::dec << "i = " << i << std::endl;
 
@@ -143,7 +143,8 @@ int main()
 
 
 	{
-		std::cout << "own: " << std::hex << (std::uint32_t)mycrc<unsigned>(5, poly, data) << std::endl;
+		std::cout << "own 1: " << std::hex << (std::uint32_t)mycrc<unsigned>(5, poly, data) << std::endl;
+		std::cout << "own 2: " << std::hex << (std::uint64_t)mycrc<unsigned>(5, poly, data) << std::endl;
 	}
 
 	return 0;
