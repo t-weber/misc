@@ -1,0 +1,10 @@
+Run in interpreter:
+	./parser test/fibo.prog > test.asm && llvm-as test.asm && lli test.asm.bc
+
+Compilation:
+	./parser test/test.prog > test.asm && llvm-as test.asm && llc test.asm.bc && clang -o 0 test.asm.s
+
+	./parser test/test.prog > test.asm && opt -stats -S --strip-debug -o test-opt.asm test.asm && llvm-as test-opt.asm && llc -O2 test-opt.asm.bc && as -o test.o test-opt.asm.s && clang -O2 -o 0 test.o && llvm-strip 0
+
+No crt startup code:
+	./parser test/test.prog > test.asm && opt -stats -S --strip-debug -o test-opt.asm test.asm && llvm-as test-opt.asm && llc -O2 test-opt.asm.bc && as -o test.o test-opt.asm.s && ld -entry=main -o 0 test.o -lc --dynamic-linker=/lib64/ld-linux-x86-64.so.2 && llvm-strip 0

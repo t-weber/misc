@@ -11,4 +11,10 @@ rm -rf test.asm
 rm -rf test.asm.bc
 rm -rf test.asm.s
 rm -rf test.asm.o
+rm -rf test-opt.asm
+rm -rf test-opt.asm.bc
+rm -rf test-opt.asm.s
+rm -rf test-opt.asm.o
+rm -rf test.o
+
 rm -f 0

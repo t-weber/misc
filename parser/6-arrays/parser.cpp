@@ -3,10 +3,6 @@
  * @author Tobias Weber
  * @date 20-dec-19
  * @license: see 'LICENSE.GPL' file
- *
- * Test:
- *   ./parser test/fibo.prog > test.asm && llvm-as test.asm && lli test.asm.bc
- *   ./parser test/test.prog > test.asm && llvm-as test.asm && llc test.asm.bc&& clang -o 0 test.asm.s
  */
 
 #include <fstream>
