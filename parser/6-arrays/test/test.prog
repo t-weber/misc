@@ -18,11 +18,12 @@ func test_args(int i, scalar j, scalar k)
 }
 
 
-func test_vec()
+func test_vec(vec 3 a)
 {
-	vec 3 v, w, x;
+	vec 3 v, w, x, b;
 	v = [1., 2., 3.];
 	v = w;
+	b = a;
 
 	x = v + w;
 }
@@ -36,6 +37,7 @@ func test_str(str s)
 
 	i = "Test 123";
 	j = i;
+	j = j + ", 987";
 	k = ", ";
 	l = i + k + j;
 
@@ -53,7 +55,12 @@ func test_str(str s)
 func start()
 {
 	test_loop();
+
 	test_args(12, 34., 56.);
-	test_vec();
+
+	vec 3 v;
+	v = [5., 6., 7.];
+	test_vec(v);
+
 	test_str("XYZ");
 }

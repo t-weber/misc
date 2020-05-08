@@ -81,6 +81,7 @@ int main(int argc, char** argv)
 		ctx.AddFunc("putstr", SymbolType::VOID, {SymbolType::STRING});
 		ctx.AddFunc("putflt", SymbolType::VOID, {SymbolType::SCALAR});
 		ctx.AddFunc("putint", SymbolType::VOID, {SymbolType::INT});
+		ctx.AddFunc("memcpy", SymbolType::STRING, {SymbolType::STRING, SymbolType::STRING, SymbolType::INT});
 
 		yy::Parser parser(ctx);
 		int res = parser.parse();
@@ -116,6 +117,7 @@ declare i8* @strncpy(i8*, i8*, i64)
 declare i8* @strncat(i8*, i8*, i64)
 declare i32 @puts(i8*)
 declare i32 @snprintf(i8*, i64, i8*, ...)
+declare i8* @memcpy(i8*, i8*, i64)
 ; -----------------------------------------------------------------------------
 
 

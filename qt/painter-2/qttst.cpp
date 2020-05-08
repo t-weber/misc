@@ -191,12 +191,14 @@ void Widget::tick(const std::chrono::milliseconds& ms)
 		double scale = 0.1;
 		if(idx >= m_casted.size())
 			break;
-		m_casted[idx] = scale/(min);
-		++idx;
 
-		//std::cout << m_casted[idx] << " ";
+		// distance between circle and tangens (projective plane) -> secans
+		t_real corr = 1./std::cos(angle-m_angle);
+		min /= corr;
+
+		m_casted[idx] = std::abs(scale/min);
+		++idx;
 	}
-	//std::cout << std::endl;
 
 	update();
 }

@@ -468,6 +468,18 @@ t_astret LLAsm::visit(const ASTCall* ast)
 
 			args.push_back(strptr);
 		}
+		else if(arg_casted->ty == SymbolType::VECTOR || arg_casted->ty == SymbolType::MATRIX)
+		{
+			// array arguments are of type double*, so use a pointer to the array
+			t_astret arrptr = get_tmp_var(arg_casted->ty, &arg_casted->dims);
+
+			(*m_ostr) << "%" << arrptr->name << " = getelementptr ["
+				<< std::get<0>(arg_casted->dims) << " x double], ["
+				<< std::get<0>(arg_casted->dims) << " x double]* %"
+				<< arg_casted->name << ", i64 0, i64 0\n";
+
+			args.push_back(arrptr);
+		}
 		else
 		{
 			args.push_back(arg_casted);
@@ -574,7 +586,7 @@ t_astret LLAsm::visit(const ASTFunc* ast)
 	for(const auto& [argname, argtype, dim1, dim2] : argnames)
 	{
 		const std::string arg = std::string{"__arg_"} + argname;
-		std::array<std::size_t, 2> argdims{{dim1, 0}};
+		std::array<std::size_t, 2> argdims{{dim1, dim2}};
 
 		t_astret symcpy = get_tmp_var(argtype, &argdims, &argname);
 
@@ -599,7 +611,27 @@ t_astret LLAsm::visit(const ASTFunc* ast)
 		}
 		else if(argtype == SymbolType::VECTOR || argtype == SymbolType::MATRIX)
 		{
-			// TODO
+			std::size_t argdim = std::get<0>(argdims);
+			if(argtype == SymbolType::MATRIX)
+				argdim *= std::get<1>(argdims);
+
+			// allocate memory for local array copy
+			(*m_ostr) << "%" << symcpy->name << " = alloca [" << argdim << " x double]\n";
+
+			t_astret arrptr = get_tmp_var();
+			(*m_ostr) << "%" << arrptr->name << " = getelementptr [" << argdim << " x double], ["
+				<< argdim << " x double]* %" << symcpy->name << ", i64 0, i64 0\n";
+
+			// copy array
+			t_astret arrptr_cast = get_tmp_var();
+			t_astret arg_cast = get_tmp_var();
+
+			// cast to memcpy argument pointer type
+			(*m_ostr) << "%" << arrptr_cast->name << " = bitcast double* %" << arrptr->name << " to i8*\n";
+			(*m_ostr) << "%" << arg_cast->name << " = bitcast double* %" << arg << " to i8*\n";
+
+			(*m_ostr) << "call i8* @memcpy(i8* %" << arrptr_cast->name << ", i8* %" << arg_cast->name
+				<< ", i64 " << argdim*sizeof(double) << ")\n";
 		}
 		else
 		{
