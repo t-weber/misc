@@ -35,7 +35,7 @@ template<class T = t_real>
 constexpr std::size_t g_iDim = geo::traits::dimension<t_vertex<T>>::value;
 
 template<class T = t_real> using t_lines = geo::model::linestring<t_vertex<T>>;
-template<class T = t_real> using t_poly = geo::model::polygon<t_vertex<T>>;
+template<class T = t_real> using t_poly = geo::model::polygon<t_vertex<T>, true /*cw*/, false /*closed*/>;
 template<class T = t_real> using t_svg = geo::svg_mapper<t_vertex<T>>;
 template<class T = t_real> using t_trafo = trafo::matrix_transformer<T, g_iDim<T>, g_iDim<T>>;
 
@@ -46,9 +46,11 @@ using t_rtree = geoidx::rtree<std::tuple<t_vertex<T>, std::size_t, void*>, geoid
 int main()
 {
 	// points
-	t_vertex<t_real> pt1(1., 2.);
-	t_vertex<t_real> pt2(3., 9.);
-	t_vertex<t_real> pt3(5., 1.);
+	t_vertex<t_real> pt1{1., 2.};
+	t_vertex<t_real> pt2{5., 8.};
+	t_vertex<t_real> pt3{7., 4.};
+	t_vertex<t_real> pt4{10., 8.};
+	t_vertex<t_real> pt5{10., 3.};
 	std::cout << geo::distance(pt1, pt2) << "\n";
 
 
@@ -57,11 +59,21 @@ int main()
 	l1.push_back(pt1);
 	l1.push_back(pt2);
 	l1.push_back(pt3);
-	l1.push_back(pt1);
+	l1.push_back(pt4);
+	l1.push_back(pt5);
 	std::cout << geo::length(l1) << "\n";
 
 
 	// polys
+	t_poly<t_real> poly0;
+	poly0.outer().push_back(pt1);
+	poly0.outer().push_back(pt2);
+	poly0.outer().push_back(pt3);
+	poly0.outer().push_back(pt4);
+	poly0.outer().push_back(pt5);
+
+
+	// convex hull
 	t_poly<t_real> poly1;
 	geo::convex_hull(l1, poly1);
 	geo::correct(poly1);
@@ -89,14 +101,19 @@ int main()
 	std::ofstream ofstr("tst.svg");
 	t_svg<t_real> svg1(ofstr, 100, 100, "width=\"200px\" height=\"200px\"");
 
+	svg1.add(poly0);
+	svg1.map(poly0, "stroke:#eeeeee; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
+
 	svg1.add(poly1);
 	svg1.map(poly1, "stroke:#000000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
+	svg1.text(t_vertex<t_real>{10., 5.}, "convex hull", "font-family:\'DejaVu Sans\'; font-size:6pt", 2.,2., 8.);
 
 	svg1.add(l2);
 	svg1.map(l2, "stroke:#000000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
 
 	svg1.add(l3);
 	svg1.map(l3, "stroke:#000000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
+
 
 	for(const auto& vert : vecPts)
 	{
