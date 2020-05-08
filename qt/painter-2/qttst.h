@@ -40,6 +40,7 @@ public:
 	virtual ~Widget();
 
 	QPointF ToScreenCoords(const QVector2D& vec);
+	QPointF ToSidescreenCoords(const QVector2D& vec);
 
 protected:
 	virtual void resizeEvent(QResizeEvent *pEvt) override;
@@ -63,6 +64,8 @@ private:
 	QVector2D m_pos, m_dir;
 	t_real m_angle, m_fov;
 	QVector2D m_fovlines[2];
+
+	std::vector<t_real> m_casted;
 
 protected slots:
 	void tick();
