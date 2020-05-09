@@ -20,6 +20,7 @@
 #include <memory>
 #include <chrono>
 #include <vector>
+#include <array>
 
 #include <boost/geometry.hpp>
 namespace geo = boost::geometry;
@@ -29,6 +30,14 @@ using t_real = float;
 using t_vertex = geo::model::point<t_real, 2, geo::cs::cartesian>;
 using t_poly = geo::model::polygon<t_vertex, true, false>;
 using t_lines = geo::model::linestring<t_vertex>;
+
+
+struct Casted
+{
+	t_real dist = -1.f;
+	t_real column = -1.f;
+	t_vertex vertex;
+};
 
 
 class Widget : public QWidget
@@ -65,7 +74,7 @@ private:
 	t_real m_angle, m_fov;
 	QVector2D m_fovlines[2];
 
-	std::vector<t_real> m_casted;
+	std::array<Casted, 128> m_casted;
 
 protected slots:
 	void tick();

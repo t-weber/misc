@@ -96,21 +96,66 @@ void Widget::keyReleaseEvent(QKeyEvent* pEvt)
 void Widget::paintEvent(QPaintEvent *pEvt)
 {
 	QPainter painter(this);
+	painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
 
+	QPen penSaved = painter.pen();
+	QPen penHighlight = penSaved;
+	QPen penFilled = penSaved;
+	penHighlight.setColor(QColor(0x00, 0x00, 0xff));
+	penHighlight.setWidth(2);
+	penFilled.setColor(QColor(0x00, 0x00, 0x00));
+	penFilled.setWidth(1);
+
+	QBrush brushSaved = painter.brush();
+	QBrush brushFilled = brushSaved;
+	QBrush brushTop = brushSaved;
+	QBrush brushBottom = brushSaved;
+	brushFilled.setStyle(Qt::SolidPattern);
+	brushTop.setStyle(Qt::SolidPattern);
+	brushBottom.setStyle(Qt::SolidPattern);
+	brushTop.setColor(QColor{0xee, 0xee, 0xee, 0xff});
+	brushBottom.setColor(QColor{0xff, 0xff, 0xff, 0xff});
 
 	t_real column_w = 1. / t_real(m_casted.size());
+	t_real maxDist = 10.f;
+
+
+	// top and bottom half colors
+	painter.setBrush(brushTop);
+	painter.drawRect(QRectF{ToScreenCoords(QVector2D{-0.5f, 0.f}), ToScreenCoords(QVector2D{0.5f, 0.5f})});
+	painter.setBrush(brushBottom);
+	painter.drawRect(QRectF{ToScreenCoords(QVector2D{-0.5f, 0.f}), ToScreenCoords(QVector2D{0.5f, -0.5f})});
+	painter.setBrush(brushSaved);
+
 
 	for(std::size_t idx=0; idx<m_casted.size(); ++idx)
 	{
+		const Casted& casted = m_casted[idx];
+
+		// view distance
+		if(casted.dist < 0.f || casted.dist > maxDist)
+			continue;
+
 		t_real x = t_real(idx)/t_real(m_casted.size()) - 0.5;
-		t_real h = m_casted[idx];
+		t_real h = casted.column;
 
 		QVector2D topL{x, h*0.5f};
 		QVector2D bottomR{x+column_w, -h*0.5f};
 
-		QPointF ptTopL = ToScreenCoords(topL);
-		QPointF ptBottomR = ToScreenCoords(bottomR);
-		painter.drawRect(QRectF{ptTopL, ptBottomR});
+		t_real _color = casted.dist/(maxDist/8.);
+		if(_color > 1.f) _color = 1.f;
+ 		if(_color < 0.2f) _color = 0.2f;
+
+		QColor color;
+		color.setRgbF(1.-_color, 1.-_color, 1.-_color, 1.);
+		penFilled.setColor(color);
+		brushFilled.setColor(color);
+
+		painter.setPen(penFilled);
+		painter.setBrush(brushFilled);
+		painter.drawRect(QRectF{ToScreenCoords(topL), ToScreenCoords(bottomR)});
+		painter.setBrush(brushSaved);
+		painter.setPen(penSaved);
 	}
 
 
@@ -136,6 +181,12 @@ void Widget::paintEvent(QPaintEvent *pEvt)
 	// fov
 	painter.drawLine(ToSidescreenCoords(m_pos), ToSidescreenCoords(m_pos + m_fovlines[0]*0.05f));
 	painter.drawLine(ToSidescreenCoords(m_pos), ToSidescreenCoords(m_pos + m_fovlines[1]*0.05f));
+
+	// intersection points
+	painter.setPen(penHighlight);
+	for(const Casted& casted : m_casted)
+		painter.drawPoint(ToSidescreenCoords(QVector2D(casted.vertex.get<0>(), casted.vertex.get<1>())));
+	painter.setPen(penSaved);
 }
 
 
@@ -164,18 +215,22 @@ void Widget::tick(const std::chrono::milliseconds& ms)
 
 
 	// fov ray intersections
-	t_real NUM_ANGLES = 100.f;
-	m_casted.resize(std::size_t(NUM_ANGLES));
+	t_real NUM_ANGLES = m_casted.size();
 	std::size_t idx = 0;
 
 	for(t_real angle=m_angle+m_fov*0.5; angle>=m_angle-m_fov*0.5; angle-=m_fov/NUM_ANGLES)
 	{
+		if(idx >= m_casted.size())
+			break;
+
 		t_lines fovline;
 		fovline.push_back(t_vertex{m_pos[0], m_pos[1]});
 		fovline.push_back(t_vertex{m_pos[0] + std::cos(angle), m_pos[1] + std::sin(angle)});
 
 		// intersect with all geometry objects and find closest
 		t_real min = std::numeric_limits<t_real>::max();
+		t_vertex intersect{0.f, 0.f};
+
 		for(const t_poly& poly : m_geo)
 		{
 			std::vector<t_vertex> vecPts;
@@ -184,19 +239,24 @@ void Widget::tick(const std::chrono::milliseconds& ms)
 			{
 				QVector2D dist{vert.get<0>() - m_pos[0], vert.get<1>()-m_pos[1]};
 				t_real distToCam = dist.length();
-				min = std::min(min, distToCam);
+
+				if(distToCam < min)
+				{
+					min = distToCam;
+					intersect = vert;
+				}
 			}
 		}
 
-		double scale = 0.1;
-		if(idx >= m_casted.size())
-			break;
+		m_casted[idx].dist = min;
+		m_casted[idx].vertex = intersect;
 
 		// distance between circle and tangens (projective plane) -> secans
 		t_real corr = 1./std::cos(angle-m_angle);
 		min /= corr;
+		double scale = 0.1;
+		m_casted[idx].column = std::abs(scale/min);
 
-		m_casted[idx] = std::abs(scale/min);
 		++idx;
 	}
 
