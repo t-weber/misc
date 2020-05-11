@@ -13,6 +13,7 @@
 #include <mutex>
 #include <atomic>
 #include <condition_variable>
+#include <chrono>
 
 
 /**
@@ -25,11 +26,14 @@ class Sema
 
 		void pass()
 		{
-			while(m_ctr == 0)
+			std::unique_lock<std::mutex> _ul{m_mtxcond};
+			m_cond.wait(_ul, [this]()->bool { return m_ctr > 0; });
+
+			/*while(m_ctr <= 0)
 			{
-				std::unique_lock<std::mutex> _ul{m_mtxcond};
-				m_cond.wait(_ul);
-			}
+				//m_cond.wait(_ul);
+				m_cond.wait_for(_ul, std::chrono::nanoseconds(10));
+			}*/
 
 			--m_ctr;
 		}
@@ -37,6 +41,9 @@ class Sema
 		void leave()
 		{
 			++m_ctr;
+
+			// lock mutex in case of spurious release of wait() in pass()
+			std::lock_guard<std::mutex> _lg{m_mtxcond};
 			m_cond.notify_one();
 		}
 
@@ -49,7 +56,7 @@ class Sema
 
 
 std::list<int> lst;
-const int MAX_ELEMS = 5;
+const int MAX_ELEMS = 10;
 std::mutex mtx;
 Sema sem_free{MAX_ELEMS};
 Sema sem_occu{0};
@@ -111,8 +118,8 @@ void consume()
 
 int main(int argc, char **argv)
 {
-	std::thread prod(&produce);
-	std::thread cons(&consume);
+	std::thread prod{&produce};
+	std::thread cons{&consume};
 
 	prod.join();
 	cons.join();
