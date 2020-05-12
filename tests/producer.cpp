@@ -29,12 +29,7 @@ class Sema
 		{
 			std::unique_lock _ul{m_mtxcond};
 			m_cond.wait(_ul, [this]()->bool { return m_ctr > 0; });
-
-			/*while(m_ctr <= 0)
-			{
-				//m_cond.wait(_ul);
-				m_cond.wait_for(_ul, std::chrono::nanoseconds(10));
-			}*/
+			//while(!m_cond.wait_for(_ul, std::chrono::nanoseconds{10}, [this]()->bool { return m_ctr > 0; }));
 
 			--m_ctr;
 		}
