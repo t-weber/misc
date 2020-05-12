@@ -14,6 +14,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <chrono>
+//#include <semaphore>
 
 
 /**
@@ -24,9 +25,9 @@ class Sema
 	public:
 		Sema(int ctr) : m_ctr{ctr} {}
 
-		void pass()
+		void acquire()
 		{
-			std::unique_lock<std::mutex> _ul{m_mtxcond};
+			std::unique_lock _ul{m_mtxcond};
 			m_cond.wait(_ul, [this]()->bool { return m_ctr > 0; });
 
 			/*while(m_ctr <= 0)
@@ -38,12 +39,12 @@ class Sema
 			--m_ctr;
 		}
 
-		void leave()
+		void release()
 		{
 			++m_ctr;
 
 			// lock mutex in case of spurious release of wait() in pass()
-			std::lock_guard<std::mutex> _lg{m_mtxcond};
+			std::scoped_lock _sl{m_mtxcond};
 			m_cond.notify_one();
 		}
 
@@ -54,12 +55,14 @@ class Sema
 };
 
 
+using t_sema = Sema;
+//using t_sema = std::counting_semaphore<10>;
 
 std::list<int> lst;
 const int MAX_ELEMS = 10;
 std::mutex mtx;
-Sema sem_free{MAX_ELEMS};
-Sema sem_occu{0};
+t_sema sem_free{MAX_ELEMS};
+t_sema sem_occu{0};
 
 
 void produce()
@@ -68,10 +71,10 @@ void produce()
 
 	while(1)
 	{
-		sem_free.pass();
+		sem_free.acquire();
 
 		{
-			std::lock_guard<std::mutex> _lg{mtx};
+			std::scoped_lock _sl{mtx};
 			lst.push_back(i++);
 
 			std::cout << "Inserted " << (i-1) << ", number of elements now: " << lst.size() << std::endl;
@@ -82,7 +85,7 @@ void produce()
 			}
 		}
 
-		sem_occu.leave();
+		sem_occu.release();
 	}
 }
 
@@ -91,10 +94,10 @@ void consume()
 {
 	while(1)
 	{
-		sem_occu.pass();
+		sem_occu.acquire();
 
 		{
-			std::lock_guard<std::mutex> _lg{mtx};
+			std::scoped_lock _sl{mtx};
 			if(lst.size())
 			{
 				if(lst.size() > MAX_ELEMS)
@@ -110,7 +113,7 @@ void consume()
 			}
 		}
 
-		sem_free.leave();
+		sem_free.release();
 	}
 }
 
