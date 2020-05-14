@@ -78,6 +78,11 @@ t_astret LLAsm::convert_sym(t_astret sym, SymbolType ty_to)
 	if(sym->ty == ty_to)
 		return sym;
 
+	// re-interpret vector as matrix
+	else if(ty_to == SymbolType::MATRIX && sym->ty == SymbolType::VECTOR)
+		return sym;
+
+
 	// scalar conversions
 	if(ty_to == SymbolType::SCALAR || ty_to == SymbolType::INT)
 	{
@@ -88,7 +93,7 @@ t_astret LLAsm::convert_sym(t_astret sym, SymbolType ty_to)
 			op = "fptosi";
 
 		if(op == "")
-			throw std::runtime_error("Invalid type conversion.");
+			throw std::runtime_error("Invalid scalar type conversion.");
 
 		std::string from = get_type_name(sym->ty);
 		std::string to = get_type_name(ty_to);
@@ -101,7 +106,132 @@ t_astret LLAsm::convert_sym(t_astret sym, SymbolType ty_to)
 	// conversions to string
 	else if(ty_to == SymbolType::STRING)
 	{
-		// TODO
+		// ... from int
+		if(sym->ty == SymbolType::INT)
+		{
+			std::size_t len = 32;
+			std::array<std::size_t, 2> dims{{len, 0}};
+			t_astret str_mem = get_tmp_var(SymbolType::STRING, &dims);
+			t_astret strptr = get_tmp_var(SymbolType::STRING, &dims);
+
+			(*m_ostr) << "%" << str_mem->name << " = alloca [" << len << " x i8]\n";
+			(*m_ostr) << "%" << strptr->name << " = getelementptr ["
+				<< len << " x i8], [" << len << " x i8]* %"
+				<< str_mem->name << ", i64 0, i64 0\n";
+
+			(*m_ostr) << "call void @int_to_str(i64 %"  << sym->name
+				<< ", i8* %" << strptr->name << ", i64 " << len << ")\n";
+			return str_mem;
+		}
+
+		// ... from (double) scalar
+		else if(sym->ty == SymbolType::SCALAR)
+		{
+			std::size_t len = 32;
+			std::array<std::size_t, 2> dims{{len, 0}};
+			t_astret str_mem = get_tmp_var(SymbolType::STRING, &dims);
+			t_astret strptr = get_tmp_var(SymbolType::STRING, &dims);
+
+			(*m_ostr) << "%" << str_mem->name << " = alloca [" << len << " x i8]\n";
+			(*m_ostr) << "%" << strptr->name << " = getelementptr ["
+				<< len << " x i8], [" << len << " x i8]* %"
+				<< str_mem->name << ", i64 0, i64 0\n";
+
+			(*m_ostr) << "call void @flt_to_str(double %"  << sym->name
+				<< ", i8* %" << strptr->name << ", i64 " << len << ")\n";
+			return str_mem;
+		}
+
+		// ... from vector or matrix
+		else if(sym->ty == SymbolType::VECTOR || sym->ty == SymbolType::MATRIX)
+		{
+			std::size_t num_floats = std::get<0>(sym->dims);
+			if(sym->ty == SymbolType::MATRIX)
+				num_floats *= std::get<1>(sym->dims);
+
+			std::size_t len = 32 * num_floats;
+			std::array<std::size_t, 2> dims{{len, 0}};
+			t_astret str_mem = get_tmp_var(SymbolType::STRING, &dims);
+			t_astret strptr = get_tmp_var(SymbolType::STRING, &dims);
+
+			(*m_ostr) << "%" << str_mem->name << " = alloca [" << len << " x i8]\n";
+			//(*m_ostr) << "%" << strptr->name << " = bitcast [" << len << " x i8]* %" << str_mem->name << " to i8*\n";
+			(*m_ostr) << "%" << strptr->name << " = getelementptr ["
+				<< len << " x i8], [" << len << " x i8]* %"
+				<< str_mem->name << ", i64 0, i64 0\n";
+
+
+			// prepare "[ ", "] ", ", ", and "; " strings
+			t_astret vecbegin = get_tmp_var(SymbolType::STRING);
+			t_astret vecend = get_tmp_var(SymbolType::STRING);
+			t_astret vecsep = get_tmp_var(SymbolType::STRING);
+			t_astret matsep = nullptr;
+
+			(*m_ostr) << "%" << vecbegin->name << " = bitcast [3 x i8]* @__str_vecbegin to i8*\n";
+			(*m_ostr) << "%" << vecend->name << " = bitcast [3 x i8]* @__str_vecend to i8*\n";
+			(*m_ostr) << "%" << vecsep->name << " = bitcast [3 x i8]* @__str_vecsep to i8*\n";
+
+			if(sym->ty == SymbolType::MATRIX)
+			{
+				matsep = get_tmp_var(SymbolType::STRING);
+				(*m_ostr) << "%" << matsep->name << " = bitcast [3 x i8]* @__str_matsep to i8*\n";
+			}
+
+
+			// vector start: "[ "
+			(*m_ostr) << "call i8* @strncpy(i8* %" << strptr->name << ", i8* %" << vecbegin->name << ", i64 3)\n";
+
+			for(std::size_t i=0; i<num_floats; ++i)
+			{
+				// get vector/matrix element
+				t_astret elemptr = get_tmp_var();
+				t_astret elem = get_tmp_var();
+
+				(*m_ostr) << "%" << elemptr->name << " = getelementptr [" << num_floats << " x double], ["
+					<< num_floats << " x double]* %" << sym->name << ", i64 0, i64 " << i << "\n";
+				(*m_ostr) << "%" << elem->name << " = load double, double* %" << elemptr->name << "\n";
+
+
+				// convert vector/matrix component to string
+				std::size_t lenComp = 32;
+				std::array<std::size_t, 2> dimsComp{{lenComp, 0}};
+				t_astret strComp_mem = get_tmp_var(SymbolType::STRING, &dimsComp);
+				t_astret strCompptr = get_tmp_var(SymbolType::STRING, &dimsComp);
+
+				(*m_ostr) << "%" << strComp_mem->name << " = alloca [" << lenComp << " x i8]\n";
+				(*m_ostr) << "%" << strCompptr->name << " = getelementptr ["
+					<< lenComp << " x i8], [" << lenComp << " x i8]* %"
+					<< strComp_mem->name << ", i64 0, i64 0\n";
+
+				(*m_ostr) << "call void @flt_to_str(double %"  << elem->name
+					<< ", i8* %" << strCompptr->name << ", i64 " << lenComp << ")\n";
+
+				(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %" << strCompptr->name << ", i64 3)\n";
+
+
+				// separator ", " or "; "
+				if(sym->ty == SymbolType::MATRIX && (i+1) % std::get<0>(sym->dims) == 0)
+				{
+					std::size_t idx0 = (i+1) % std::get<0>(sym->dims);
+					std::size_t idx1 = i / std::get<0>(sym->dims);
+
+					// don't output last "; "
+					if(idx0 < std::get<1>(sym->dims)-1 && idx1 < std::get<1>(sym->dims)-1)
+						(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %" << matsep->name << ", i64 3)\n";
+				}
+				else
+				{
+					// don't output last ", "
+					if(i < num_floats-1)
+						(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %" << vecsep->name << ", i64 3)\n";
+				}
+			}
+
+			// vector end: " ]"
+			(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %" << vecend->name << ", i64 3)\n";
+
+			return str_mem;
+		}
 	}
 
 	// unknown conversion
@@ -697,8 +827,18 @@ t_astret LLAsm::visit(const ASTAssign* ast)
 	}
 	else if(sym->ty == SymbolType::VECTOR || sym->ty == SymbolType::MATRIX)
 	{
-		if(std::get<0>(expr->dims) != std::get<0>(sym->dims))
-			throw std::runtime_error("ASTAssign: Dimension mismatch in assignment of \"" + sym->name + "\".");
+		if(sym->ty == SymbolType::VECTOR && expr->ty == SymbolType::VECTOR)
+		{
+			if(std::get<0>(expr->dims) != std::get<0>(sym->dims))
+				throw std::runtime_error("ASTAssign: Vector dimension mismatch in assignment of \"" + sym->name + "\".");
+		}
+		else if(sym->ty == SymbolType::MATRIX && expr->ty == SymbolType::MATRIX)
+		{
+			if(std::get<0>(expr->dims) != std::get<0>(sym->dims) && std::get<1>(expr->dims) != std::get<1>(sym->dims))
+				throw std::runtime_error("ASTAssign: Matrix dimension mismatch in assignment of \"" + sym->name + "\".");
+		}
+		// TODO: check mat/vec and vec/mat cases
+
 
 		std::size_t dim = std::get<0>(expr->dims);
 		if(expr->ty == SymbolType::MATRIX)

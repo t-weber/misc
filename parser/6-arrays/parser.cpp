@@ -125,6 +125,10 @@ declare i8* @memcpy(i8*, i8*, i64)
 ; constants
 @__strfmt_g = constant [3 x i8] c"%g\00"
 @__strfmt_ld = constant [4 x i8] c"%ld\00"
+@__str_vecbegin = constant [3 x i8] c"[ \00"
+@__str_vecend = constant [3 x i8] c" ]\00"
+@__str_vecsep = constant [3 x i8] c", \00"
+@__str_matsep = constant [3 x i8] c"; \00"
 ; -----------------------------------------------------------------------------
 
 
