@@ -44,8 +44,8 @@ std::string LLAsm::get_label()
 
 
 /**
-	* find the symbol with a specific name in the symbol table
-	*/
+ * find the symbol with a specific name in the symbol table
+ */
 t_astret LLAsm::get_sym(const std::string& name) const
 {
 	std::string scoped_name;
@@ -70,8 +70,8 @@ t_astret LLAsm::get_sym(const std::string& name) const
 
 
 /**
-	* convert symbol to another type
-	*/
+ * convert symbol to another type
+ */
 t_astret LLAsm::convert_sym(t_astret sym, SymbolType ty_to)
 {
 	// already the correct type
@@ -322,6 +322,19 @@ t_astret LLAsm::visit(const ASTPlus* ast)
 
 		std::string op = ast->IsInverted() ? "fsub" : "fadd";
 
+#ifdef USE_VECTOR_OPS
+		// TODO
+		t_astret elem_src1 = get_tmp_var();
+		t_astret elem_src2 = get_tmp_var();
+
+		(*m_ostr) << "%" << elem_src1->name << " = bitcast [" << dim << " x double]* %"
+			<< term1->name <<  " to <" << dim << " x double>*\n";
+		(*m_ostr) << "%" << elem_src2->name << " = bitcast [" << dim << " x double]* %"
+			<< term2->name <<  " to <" << dim << " x double>*\n";
+
+		(*m_ostr) << "%" << vec_mem->name << " = " << op << " <" << dim << " x double> %"
+			<< elem_src1->name << ", %" << elem_src2->name << "\n";
+#else
 		// copy elements in a loop
 		std::string labelStart = get_label();
 		std::string labelBegin = get_label();
@@ -379,6 +392,7 @@ t_astret LLAsm::visit(const ASTPlus* ast)
 
 		(*m_ostr) << "br label %" << labelStart << "\n";
 		(*m_ostr) << labelEnd << ":  ; loop end\n";
+#endif
 
 		return vec_mem;
 	}
@@ -461,26 +475,125 @@ t_astret LLAsm::visit(const ASTMult* ast)
 	t_astret term1 = ast->GetTerm1()->accept(this);
 	t_astret term2 = ast->GetTerm2()->accept(this);
 
-	// cast if needed
-	SymbolType ty = term1->ty;
-	if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
-		ty = SymbolType::SCALAR;
-	t_astret var = get_tmp_var(ty, &term1->dims);
+	// inner product of vectors
+	if(term1->ty == SymbolType::VECTOR && term2->ty == SymbolType::VECTOR)
+	{
+		if(std::get<0>(term1->dims) != std::get<0>(term2->dims))
+		{
+			throw std::runtime_error("ASTPlus: Dimension mismatch in inner product of \""
+				+ term1->name + "\" and \"" + term2->name + "\".");
+		}
 
-	term1 = convert_sym(term1, ty);
-	term2 = convert_sym(term2, ty);
+		std::size_t dim = std::get<0>(term1->dims);
 
 
-	std::string op = ast->IsInverted() ? "div" : "mul";
-	if(ty == SymbolType::SCALAR)
-		op = "f" + op;
-	else if(ty == SymbolType::INT && ast->IsInverted())
-		op = "s" + op;
+		// result variable
+		t_astret dotptr = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << dotptr->name << " = alloca double\n";
+		(*m_ostr) << "store double 0., double* %" << dotptr->name << "\n";
 
-	(*m_ostr) << "%" << var->name << " = " << op << " "
-		<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
+		// add elements in a loop
+		std::string labelStart = get_label();
+		std::string labelBegin = get_label();
+		std::string labelEnd = get_label();
 
-	return var;
+		// loop counter
+		t_astret ctr = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctr->name << " = alloca i64\n";
+		(*m_ostr) << "store i64 0, i64* %" << ctr->name << "\n";
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelStart << ":  ; loop start\n";
+
+		// loop condition: ctr < dim
+		t_astret ctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctrval->name << " = load i64, i64* %" << ctr->name << "\n";
+
+		t_astret cond = get_tmp_var();
+		(*m_ostr) << "%" << cond->name << " = icmp slt i64 %" << ctrval->name <<  ", " << dim << "\n";
+		(*m_ostr) << "br i1 %" << cond->name << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+		(*m_ostr) << labelBegin << ":  ; loop begin\n";
+
+		// ---------------
+		// loop statements
+		t_astret elemptr_src1 = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_src1->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << term1->name << ", i64 0, i64 %" << ctrval->name << "\n";
+		t_astret elemptr_src2 = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_src2->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << term2->name << ", i64 0, i64 %" << ctrval->name << "\n";
+
+		t_astret elem_src1 = get_tmp_var();
+		(*m_ostr) << "%" << elem_src1->name << " = load double, double* %" << elemptr_src1->name << "\n";
+		t_astret elem_src2 = get_tmp_var();
+		(*m_ostr) << "%" << elem_src2->name << " = load double, double* %" << elemptr_src2->name << "\n";
+
+		// multiply elements
+		t_astret mul_elems = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << mul_elems->name << " = fmul "
+			<< "double %" << elem_src1->name << ", %" << elem_src2->name << "\n";
+
+		// increment dot product variable
+		t_astret cur_dot = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << cur_dot->name << " = load double, double* %" << dotptr->name << "\n";
+		t_astret sum_dot = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << sum_dot->name << " = fadd "
+			<< "double %" << cur_dot->name << ", %" << mul_elems->name << "\n";
+		(*m_ostr) << "store double %" << sum_dot->name << ", double* %" << dotptr->name << "\n";
+
+		// increment counter
+		t_astret newctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << newctrval->name << " = add i64 %" << ctrval->name << ", 1\n";
+		(*m_ostr) << "store i64 %" << newctrval->name << ", i64* %" << ctr->name << "\n";
+		// ---------------
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelEnd << ":  ; loop end\n";
+
+		t_astret dot = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << dot->name << " = load double, double* %" << dotptr->name << "\n";
+		return dot;
+	}
+
+	// matrix-vector product
+	else if(term1->ty == SymbolType::MATRIX && term2->ty == SymbolType::VECTOR)
+	{
+		// TODO
+	}
+
+	// matrix-matrix product
+	else if(term1->ty == SymbolType::MATRIX && term2->ty == SymbolType::MATRIX)
+	{
+		// TODO
+	}
+
+	// scalar types
+	else
+	{
+		// cast if needed
+		SymbolType ty = term1->ty;
+		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
+			ty = SymbolType::SCALAR;
+		t_astret var = get_tmp_var(ty, &term1->dims);
+
+		term1 = convert_sym(term1, ty);
+		term2 = convert_sym(term2, ty);
+
+
+		std::string op = ast->IsInverted() ? "div" : "mul";
+		if(ty == SymbolType::SCALAR)
+			op = "f" + op;
+		else if(ty == SymbolType::INT && ast->IsInverted())
+			op = "s" + op;
+
+		(*m_ostr) << "%" << var->name << " = " << op << " "
+			<< get_type_name(ty) << " %" << term1->name << ", %" << term2->name << "\n";
+
+		return var;
+	}
+
+	return nullptr;
 }
 
 
