@@ -64,6 +64,7 @@ func test_mat()
 	v = [1., 5., 9.];
 
 	putstr(M*v);
+	putstr(M*M);
 }
 
 
