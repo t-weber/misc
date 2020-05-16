@@ -475,7 +475,7 @@ t_astret LLAsm::visit(const ASTMult* ast)
 	t_astret term1 = ast->GetTerm1()->accept(this);
 	t_astret term2 = ast->GetTerm2()->accept(this);
 
-	// inner product of vectors
+	// inner product of vectors: s = v^i v_i
 	if(term1->ty == SymbolType::VECTOR && term2->ty == SymbolType::VECTOR)
 	{
 		if(std::get<0>(term1->dims) != std::get<0>(term2->dims))
@@ -556,13 +556,150 @@ t_astret LLAsm::visit(const ASTMult* ast)
 		return dot;
 	}
 
-	// matrix-vector product
+	// matrix-vector product: w^i = M^i_j v^j
 	else if(term1->ty == SymbolType::MATRIX && term2->ty == SymbolType::VECTOR)
 	{
-		// TODO
+		if(std::get<1>(term1->dims) != std::get<0>(term2->dims))
+		{
+			throw std::runtime_error("ASTPlus: Dimension mismatch in matrix-vector product of \""
+				+ term1->name + "\" and \"" + term2->name + "\".");
+		}
+
+		std::size_t dim_i = std::get<0>(term1->dims);
+		std::size_t dim_j = std::get<1>(term1->dims);
+
+
+		// result vector w
+		std::array<std::size_t, 2> w_dims{{dim_i, 0}};
+		t_astret w_mem = get_tmp_var(SymbolType::VECTOR, &w_dims);
+		(*m_ostr) << "%" << w_mem->name << " = alloca [" << dim_i << " x double]\n";
+
+
+		// loop i
+		std::string labeli_Start = get_label();
+		std::string labeli_Begin = get_label();
+		std::string labeli_End = get_label();
+
+		// loop counter
+		t_astret ctr_i = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctr_i->name << " = alloca i64\n";
+		(*m_ostr) << "store i64 0, i64* %" << ctr_i->name << "\n";
+
+		(*m_ostr) << "br label %" << labeli_Start << "\n";
+		(*m_ostr) << labeli_Start << ":  ; i loop start\n";
+
+		// i loop condition: ctr_i < dim_i
+		t_astret ctr_i_val = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctr_i_val->name << " = load i64, i64* %" << ctr_i->name << "\n";
+
+		t_astret cond_i = get_tmp_var();
+		(*m_ostr) << "%" << cond_i->name << " = icmp slt i64 %" << ctr_i_val->name <<  ", " << dim_i << "\n";
+		(*m_ostr) << "br i1 %" << cond_i->name << ", label %" << labeli_Begin << ", label %" << labeli_End << "\n";
+
+		(*m_ostr) << labeli_Begin << ":  ; loop i begin\n";
+
+		// ---------------
+		// loop i statements
+
+		// w[i] pointer
+		t_astret elemptr_w_i = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_w_i->name << " = getelementptr [" << dim_i << " x double], ["
+			<< dim_i << " x double]* %" << w_mem->name << ", i64 0, i64 %" << ctr_i_val->name << "\n";
+
+		// w[i] = 0
+		(*m_ostr) << "store double 0., double* %" << elemptr_w_i->name << "\n";
+
+		// loop i index of M: i*dim_j
+		t_astret M_idx_i = get_tmp_var();
+		(*m_ostr) << "%" << M_idx_i->name << " = mul i64 %" << ctr_i_val->name << ", " << dim_j << "\n";
+
+
+			// loop j
+			std::string labelj_Start = get_label();
+			std::string labelj_Begin = get_label();
+			std::string labelj_End = get_label();
+
+			// loop counter
+			t_astret ctr_j = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << ctr_j->name << " = alloca i64\n";
+			(*m_ostr) << "store i64 0, i64* %" << ctr_j->name << "\n";
+
+			(*m_ostr) << "br label %" << labelj_Start << "\n";
+			(*m_ostr) << labelj_Start << ":  ; j loop start\n";
+
+			// i loop condition: ctr_j < dim_j
+			t_astret ctr_j_val = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << ctr_j_val->name << " = load i64, i64* %" << ctr_j->name << "\n";
+
+			t_astret cond_j = get_tmp_var();
+			(*m_ostr) << "%" << cond_j->name << " = icmp slt i64 %" << ctr_j_val->name <<  ", " << dim_j << "\n";
+			(*m_ostr) << "br i1 %" << cond_j->name << ", label %" << labelj_Begin << ", label %" << labelj_End << "\n";
+
+			(*m_ostr) << labelj_Begin << ":  ; loop j begin\n";
+
+			// ---------------
+			// loop j statements
+
+			// v[j] pointer
+			t_astret elemptr_v_j = get_tmp_var();
+			(*m_ostr) << "%" << elemptr_v_j->name << " = getelementptr [" << dim_j << " x double], ["
+				<< dim_j << " x double]* %" << term2->name << ", i64 0, i64 %" << ctr_j_val->name << "\n";
+
+			// M index: i*dim_j + j
+			t_astret M_idx = get_tmp_var();
+			(*m_ostr) << "%" << M_idx->name << " = add i64 %" << M_idx_i->name << ", %" << ctr_j_val->name << "\n";
+
+			// M[i,j] pointer
+			t_astret elemptr_M_ij = get_tmp_var();
+			(*m_ostr) << "%" << elemptr_M_ij->name << " = getelementptr [" << dim_i*dim_j << " x double], ["
+				<< dim_i*dim_j << " x double]* %" << term1->name << ", i64 0, i64 %"
+				<< M_idx->name << "\n";
+
+			// v[j] value
+			t_astret elem_v_j = get_tmp_var();
+			(*m_ostr) << "%" << elem_v_j->name << " = load double, double* %" << elemptr_v_j->name << "\n";
+
+			// M[i,j] value
+			t_astret elem_M_ij = get_tmp_var();
+			(*m_ostr) << "%" << elem_M_ij->name << " = load double, double* %" << elemptr_M_ij->name << "\n";
+
+			// m = M[i,j]*v[j]
+			t_astret m = get_tmp_var();
+			(*m_ostr) << "%" << m->name << " = fmul double %" << elem_M_ij->name << ", %" << elem_v_j->name << "\n";
+
+			// current w[i] value
+			t_astret elem_w_i = get_tmp_var();
+			(*m_ostr) << "%" << elem_w_i->name << " = load double, double* %" << elemptr_w_i->name << "\n";
+
+			// d = w[i] + m
+			t_astret d = get_tmp_var();
+			(*m_ostr) << "%" << d->name << " = fadd double %" << elem_w_i->name << ", %" << m->name << "\n";
+
+			// w[i] = d
+			(*m_ostr) << "store double %" << d->name << ", double* %" << elemptr_w_i->name << "\n";
+
+			// increment j counter
+			t_astret newctr_j_val = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << newctr_j_val->name << " = add i64 %" << ctr_j_val->name << ", 1\n";
+			(*m_ostr) << "store i64 %" << newctr_j_val->name << ", i64* %" << ctr_j->name << "\n";
+			// ---------------
+
+			(*m_ostr) << "br label %" << labelj_Start << "\n";
+			(*m_ostr) << labelj_End << ":  ; loop j end\n";
+
+		// increment i counter
+		t_astret newctr_i_val = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << newctr_i_val->name << " = add i64 %" << ctr_i_val->name << ", 1\n";
+		(*m_ostr) << "store i64 %" << newctr_i_val->name << ", i64* %" << ctr_i->name << "\n";
+		// ---------------
+
+		(*m_ostr) << "br label %" << labeli_Start << "\n";
+		(*m_ostr) << labeli_End << ":  ; loop i end\n";
+
+		return w_mem;
 	}
 
-	// matrix-matrix product
+	// matrix-matrix product: L^i_k = M^i_j N^j_k
 	else if(term1->ty == SymbolType::MATRIX && term2->ty == SymbolType::MATRIX)
 	{
 		// TODO

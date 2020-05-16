@@ -55,6 +55,18 @@ func test_vec(vec 3 a)
 }
 
 
+func test_mat()
+{
+	mat 3 3 M;
+	M = [0., 1., 0.,  1., 0., 0.,  0., 0., 1.];
+
+	vec 3 v;
+	v = [1., 5., 9.];
+
+	putstr(M*v);
+}
+
+
 func test_str(str s)
 {
 	putstr(s);
@@ -93,6 +105,9 @@ func start()
 	vec 3 v;
 	v = [5., 6., 7.];
 	test_vec(v);
+
+	putstr("----- matrices -----");
+	test_mat();
 
 	putstr("----- strings -----");
 	test_str("XYZ");
