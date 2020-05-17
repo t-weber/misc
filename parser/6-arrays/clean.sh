@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# parser test
+# @author Tobias Weber
+# @date 20-dec-19
+# @license: see 'LICENSE.GPL' file
+#
 
 rm -f parser
 rm -f parser_impl.cpp

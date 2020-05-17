@@ -1,14 +1,19 @@
 #!/bin/sh
-
+#
+# parser test
+# @author Tobias Weber
+# @date 20-dec-19
+# @license: see 'LICENSE.GPL' file
+#
 
 BISON=bison
 FLEX=flex
-
 
 if [ "${CXX}" == "" ]; then
 	CXX=g++
 fi
 
+OUTNAME=parser
 
 
 echo -e "\n--------------------------------------------------------------------------------"
@@ -36,8 +41,11 @@ echo -e "-----------------------------------------------------------------------
 echo -e "\n--------------------------------------------------------------------------------"
 echo -e "Running $($CXX --version | head -n 1)...\n"
 
-if ! ${CXX} -O2 -march=native -Wall -Wextra -std=c++17 -o parser parser.cpp parser_impl.cpp lexer_impl.cpp llasm.cpp; then
+if ! ${CXX} -O2 -march=native -Wall -Wextra -std=c++17 -o ${OUTNAME} parser.cpp parser_impl.cpp lexer_impl.cpp llasm.cpp; then
 	echo -e "Compilation failed."
 	exit -1
 fi
+
+echo -e "\nStripping ${OUTNAME} binary..."
+strip -v ${OUTNAME}
 echo -e "--------------------------------------------------------------------------------\n"
