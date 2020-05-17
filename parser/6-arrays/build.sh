@@ -40,9 +40,16 @@ echo -e "-----------------------------------------------------------------------
 
 echo -e "\n--------------------------------------------------------------------------------"
 echo -e "Running $($CXX --version | head -n 1)...\n"
+echo -e "Building parser...\n"
 
 if ! ${CXX} -O2 -march=native -Wall -Wextra -std=c++17 -o ${OUTNAME} parser.cpp parser_impl.cpp lexer_impl.cpp llasm.cpp; then
-	echo -e "Compilation failed."
+	echo -e "Compilation of parser failed."
+	exit -1
+fi
+
+echo -e "\nBuilding runtime...\n"
+if ! ${CXX} -O2 -march=native -Wall -Wextra -std=c++17 -c runtime.cpp; then
+	echo -e "Compilation of runtime failed."
 	exit -1
 fi
 

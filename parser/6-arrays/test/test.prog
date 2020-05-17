@@ -70,6 +70,8 @@ func test_mat()
 	putstr(M);
 	putstr(M[2,2] = 987);
 	putstr(M);
+
+	#putstr(ext_determinant(M, 3, 3));
 }
 
 
@@ -97,6 +99,13 @@ func test_str(str s)
 }
 
 
+func test_norm()
+{
+	putstr( |-123.4| );
+	putstr( |-987| );
+}
+
+
 func start()
 {
 	putstr("----- conversions -----");
@@ -118,4 +127,7 @@ func start()
 
 	putstr("----- strings -----");
 	test_str("XYZ");
+
+	putstr("----- norm -----");
+	test_norm();
 }

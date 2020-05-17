@@ -73,15 +73,22 @@ int main(int argc, char** argv)
 		ctx.AddFunc("cos", SymbolType::SCALAR, {SymbolType::SCALAR});
 		ctx.AddFunc("sqrt", SymbolType::SCALAR, {SymbolType::SCALAR});
 		ctx.AddFunc("exp", SymbolType::SCALAR, {SymbolType::SCALAR});
-		ctx.AddFunc("flt_to_str", SymbolType::VOID, {SymbolType::SCALAR, SymbolType::STRING, SymbolType::INT});
-		ctx.AddFunc("int_to_str", SymbolType::VOID, {SymbolType::INT, SymbolType::STRING, SymbolType::INT});
+		ctx.AddFunc("fabs", SymbolType::SCALAR, {SymbolType::SCALAR});
+		ctx.AddFunc("labs", SymbolType::INT, {SymbolType::INT});
+
 		ctx.AddFunc("strlen", SymbolType::INT, {SymbolType::STRING});
 		ctx.AddFunc("strncpy", SymbolType::STRING, {SymbolType::STRING, SymbolType::STRING, SymbolType::INT});
 		ctx.AddFunc("strncat", SymbolType::STRING, {SymbolType::STRING, SymbolType::STRING, SymbolType::INT});
+		ctx.AddFunc("memcpy", SymbolType::STRING, {SymbolType::STRING, SymbolType::STRING, SymbolType::INT});
+
 		ctx.AddFunc("putstr", SymbolType::VOID, {SymbolType::STRING});
 		ctx.AddFunc("putflt", SymbolType::VOID, {SymbolType::SCALAR});
 		ctx.AddFunc("putint", SymbolType::VOID, {SymbolType::INT});
-		ctx.AddFunc("memcpy", SymbolType::STRING, {SymbolType::STRING, SymbolType::STRING, SymbolType::INT});
+
+		ctx.AddFunc("flt_to_str", SymbolType::VOID, {SymbolType::SCALAR, SymbolType::STRING, SymbolType::INT});
+		ctx.AddFunc("int_to_str", SymbolType::VOID, {SymbolType::INT, SymbolType::STRING, SymbolType::INT});
+
+		//ctx.AddFunc("ext_determinant", SymbolType::SCALAR, {SymbolType::MATRIX, SymbolType::INT, SymbolType::INT});
 
 		yy::Parser parser(ctx);
 		int res = parser.parse();
@@ -111,6 +118,8 @@ declare double @sin(double)
 declare double @cos(double)
 declare double @sqrt(double)
 declare double @exp(double)
+declare double @fabs(double)
+declare i64 @labs(i64)
 
 declare i64 @strlen(i8*)
 declare i8* @strncpy(i8*, i8*, i64)
@@ -118,6 +127,12 @@ declare i8* @strncat(i8*, i8*, i64)
 declare i32 @puts(i8*)
 declare i32 @snprintf(i8*, i64, i8*, ...)
 declare i8* @memcpy(i8*, i8*, i64)
+; -----------------------------------------------------------------------------
+
+
+; -----------------------------------------------------------------------------
+; external runtime functions from runtime.cpp
+; declare double @ext_determinant(double*, i64, i64);
 ; -----------------------------------------------------------------------------
 
 

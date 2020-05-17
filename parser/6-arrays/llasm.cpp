@@ -969,13 +969,41 @@ t_astret LLAsm::visit(const ASTPow* ast)
 	term1 = convert_sym(term1, ty);
 	term2 = convert_sym(term2, ty);
 
-
 	(*m_ostr) << "%" << var->name << " = call double @pow("
 		<< get_type_name(ty) << " %" << term1->name << ", "
 		<< get_type_name(ty) << " %" << term2->name << ")\n";
 
-
 	return var;
+}
+
+
+t_astret LLAsm::visit(const ASTNorm* ast)
+{
+	t_astret term = ast->GetTerm()->accept(this);
+
+	if(term->ty == SymbolType::SCALAR)
+	{
+		t_astret var = get_tmp_var(term->ty);
+		(*m_ostr) << "%" << var->name << " = call double @fabs(double %" << term->name << ")\n";
+		return var;
+	}
+	else if(term->ty == SymbolType::INT)
+	{
+		t_astret var = get_tmp_var(term->ty);
+		(*m_ostr) << "%" << var->name << " = call i64 @labs(i64 %" << term->name << ")\n";
+		return var;
+	}
+	else if(term->ty == SymbolType::VECTOR)
+	{
+		// TODO: 2-norm
+	}
+	else if(term->ty == SymbolType::MATRIX)
+	{
+		// TODO: det
+	}
+
+	throw std::runtime_error("ASTNorm: Invalid symbol type for \"" + term->name + "\".");
+	return nullptr;
 }
 
 
@@ -1046,9 +1074,13 @@ t_astret LLAsm::visit(const ASTCall* ast)
 			// array arguments are of type double*, so use a pointer to the array
 			t_astret arrptr = get_tmp_var(arg_casted->ty, &arg_casted->dims);
 
+			std::size_t dim = std::get<0>(arg_casted->dims);
+			if(arg_casted->ty == SymbolType::MATRIX)
+				dim *= std::get<1>(arg_casted->dims);
+
 			(*m_ostr) << "%" << arrptr->name << " = getelementptr ["
-				<< std::get<0>(arg_casted->dims) << " x double], ["
-				<< std::get<0>(arg_casted->dims) << " x double]* %"
+				<< dim << " x double], ["
+				<< dim << " x double]* %"
 				<< arg_casted->name << ", i64 0, i64 0\n";
 
 			args.push_back(arrptr);

@@ -6,22 +6,24 @@
 # @license: see 'LICENSE.GPL' file
 #
 
-rm -f parser
-rm -f parser_impl.cpp
-rm -f parser_impl.output
-rm -f parser_defs.h
-rm -f stack.hh
-rm -f lexer_impl.cpp
-rm -f lexer_impl.h
+rm -fv parser
+rm -fv parser_impl.cpp
+rm -fv parser_impl.output
+rm -fv parser_defs.h
+rm -fv stack.hh
+rm -fv lexer_impl.cpp
+rm -fv lexer_impl.h
 
-rm -rf test.asm
-rm -rf test.asm.bc
-rm -rf test.asm.s
-rm -rf test.asm.o
-rm -rf test-opt.asm
-rm -rf test-opt.asm.bc
-rm -rf test-opt.asm.s
-rm -rf test-opt.asm.o
-rm -rf test.o
+rm -rfv runtime.o
 
-rm -f 0
+rm -rfv test.asm
+rm -rfv test.asm.bc
+rm -rfv test.asm.s
+rm -rfv test.asm.o
+rm -rfv test-opt.asm
+rm -rfv test-opt.asm.bc
+rm -rfv test-opt.asm.s
+rm -rfv test-opt.asm.o
+rm -rfv test.o
+
+rm -fv 0

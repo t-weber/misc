@@ -100,7 +100,7 @@
 %left '*' '/' '%'
 %right UNARY_OP
 %right '^'
-%left '(' '[' '{'
+%left '(' '[' '{' '|'
 
 // for the if/else r/s conflict shift "else"
 // see: https://www.gnu.org/software/bison/manual/html_node/Non-Operators.html
@@ -266,6 +266,8 @@ expr[res]
 	// unary expressions
 	| '+' expr[term] %prec UNARY_OP		{ $res = $term; }
 	| '-' expr[term] %prec UNARY_OP		{ $res = std::make_shared<ASTUMinus>($term); }
+	| '|' expr[term] '|'	{ $res = std::make_shared<ASTNorm>($term); }
+
 
 	// binary expressions
 	| expr[term1] '+' expr[term2]	{ $res = std::make_shared<ASTPlus>($term1, $term2, 0); }
