@@ -131,6 +131,11 @@ variables[res]
 			$res = std::make_shared<ASTVarDecl>();
 			$res->AddVariable(symName);
 		}
+	| IDENT[name] '=' expr[term] {
+			std::string symName = context.AddSymbol($name);
+			$res = std::make_shared<ASTVarDecl>(std::make_shared<ASTAssign>($name, $term));
+			$res->AddVariable(symName);
+		}
 	;
 
 
@@ -285,6 +290,10 @@ expr[res]
 
 	// variable
 	| IDENT[ident]		{ $res = std::make_shared<ASTVar>($ident); }
+
+	// array access
+	| expr[term] '[' expr[num] ']'	{ $res = std::make_shared<ASTArrayAccess>($term, $num); }
+	| expr[term] '[' expr[num1] ',' expr[num2] ']'	{ $res = std::make_shared<ASTArrayAccess>($term, $num1, $num2); }
 
 	// function calls
 	| IDENT[ident] '(' ')'	{ $res = std::make_shared<ASTCall>($ident); }

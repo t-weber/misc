@@ -283,6 +283,7 @@ t_astret LLAsm::visit(const ASTUMinus* ast)
 		(*m_ostr) << "%" << var->name << " = sub " << get_type_name(term->ty) << " "
 			<< "0, %" << term->name << "\n";
 	}
+
 	return var;
 }
 
@@ -452,6 +453,8 @@ t_astret LLAsm::visit(const ASTPlus* ast)
 		return var;
 	}
 
+	throw std::runtime_error("ASTMult: Invalid addition operation between \""
+		+ term1->name + "\" and \"" + term2->name + "\".");
 	return nullptr;
 }
 
@@ -466,7 +469,7 @@ t_astret LLAsm::visit(const ASTMult* ast)
 	{
 		if(std::get<0>(term1->dims) != std::get<0>(term2->dims))
 		{
-			throw std::runtime_error("ASTPlus: Dimension mismatch in inner product of \""
+			throw std::runtime_error("ASTMult: Dimension mismatch in inner product of \""
 				+ term1->name + "\" and \"" + term2->name + "\".");
 		}
 
@@ -547,7 +550,7 @@ t_astret LLAsm::visit(const ASTMult* ast)
 	{
 		if(std::get<1>(term1->dims) != std::get<0>(term2->dims))
 		{
-			throw std::runtime_error("ASTPlus: Dimension mismatch in matrix-vector product of \""
+			throw std::runtime_error("ASTMult: Dimension mismatch in matrix-vector product of \""
 				+ term1->name + "\" and \"" + term2->name + "\".");
 		}
 
@@ -689,7 +692,7 @@ t_astret LLAsm::visit(const ASTMult* ast)
 	{
 		if(std::get<1>(term1->dims) != std::get<0>(term2->dims))
 		{
-			throw std::runtime_error("ASTPlus: Dimension mismatch in matrix-matrix product of \""
+			throw std::runtime_error("ASTMult: Dimension mismatch in matrix-matrix product of \""
 				+ term1->name + "\" and \"" + term2->name + "\".");
 		}
 
@@ -918,6 +921,8 @@ t_astret LLAsm::visit(const ASTMult* ast)
 		return var;
 	}
 
+	throw std::runtime_error("ASTMult: Invalid multiplication operation between \""
+		+ term1->name + "\" and \"" + term2->name + "\".");
 	return nullptr;
 }
 
@@ -1124,6 +1129,11 @@ t_astret LLAsm::visit(const ASTVarDecl* ast)
 		{
 			throw std::runtime_error("ASTVarDecl: Invalid type in declaration: \"" + sym->name + "\".");
 		}
+
+
+		// optional assignment
+		if(ast->GetAssignment())
+			ast->GetAssignment()->accept(this);
 	}
 
 	return nullptr;
@@ -1487,6 +1497,109 @@ t_astret LLAsm::visit(const ASTLoop* ast)
 	(*m_ostr) << "br label %" << labelStart << "\n";
 	(*m_ostr) << labelEnd << ":  ; loop end\n";
 
+	return nullptr;
+}
+
+
+
+t_astret LLAsm::visit(const ASTArrayAccess* ast)
+{
+	t_astret num1 = ast->GetNum1()->accept(this);
+	num1 = convert_sym(num1, SymbolType::INT);
+
+	t_astret num2 = nullptr;
+	if(ast->GetNum2())
+	{
+		num2 = ast->GetNum2()->accept(this);
+		num2 = convert_sym(num2, SymbolType::INT);
+	}
+
+	t_astret term = ast->GetTerm()->accept(this);
+
+	if(term->ty == SymbolType::VECTOR)
+	{
+		if(num2)	// no second argument needed
+			throw std::runtime_error("Invalid access operator for vector \"" + term->name + "\".");
+
+		std::size_t dim = std::get<0>(term->dims);
+
+		// vector element pointer
+		t_astret elemptr = get_tmp_var();
+		(*m_ostr) << "%" << elemptr->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << term->name << ", i64 0, i64 %" << num1->name << "\n";
+
+		// vector element
+		t_astret elem = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << elem->name << " = load double, double* %" << elemptr->name << "\n";
+		return elem;
+
+	}
+	else if(term->ty == SymbolType::MATRIX)
+	{
+		if(!num2)	// second argument needed
+			throw std::runtime_error("Invalid access operator for matrix \"" + term->name + "\".");
+
+		std::size_t dim1 = std::get<0>(term->dims);
+		std::size_t dim2 = std::get<1>(term->dims);
+
+		// idx = num1*dim2 + num2
+		t_astret idx1 = get_tmp_var();
+		t_astret idx = get_tmp_var();
+		(*m_ostr) << "%" << idx1->name << " = mul i64 %" << num1->name << ", " << dim2 << "\n";
+		(*m_ostr) << "%" << idx->name << " = add i64 %" << idx1->name << ", %" << num2->name << "\n";
+
+		// matrix element pointer
+		t_astret elemptr = get_tmp_var();
+		(*m_ostr) << "%" << elemptr->name << " = getelementptr [" << dim1*dim2 << " x double], ["
+			<< dim1*dim2 << " x double]* %" << term->name << ", i64 0, i64 %" << idx->name << "\n";
+
+		// matrix element
+		t_astret elem = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << elem->name << " = load double, double* %" << elemptr->name << "\n";
+		return elem;
+	}
+	else if(term->ty == SymbolType::STRING)
+	{
+		if(num2)	// no second argument needed
+			throw std::runtime_error("Invalid access operator for string \"" + term->name + "\".");
+
+		std::size_t dim = std::get<0>(term->dims);
+
+		// string element pointer
+		t_astret elemptr = get_tmp_var();
+		(*m_ostr) << "%" << elemptr->name << " = getelementptr [" << dim << " x i8], ["
+			<< dim << " x i8]* %" << term->name << ", i64 0, i64 %" << num1->name << "\n";
+
+		// char at that pointer position
+		t_astret elem = get_tmp_var();
+		(*m_ostr) << "%" << elem->name << " = load i8, i8* %" << elemptr->name << "\n";
+
+
+		// return string
+		std::array<std::size_t, 2> retdims{{2, 0}};	// one char and a 0
+		t_astret str_mem = get_tmp_var(SymbolType::STRING, &retdims);
+
+		// allocate the return string's memory
+		(*m_ostr) << "%" << str_mem->name << " = alloca [" << std::get<0>(retdims) << " x i8]\n";
+
+		// store the char
+		t_astret ptr0 = get_tmp_var();
+		(*m_ostr) << "%" << ptr0->name << " = getelementptr [" << std::get<0>(retdims) << " x i8], ["
+			<< std::get<0>(retdims) << " x i8]* %" << str_mem->name << ", i64 0, i64 0\n";
+
+		(*m_ostr) << "store i8 %" << elem->name << ", i8* %" << ptr0->name << "\n";
+
+		// add zero termination
+		t_astret ptr1 = get_tmp_var();
+		(*m_ostr) << "%" << ptr1->name << " = getelementptr [" << std::get<0>(retdims) << " x i8], ["
+			<< std::get<0>(retdims) << " x i8]* %" << str_mem->name << ", i64 0, i64 1\n";
+
+		(*m_ostr) << "store i8 0, i8* %" << ptr1->name << "\n";
+
+		return str_mem;
+	}
+
+	throw std::runtime_error("Invalid array access to \"" + term->name + "\".");
 	return nullptr;
 }
 

@@ -1,7 +1,6 @@
 func test_conversion()
 {
-	int i;
-	i = 1234;
+	int i = 1234;
 
 	scalar s;
 	s = 987.654;
@@ -21,8 +20,7 @@ func test_conversion()
 
 func test_loop()
 {
-	int i;
-	i = 0;
+	int i = 0;
 
 	loop i<16 do
 		i = i+1;
@@ -52,25 +50,27 @@ func test_vec(vec 3 a)
 	putstr(x + b);
 
 	putstr(v*w);
+
+	putstr(x[1]);
 }
 
 
 func test_mat()
 {
-	mat 3 3 M;
-	M = [0., 1., 0.,  1., 0., 0.,  0., 0., 1.];
-
-	vec 3 v;
-	v = [1., 5., 9.];
+	mat 3 3 M = [0., 1., 0.,  1., 0., 0.,  0., 0., 1.];
+	vec 3 v = [1., 5., 9.];
 
 	putstr(M*v);
 	putstr(M*M);
+
+	putstr(M[2,2]);
 }
 
 
 func test_str(str s)
 {
 	putstr(s);
+	putstr(s[1]);
 
 	str i, j, k, l;
 

@@ -39,6 +39,7 @@ class ASTAssign;
 class ASTComp;
 class ASTCond;
 class ASTLoop;
+class ASTArrayAccess;
 template<class> class ASTNumConst;
 template<class> class ASTNumList;
 
@@ -72,6 +73,7 @@ public:
 	virtual t_astret visit(const ASTComp* ast) = 0;
 	virtual t_astret visit(const ASTCond* ast) = 0;
 	virtual t_astret visit(const ASTLoop* ast) = 0;
+	virtual t_astret visit(const ASTArrayAccess* ast) = 0;
 	virtual t_astret visit(const ASTStrConst* ast) = 0;
 	virtual t_astret visit(const ASTNumConst<double>* ast) = 0;
 	virtual t_astret visit(const ASTNumConst<std::int64_t>* ast) = 0;
@@ -100,7 +102,7 @@ public:
 	: term{term}
 	{}
 
-	std::shared_ptr<AST> GetTerm() const { return term; }
+	const std::shared_ptr<AST> GetTerm() const { return term; }
 
 	ASTVISITOR_ACCEPT
 
@@ -117,8 +119,8 @@ public:
 		: term1{term1}, term2{term2}, inverted{invert}
 	{}
 
-	std::shared_ptr<AST> GetTerm1() const { return term1; }
-	std::shared_ptr<AST> GetTerm2() const { return term2; }
+	const std::shared_ptr<AST> GetTerm1() const { return term1; }
+	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 	bool IsInverted() const { return inverted; }
 
 	ASTVISITOR_ACCEPT
@@ -137,8 +139,8 @@ public:
 		: term1{term1}, term2{term2}, inverted{invert}
 	{}
 
-	std::shared_ptr<AST> GetTerm1() const { return term1; }
-	std::shared_ptr<AST> GetTerm2() const { return term2; }
+	const std::shared_ptr<AST> GetTerm1() const { return term1; }
+	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 	bool IsInverted() const { return inverted; }
 
 	ASTVISITOR_ACCEPT
@@ -156,8 +158,8 @@ public:
 		: term1{term1}, term2{term2}
 	{}
 
-	std::shared_ptr<AST> GetTerm1() const { return term1; }
-	std::shared_ptr<AST> GetTerm2() const { return term2; }
+	const std::shared_ptr<AST> GetTerm1() const { return term1; }
+	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 
 	ASTVISITOR_ACCEPT
 
@@ -173,8 +175,8 @@ public:
 		: term1{term1}, term2{term2}
 	{}
 
-	std::shared_ptr<AST> GetTerm1() const { return term1; }
-	std::shared_ptr<AST> GetTerm2() const { return term2; }
+	const std::shared_ptr<AST> GetTerm1() const { return term1; }
+	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 
 	ASTVISITOR_ACCEPT
 
@@ -225,7 +227,12 @@ private:
 class ASTVarDecl : public AST
 {
 public:
-	ASTVarDecl() : vars{}
+	ASTVarDecl()
+		: vars{}
+	{}
+
+	ASTVarDecl(std::shared_ptr<ASTAssign> optAssign)
+		: vars{}, optAssign{optAssign}
 	{}
 
 	void AddVariable(const std::string& var)
@@ -238,10 +245,15 @@ public:
 		return vars;
 	}
 
+	const std::shared_ptr<ASTAssign> GetAssignment() const { return optAssign; }
+
 	ASTVISITOR_ACCEPT
 
 private:
 	std::list<std::string> vars;
+
+	// optional assignment
+	std::shared_ptr<ASTAssign> optAssign;
 };
 
 
@@ -314,7 +326,7 @@ public:
 	const std::list<std::tuple<std::string, SymbolType, std::size_t, std::size_t>>&
 	GetArgNames() const { return argnames; }
 
-	std::shared_ptr<ASTStmts> GetStatements() const { return stmts; }
+	const std::shared_ptr<ASTStmts> GetStatements() const { return stmts; }
 
 	ASTVISITOR_ACCEPT
 
@@ -335,7 +347,7 @@ public:
 	ASTReturn()
 	{}
 
-	std::shared_ptr<AST> GetTerm() const { return term; }
+	const std::shared_ptr<AST> GetTerm() const { return term; }
 
 	ASTVISITOR_ACCEPT
 
@@ -397,7 +409,7 @@ public:
 	{}
 
 	const std::string& GetIdent() const { return ident; }
-	std::shared_ptr<AST> GetExpr() const { return expr; }
+	const std::shared_ptr<AST> GetExpr() const { return expr; }
 
 	ASTVISITOR_ACCEPT
 
@@ -425,8 +437,8 @@ public:
 		: term1{term1}, term2{nullptr}, op{op}
 	{}
 
-	std::shared_ptr<AST> GetTerm1() const { return term1; }
-	std::shared_ptr<AST> GetTerm2() const { return term2; }
+	const std::shared_ptr<AST> GetTerm1() const { return term1; }
+	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 	CompOp GetOp() const { return op; }
 
 	ASTVISITOR_ACCEPT
@@ -447,9 +459,9 @@ public:
 		: cond{cond}, if_stmt{if_stmt}, else_stmt{else_stmt}
 	{}
 
-	std::shared_ptr<AST> GetCond() const { return cond; }
-	std::shared_ptr<AST> GetIf() const { return if_stmt; }
-	std::shared_ptr<AST> GetElse() const { return else_stmt; }
+	const std::shared_ptr<AST> GetCond() const { return cond; }
+	const std::shared_ptr<AST> GetIf() const { return if_stmt; }
+	const std::shared_ptr<AST> GetElse() const { return else_stmt; }
 	bool HasElse() const { return else_stmt != nullptr; }
 
 	ASTVISITOR_ACCEPT
@@ -467,13 +479,33 @@ public:
 		: cond{cond}, stmt{stmt}
 	{}
 
-	std::shared_ptr<AST> GetCond() const { return cond; }
-	std::shared_ptr<AST> GetLoopStmt() const { return stmt; }
+	const std::shared_ptr<AST> GetCond() const { return cond; }
+	const std::shared_ptr<AST> GetLoopStmt() const { return stmt; }
 
 	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> cond, stmt;
+};
+
+
+class ASTArrayAccess : public AST
+{
+public:
+	ASTArrayAccess(std::shared_ptr<AST> term,
+		std::shared_ptr<AST> num1, std::shared_ptr<AST> num2 = nullptr)
+	: term{term}, num1{num1}, num2{num2}
+	{}
+
+	const std::shared_ptr<AST> GetTerm() const { return term; }
+	const std::shared_ptr<AST> GetNum1() const { return num1; }
+	const std::shared_ptr<AST> GetNum2() const { return num2; }
+
+	ASTVISITOR_ACCEPT
+
+private:
+	std::shared_ptr<AST> term;
+	std::shared_ptr<AST> num1, num2;
 };
 
 

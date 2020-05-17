@@ -31,13 +31,13 @@ enum class SymbolType
 struct Symbol
 {
 	std::string name;
-	SymbolType ty;
-	std::array<std::size_t, 2> dims;
+	SymbolType ty = SymbolType::VOID;
+	std::array<std::size_t, 2> dims{{0,0}};
 
 	// for functions
-	std::vector<SymbolType> argty;
-	SymbolType retty;
-	std::array<std::size_t, 2> retdims;
+	std::vector<SymbolType> argty{{}};
+	SymbolType retty = SymbolType::VOID;
+	std::array<std::size_t, 2> retdims{{0,0}};
 
 	bool tmp = false;	// temporary or declared variable?
 };
