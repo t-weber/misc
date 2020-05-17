@@ -64,6 +64,12 @@ func test_mat()
 	putstr(M*M);
 
 	putstr(M[2,2]);
+
+	putstr(M);
+	M[2,2] = 123;
+	putstr(M);
+	putstr(M[2,2] = 987);
+	putstr(M);
 }
 
 

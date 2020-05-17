@@ -84,6 +84,7 @@
 %type<std::shared_ptr<ASTFunc>> function
 %type<std::shared_ptr<ASTTypeDecl>> typedecl
 %type<std::shared_ptr<ASTNumList<double>>> numlist
+%type<std::shared_ptr<AST>> opt_assign
 
 
 // precedences and left/right-associativity
@@ -291,9 +292,45 @@ expr[res]
 	// variable
 	| IDENT[ident]		{ $res = std::make_shared<ASTVar>($ident); }
 
-	// array access
-	| expr[term] '[' expr[num] ']'	{ $res = std::make_shared<ASTArrayAccess>($term, $num); }
-	| expr[term] '[' expr[num1] ',' expr[num2] ']'	{ $res = std::make_shared<ASTArrayAccess>($term, $num1, $num2); }
+	// array access and assignment
+	| expr[term] '[' expr[num] ']' opt_assign[opt_term] {
+			if(!$opt_term)
+			{	// array access into any vector expression
+				$res = std::make_shared<ASTArrayAccess>($term, $num);
+			}
+			else
+			{	// assignment of a vector element
+				if($term->type() != ASTType::Var)
+				{
+					error("Can only assign to an l-value symbol.");
+					$res = nullptr;
+				}
+				else
+				{
+					auto var = std::static_pointer_cast<ASTVar>($term);
+					$res = std::make_shared<ASTArrayAssign>(var->GetIdent(), $opt_term, $num);
+				}
+			}
+		}
+	| expr[term] '[' expr[num1] ',' expr[num2] ']' opt_assign[opt_term]	{
+			if(!$opt_term)
+			{	// array access into any matrix expression
+				$res = std::make_shared<ASTArrayAccess>($term, $num1, $num2);
+			}
+			else
+			{	// assignment of a matrix element
+				if($term->type() != ASTType::Var)
+				{
+					error("Can only assign to an l-value symbol.");
+					$res = nullptr;
+				}
+				else
+				{
+					auto var = std::static_pointer_cast<ASTVar>($term);
+					$res = std::make_shared<ASTArrayAssign>(var->GetIdent(), $opt_term, $num1, $num2);
+				}
+			}
+		}
 
 	// function calls
 	| IDENT[ident] '(' ')'	{ $res = std::make_shared<ASTCall>($ident); }
@@ -302,7 +339,15 @@ expr[res]
 	}
 
 	// assignment
-	| IDENT[ident] '=' expr[term]		{ $res = std::make_shared<ASTAssign>($ident, $term); }
+	| IDENT[ident] '=' expr[term]	{ $res = std::make_shared<ASTAssign>($ident, $term); }
+
+	;
+
+
+// optional assignment
+opt_assign[res]
+	: '=' expr[term]	{ $res = $term; }
+	| /*epsilon*/		{ $res = nullptr; }
 	;
 
 %%

@@ -36,12 +36,41 @@ class ASTReturn;
 class ASTArgs;
 class ASTCall;
 class ASTAssign;
+class ASTArrayAssign;
+class ASTArrayAccess;
 class ASTComp;
 class ASTCond;
 class ASTLoop;
-class ASTArrayAccess;
 template<class> class ASTNumConst;
 template<class> class ASTNumList;
+
+
+enum class ASTType
+{
+	UMinus,
+	Plus,
+	Mult,
+	Mod,
+	Pow,
+	StrConst,
+	Var,
+	Stmts,
+	VarDecl,
+	ArgNames,
+	TypeDecl,
+	Func,
+	Return,
+	Args,
+	Call,
+	Assign,
+	ArrayAssign,
+	ArrayAccess,
+	Comp,
+	Cond,
+	Loop,
+	NumConst,
+	NumList
+};
 
 
 using t_astret = const Symbol*;
@@ -70,10 +99,11 @@ public:
 	virtual t_astret visit(const ASTArgs* ast) = 0;
 	virtual t_astret visit(const ASTCall* ast) = 0;
 	virtual t_astret visit(const ASTAssign* ast) = 0;
+	virtual t_astret visit(const ASTArrayAssign* ast) = 0;
+	virtual t_astret visit(const ASTArrayAccess* ast) = 0;
 	virtual t_astret visit(const ASTComp* ast) = 0;
 	virtual t_astret visit(const ASTCond* ast) = 0;
 	virtual t_astret visit(const ASTLoop* ast) = 0;
-	virtual t_astret visit(const ASTArrayAccess* ast) = 0;
 	virtual t_astret visit(const ASTStrConst* ast) = 0;
 	virtual t_astret visit(const ASTNumConst<double>* ast) = 0;
 	virtual t_astret visit(const ASTNumConst<std::int64_t>* ast) = 0;
@@ -91,6 +121,8 @@ class AST
 {
 public:
 	virtual t_astret accept(ASTVisitor* visitor) const = 0;
+	virtual ASTType type() = 0;
+
 	virtual ~AST() {}
 };
 
@@ -104,6 +136,7 @@ public:
 
 	const std::shared_ptr<AST> GetTerm() const { return term; }
 
+	virtual ASTType type() override { return ASTType::UMinus; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -123,6 +156,7 @@ public:
 	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 	bool IsInverted() const { return inverted; }
 
+	virtual ASTType type() override { return ASTType::Plus; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -143,6 +177,7 @@ public:
 	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 	bool IsInverted() const { return inverted; }
 
+	virtual ASTType type() override { return ASTType::Mult; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -161,6 +196,7 @@ public:
 	const std::shared_ptr<AST> GetTerm1() const { return term1; }
 	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 
+	virtual ASTType type() override { return ASTType::Mod; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -178,6 +214,7 @@ public:
 	const std::shared_ptr<AST> GetTerm1() const { return term1; }
 	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 
+	virtual ASTType type() override { return ASTType::Pow; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -194,6 +231,7 @@ public:
 
 	const std::string& GetIdent() const { return ident; }
 
+	virtual ASTType type() override { return ASTType::Var; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -217,6 +255,7 @@ public:
 		return stmts;
 	}
 
+	virtual ASTType type() override { return ASTType::Stmts; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -247,6 +286,7 @@ public:
 
 	const std::shared_ptr<ASTAssign> GetAssignment() const { return optAssign; }
 
+	virtual ASTType type() override { return ASTType::VarDecl; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -281,6 +321,7 @@ public:
 		return ty;
 	}
 
+	virtual ASTType type() override { return ASTType::ArgNames; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -304,6 +345,7 @@ public:
 		return 0;
 	}
 
+	virtual ASTType type() override { return ASTType::TypeDecl; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -328,6 +370,7 @@ public:
 
 	const std::shared_ptr<ASTStmts> GetStatements() const { return stmts; }
 
+	virtual ASTType type() override { return ASTType::Func; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -349,6 +392,7 @@ public:
 
 	const std::shared_ptr<AST> GetTerm() const { return term; }
 
+	virtual ASTType type() override { return ASTType::Return; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -372,6 +416,7 @@ public:
 		return args;
 	}
 
+	virtual ASTType type() override { return ASTType::Args; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -393,6 +438,7 @@ public:
 	const std::string& GetIdent() const { return ident; }
 	const std::list<std::shared_ptr<AST>>& GetArgumentList() const { return args->GetArgumentList(); }
 
+	virtual ASTType type() override { return ASTType::Call; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -411,6 +457,7 @@ public:
 	const std::string& GetIdent() const { return ident; }
 	const std::shared_ptr<AST> GetExpr() const { return expr; }
 
+	virtual ASTType type() override { return ASTType::Assign; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -441,6 +488,7 @@ public:
 	const std::shared_ptr<AST> GetTerm2() const { return term2; }
 	CompOp GetOp() const { return op; }
 
+	virtual ASTType type() override { return ASTType::Comp; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -464,6 +512,7 @@ public:
 	const std::shared_ptr<AST> GetElse() const { return else_stmt; }
 	bool HasElse() const { return else_stmt != nullptr; }
 
+	virtual ASTType type() override { return ASTType::Cond; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -482,6 +531,7 @@ public:
 	const std::shared_ptr<AST> GetCond() const { return cond; }
 	const std::shared_ptr<AST> GetLoopStmt() const { return stmt; }
 
+	virtual ASTType type() override { return ASTType::Loop; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -501,10 +551,35 @@ public:
 	const std::shared_ptr<AST> GetNum1() const { return num1; }
 	const std::shared_ptr<AST> GetNum2() const { return num2; }
 
+	virtual ASTType type() override { return ASTType::ArrayAccess; }
 	ASTVISITOR_ACCEPT
 
 private:
 	std::shared_ptr<AST> term;
+	std::shared_ptr<AST> num1, num2;
+};
+
+
+class ASTArrayAssign : public AST
+{
+public:
+	ASTArrayAssign(const std::string& ident, std::shared_ptr<AST> expr,
+		std::shared_ptr<AST> num1, std::shared_ptr<AST> num2 = nullptr
+	)
+		: ident{ident}, expr{expr}, num1{num1}, num2{num2}
+	{}
+
+	const std::string& GetIdent() const { return ident; }
+	const std::shared_ptr<AST> GetExpr() const { return expr; }
+	const std::shared_ptr<AST> GetNum1() const { return num1; }
+	const std::shared_ptr<AST> GetNum2() const { return num2; }
+
+	virtual ASTType type() override { return ASTType::ArrayAssign; }
+	ASTVISITOR_ACCEPT
+
+private:
+	std::string ident;
+	std::shared_ptr<AST> expr;
 	std::shared_ptr<AST> num1, num2;
 };
 
@@ -518,6 +593,7 @@ public:
 
 	t_num GetVal() const { return val; }
 
+	virtual ASTType type() override { return ASTType::NumConst; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -533,6 +609,7 @@ public:
 
 	const std::string& GetVal() const { return val; }
 
+	virtual ASTType type() override { return ASTType::StrConst; }
 	ASTVISITOR_ACCEPT
 
 private:
@@ -557,6 +634,7 @@ public:
 		return nums;
 	}
 
+	virtual ASTType type() override { return ASTType::NumList; }
 	ASTVISITOR_ACCEPT
 
 private:

@@ -1604,6 +1604,78 @@ t_astret LLAsm::visit(const ASTArrayAccess* ast)
 }
 
 
+t_astret LLAsm::visit(const ASTArrayAssign* ast)
+{
+	std::string var = ast->GetIdent();
+	t_astret sym = get_sym(var);
+
+	t_astret expr = ast->GetExpr()->accept(this);
+
+	t_astret num1 = ast->GetNum1()->accept(this);
+	num1 = convert_sym(num1, SymbolType::INT);
+
+	t_astret num2 = nullptr;
+	if(ast->GetNum2())
+	{
+		num2 = ast->GetNum2()->accept(this);
+		num2 = convert_sym(num2, SymbolType::INT);
+	}
+
+
+	if(sym->ty == SymbolType::VECTOR)
+	{
+		// cast if needed
+		if(expr->ty != SymbolType::SCALAR)
+			expr = convert_sym(expr, SymbolType::SCALAR);
+
+		if(num2)	// no second argument needed
+			throw std::runtime_error("Invalid element assignment for vector \"" + sym->name + "\".");
+
+		std::size_t dim = std::get<0>(sym->dims);
+
+		// vector element pointer
+		t_astret elemptr = get_tmp_var();
+		(*m_ostr) << "%" << elemptr->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << sym->name << ", i64 0, i64 %" << num1->name << "\n";
+
+		// assign vector element
+		(*m_ostr) << "store double %" << expr->name << ", double* %" << elemptr->name << "\n";
+	}
+	else if(sym->ty == SymbolType::MATRIX)
+	{
+		// cast if needed
+		if(expr->ty != SymbolType::SCALAR)
+			expr = convert_sym(expr, SymbolType::SCALAR);
+
+		if(!num2)	// second argument needed
+			throw std::runtime_error("Invalid element assignment for matrix \"" + sym->name + "\".");
+
+		std::size_t dim1 = std::get<0>(sym->dims);
+		std::size_t dim2 = std::get<1>(sym->dims);
+
+		// idx = num1*dim2 + num2
+		t_astret idx1 = get_tmp_var();
+		t_astret idx = get_tmp_var();
+		(*m_ostr) << "%" << idx1->name << " = mul i64 %" << num1->name << ", " << dim2 << "\n";
+		(*m_ostr) << "%" << idx->name << " = add i64 %" << idx1->name << ", %" << num2->name << "\n";
+
+		// matrix element pointer
+		t_astret elemptr = get_tmp_var();
+		(*m_ostr) << "%" << elemptr->name << " = getelementptr [" << dim1*dim2 << " x double], ["
+			<< dim1*dim2 << " x double]* %" << sym->name << ", i64 0, i64 %" << idx->name << "\n";
+
+		// assign matrix element
+		(*m_ostr) << "store double %" << expr->name << ", double* %" << elemptr->name << "\n";
+	}
+	else if(sym->ty == SymbolType::STRING)
+	{
+		// TODO
+	}
+
+	return expr;
+}
+
+
 t_astret LLAsm::visit(const ASTNumConst<double>* ast)
 {
 	double val = ast->GetVal();
