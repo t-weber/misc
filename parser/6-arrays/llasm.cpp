@@ -994,8 +994,74 @@ t_astret LLAsm::visit(const ASTNorm* ast)
 		return var;
 	}
 	else if(term->ty == SymbolType::VECTOR)
-	{
-		// TODO: 2-norm
+	{	// 2-norm
+		std::size_t dim = std::get<0>(term->dims);
+
+		// result variable
+		t_astret dotptr = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << dotptr->name << " = alloca double\n";
+		(*m_ostr) << "store double 0., double* %" << dotptr->name << "\n";
+
+		// add elements in a loop
+		std::string labelStart = get_label();
+		std::string labelBegin = get_label();
+		std::string labelEnd = get_label();
+
+		// loop counter
+		t_astret ctr = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctr->name << " = alloca i64\n";
+		(*m_ostr) << "store i64 0, i64* %" << ctr->name << "\n";
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelStart << ":  ; loop start\n";
+
+		// loop condition: ctr < dim
+		t_astret ctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctrval->name << " = load i64, i64* %" << ctr->name << "\n";
+
+		t_astret cond = get_tmp_var();
+		(*m_ostr) << "%" << cond->name << " = icmp slt i64 %" << ctrval->name <<  ", " << dim << "\n";
+		(*m_ostr) << "br i1 %" << cond->name << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+		(*m_ostr) << labelBegin << ":  ; loop begin\n";
+
+		// ---------------
+		// loop statements
+		t_astret elemptr_src1 = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_src1->name << " = getelementptr [" << dim << " x double], ["
+		<< dim << " x double]* %" << term->name << ", i64 0, i64 %" << ctrval->name << "\n";
+
+		t_astret elem_src1 = get_tmp_var();
+		(*m_ostr) << "%" << elem_src1->name << " = load double, double* %" << elemptr_src1->name << "\n";
+
+		// square element
+		t_astret mul_elems = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << mul_elems->name << " = fmul "
+			<< "double %" << elem_src1->name << ", %" << elem_src1->name << "\n";
+
+		// increment dot product variable
+		t_astret cur_dot = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << cur_dot->name << " = load double, double* %" << dotptr->name << "\n";
+		t_astret sum_dot = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << sum_dot->name << " = fadd "
+			<< "double %" << cur_dot->name << ", %" << mul_elems->name << "\n";
+		(*m_ostr) << "store double %" << sum_dot->name << ", double* %" << dotptr->name << "\n";
+
+		// increment counter
+		t_astret newctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << newctrval->name << " = add i64 %" << ctrval->name << ", 1\n";
+		(*m_ostr) << "store i64 %" << newctrval->name << ", i64* %" << ctr->name << "\n";
+		// ---------------
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelEnd << ":  ; loop end\n";
+
+		t_astret dot = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << dot->name << " = load double, double* %" << dotptr->name << "\n";
+
+		t_astret dot_sqrt = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << dot_sqrt->name << " = call double @sqrt(double %" << dot->name << ")\n";
+		return dot_sqrt;
 	}
 	else if(term->ty == SymbolType::MATRIX)
 	{

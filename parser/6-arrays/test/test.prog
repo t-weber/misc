@@ -103,6 +103,9 @@ func test_norm()
 {
 	putstr( |-123.4| );
 	putstr( |-987| );
+
+	vec 3 v = [5, 6, 7];
+	putstr( | v | );
 }
 
 

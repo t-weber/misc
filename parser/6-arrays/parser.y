@@ -252,6 +252,11 @@ numlist[res]
 			$res = std::make_shared<ASTNumList<double>>();
 			$res->AddNum($num);
 		}
+	| INT[num] ',' numlist[lst]	{ $lst->AddNum(double($num)); $res = $lst; }
+	| INT[num] {
+			$res = std::make_shared<ASTNumList<double>>();
+			$res->AddNum(double($num));
+		}
 	;
 
 
