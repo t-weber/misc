@@ -39,7 +39,8 @@ struct Symbol
 	SymbolType retty = SymbolType::VOID;
 	std::array<std::size_t, 2> retdims{{0,0}};
 
-	bool tmp = false;	// temporary or declared variable?
+	bool tmp = false;		// temporary or declared variable?
+	bool on_heap = false;	// heap or stack variable?
 };
 
 
@@ -49,9 +50,9 @@ public:
 	const Symbol* AddSymbol(const std::string& name_with_scope,
 		const std::string& name, SymbolType ty,
 		const std::array<std::size_t, 2>& dims,
-		bool is_temp=false)
+		bool is_temp=false, bool on_heap=false)
 	{
-		Symbol sym{.name = name, .ty = ty, .dims=dims, .tmp = is_temp};
+		Symbol sym{.name = name, .ty = ty, .dims=dims, .tmp = is_temp, .on_heap=on_heap};
 		auto pair = m_syms.insert_or_assign(name_with_scope, sym);
 		return &pair.first->second;
 	}

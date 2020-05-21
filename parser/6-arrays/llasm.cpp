@@ -13,7 +13,9 @@
 #include "llasm.h"
 
 
-t_astret LLAsm::get_tmp_var(SymbolType ty, const std::array<std::size_t, 2>* dims, const std::string* name)
+t_astret LLAsm::get_tmp_var(SymbolType ty,
+	const std::array<std::size_t, 2>* dims,
+	const std::string* name, bool on_heap)
 {
 	std::string var;
 	if(name)
@@ -28,9 +30,9 @@ t_astret LLAsm::get_tmp_var(SymbolType ty, const std::array<std::size_t, 2>* dim
 	}
 
 	if(dims)
-		return m_syms->AddSymbol(var, var, ty, *dims, true);
+		return m_syms->AddSymbol(var, var, ty, *dims, true, on_heap);
 	else
-		return m_syms->AddSymbol(var, var, ty, {0,0}, true);
+		return m_syms->AddSymbol(var, var, ty, {0,0}, true, on_heap);
 }
 
 
@@ -384,7 +386,7 @@ t_astret LLAsm::visit(const ASTPlus* ast)
 		return vec_mem;
 	}
 
-	// concatenate strings, TODO: conversion in case one term is not of string type
+	// concatenate strings
 	else if(term1->ty == SymbolType::STRING || term2->ty == SymbolType::STRING)
 	{
 		// cast to string if needed
@@ -1113,13 +1115,15 @@ t_astret LLAsm::visit(const ASTCall* ast)
 {
 	const std::string& funcname = ast->GetIdent();
 	t_astret func = get_sym(funcname);
+
 	if(func == nullptr)
 		throw std::runtime_error("ASTCall: Function \"" + funcname + "\" not in symbol table.");
 	if(ast->GetArgumentList().size() != func->argty.size())
 		throw std::runtime_error("ASTCall: Invalid number of function parameters for \"" + funcname + "\".");
 
-	std::vector<t_astret> args;
 
+	// prepare arguments
+	std::vector<t_astret> args;
 	std::size_t _idx=0;
 	for(const auto& curarg : ast->GetArgumentList())
 	{
@@ -1182,8 +1186,8 @@ t_astret LLAsm::visit(const ASTCall* ast)
 	(*m_ostr) << ")\n";
 
 
+	// prepare return values
 	// allocate memory for local string copy
-	// TODO: free memory, if a heap pointer is returned
 	if(func->retty == SymbolType::STRING)
 	{
 		t_astret symcpy = get_tmp_var(func->retty, &func->retdims);
@@ -1197,11 +1201,12 @@ t_astret LLAsm::visit(const ASTCall* ast)
 		(*m_ostr) << "call i8* @strncpy(i8* %" << strptr->name << ", i8* %" << retvar->name
 			<< ", i64 " << std::get<0>(func->retdims) << ")\n";
 
+		// free heap return value (TODO: check if it really is on the heap)
+		(*m_ostr) << "call void @free(i8* %" << retvar->name << ")\n";
 		retvar = symcpy;
 	}
 
 	// allocate memory for local array copy
-	// TODO: free memory, if a heap pointer is returned
 	else if(func->retty == SymbolType::VECTOR || func->retty == SymbolType::MATRIX)
 	{
 		t_astret symcpy = get_tmp_var(func->retty, &func->retdims);
@@ -1227,6 +1232,8 @@ t_astret LLAsm::visit(const ASTCall* ast)
 		(*m_ostr) << "call i8* @memcpy(i8* %" << arrptr_cast->name << ", i8* %" << arg_cast->name
 			<< ", i64 " << argdim*sizeof(double) << ")\n";
 
+		// free heap return value (TODO: check if it really is on the heap)
+		(*m_ostr) << "call void @free(i8* %" << arg_cast->name << ")\n";
 		retvar = symcpy;
 	}
 
@@ -1410,7 +1417,7 @@ t_astret LLAsm::visit(const ASTReturn* ast)
 		}
 
 		// string and array pointers cannot be returned directly as they refer to the local stack
-		// returning a pointer to a copy on the heap instead (TODO: free mem)
+		// returning a pointer to a copy on the heap instead
 		else if(term->ty == SymbolType::STRING)
 		{
 			std::size_t dim = std::get<0>(term->dims);
@@ -1424,7 +1431,7 @@ t_astret LLAsm::visit(const ASTReturn* ast)
 			t_astret strretlen_z = get_tmp_var(SymbolType::INT);
 			(*m_ostr) << "%" << strretlen_z->name << " = add i64 %" << strretlen->name << ", 1\n";
 
-			t_astret strret = get_tmp_var(SymbolType::STRING, &term->dims);
+			t_astret strret = get_tmp_var(SymbolType::STRING, &term->dims, nullptr, true);
 			(*m_ostr) << "%" << strret->name << " = call i8* @malloc(i64 %" << strretlen_z->name << ")\n";
 
 			(*m_ostr) << "call i8* @strncpy(i8* %" << strret->name << ", i8* %" << termptr->name
@@ -1435,7 +1442,7 @@ t_astret LLAsm::visit(const ASTReturn* ast)
 		}
 
 		// string and array pointers cannot be returned directly as they refer to the local stack
-		// returning a pointer to a copy on the heap instead (TODO: free mem)
+		// returning a pointer to a copy on the heap instead
 		else if(term->ty == SymbolType::VECTOR || term->ty == SymbolType::MATRIX)
 		{
 			std::size_t dim = std::get<0>(term->dims);
@@ -1445,7 +1452,7 @@ t_astret LLAsm::visit(const ASTReturn* ast)
 			t_astret termptr = get_tmp_var(term->ty);
 			(*m_ostr) << "%" << termptr->name << " = bitcast [" << dim << " x double]* %" << term->name << " to i8*\n";
 
-			t_astret arrret = get_tmp_var(term->ty, &term->dims);
+			t_astret arrret = get_tmp_var(term->ty, &term->dims, nullptr, true);
 			(*m_ostr) << "%" << arrret->name << " = call i8* @malloc(i64 " << dim*sizeof(double) << ")\n";
 
 			(*m_ostr) << "call i8* @memcpy(i8* %" << arrret->name << ", i8* %" << termptr->name
@@ -1660,7 +1667,12 @@ t_astret LLAsm::visit(const ASTComp* ast)
 				op = "s" + op;	// signed
 			break;
 		}
-		// TODO: other types
+		default:
+		{
+			throw std::runtime_error("ASTComp: Invalid comparison between variables of type "
+				+ get_type_name(ty) + ".");
+			break;
+		}
 	}
 
 	(*m_ostr) << "%" << var->name << " = " << cmpop << " " << op << " "
@@ -1737,7 +1749,7 @@ t_astret LLAsm::visit(const ASTArrayAccess* ast)
 	if(term->ty == SymbolType::VECTOR)
 	{
 		if(num2)	// no second argument needed
-			throw std::runtime_error("Invalid access operator for vector \"" + term->name + "\".");
+			throw std::runtime_error("ASTArrayAccess: Invalid access operator for vector \"" + term->name + "\".");
 
 		std::size_t dim = std::get<0>(term->dims);
 
@@ -1756,7 +1768,7 @@ t_astret LLAsm::visit(const ASTArrayAccess* ast)
 	else if(term->ty == SymbolType::MATRIX)
 	{
 		if(!num2)	// second argument needed
-			throw std::runtime_error("Invalid access operator for matrix \"" + term->name + "\".");
+			throw std::runtime_error("ASTArrayAccess: Invalid access operator for matrix \"" + term->name + "\".");
 
 		std::size_t dim1 = std::get<0>(term->dims);
 		std::size_t dim2 = std::get<1>(term->dims);
@@ -1781,7 +1793,7 @@ t_astret LLAsm::visit(const ASTArrayAccess* ast)
 	else if(term->ty == SymbolType::STRING)
 	{
 		if(num2)	// no second argument needed
-			throw std::runtime_error("Invalid access operator for string \"" + term->name + "\".");
+			throw std::runtime_error("ASTArrayAccess: Invalid access operator for string \"" + term->name + "\".");
 
 		std::size_t dim = std::get<0>(term->dims);
 
@@ -1819,7 +1831,7 @@ t_astret LLAsm::visit(const ASTArrayAccess* ast)
 		return str_mem;
 	}
 
-	throw std::runtime_error("Invalid array access to \"" + term->name + "\".");
+	throw std::runtime_error("ASTArrayAccess: Invalid array access to \"" + term->name + "\".");
 	return nullptr;
 }
 
@@ -1849,7 +1861,7 @@ t_astret LLAsm::visit(const ASTArrayAssign* ast)
 			expr = convert_sym(expr, SymbolType::SCALAR);
 
 		if(num2)	// no second argument needed
-			throw std::runtime_error("Invalid element assignment for vector \"" + sym->name + "\".");
+			throw std::runtime_error("ASTArrayAssign: Invalid element assignment for vector \"" + sym->name + "\".");
 
 		std::size_t dim = std::get<0>(sym->dims);
 
@@ -1868,7 +1880,7 @@ t_astret LLAsm::visit(const ASTArrayAssign* ast)
 			expr = convert_sym(expr, SymbolType::SCALAR);
 
 		if(!num2)	// second argument needed
-			throw std::runtime_error("Invalid element assignment for matrix \"" + sym->name + "\".");
+			throw std::runtime_error("ASTArrayAssign: Invalid element assignment for matrix \"" + sym->name + "\".");
 
 		std::size_t dim1 = std::get<0>(sym->dims);
 		std::size_t dim2 = std::get<1>(sym->dims);

@@ -60,7 +60,7 @@ public:
 protected:
 	t_astret get_tmp_var(SymbolType ty = SymbolType::SCALAR,
 		const std::array<std::size_t, 2>* dims = nullptr,
-		const std::string* name = nullptr);
+		const std::string* name = nullptr, bool on_heap = false);
 
 	/**
 	 * create a label for branch instructions
