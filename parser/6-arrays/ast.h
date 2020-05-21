@@ -364,6 +364,11 @@ public:
 		return 0;
 	}
 
+	std::tuple<SymbolType, std::size_t, std::size_t> GetRet() const
+	{
+		return std::make_tuple(ty, dim1, dim2);
+	}
+
 	virtual ASTType type() override { return ASTType::TypeDecl; }
 	ASTVISITOR_ACCEPT
 
@@ -378,11 +383,11 @@ class ASTFunc : public AST
 public:
 	ASTFunc(const std::string& ident, std::shared_ptr<ASTTypeDecl>& rettype,
 		std::shared_ptr<ASTArgNames>& args, std::shared_ptr<ASTStmts> stmts)
-		: ident{ident}, rettype{rettype}, argnames{args->GetArgs()}, stmts{stmts}
+		: ident{ident}, rettype{rettype->GetRet()}, argnames{args->GetArgs()}, stmts{stmts}
 	{}
 
 	const std::string& GetIdent() const { return ident; }
-	SymbolType GetRetType() const { return rettype->GetType(); }
+	std::tuple<SymbolType, std::size_t, std::size_t> GetRetType() const { return rettype; }
 
 	const std::list<std::tuple<std::string, SymbolType, std::size_t, std::size_t>>&
 	GetArgNames() const { return argnames; }
@@ -394,7 +399,7 @@ public:
 
 private:
 	std::string ident;
-	std::shared_ptr<ASTTypeDecl> rettype;
+	std::tuple<SymbolType, std::size_t, std::size_t> rettype;
 	std::list<std::tuple<std::string, SymbolType, std::size_t, std::size_t>> argnames;
 	std::shared_ptr<ASTStmts> stmts;
 };

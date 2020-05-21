@@ -387,6 +387,10 @@ t_astret LLAsm::visit(const ASTPlus* ast)
 	// concatenate strings, TODO: conversion in case one term is not of string type
 	else if(term1->ty == SymbolType::STRING || term2->ty == SymbolType::STRING)
 	{
+		// cast to string if needed
+		term1 = convert_sym(term1, SymbolType::STRING);
+		term2 = convert_sym(term2, SymbolType::STRING);
+
 		/* get individual and total string lengths
 		t_astret len1 = get_tmp_var(SymbolType::INT);
 		t_astret len2 = get_tmp_var(SymbolType::INT);
@@ -1135,6 +1139,7 @@ t_astret LLAsm::visit(const ASTCall* ast)
 
 			args.push_back(strptr);
 		}
+
 		else if(arg_casted->ty == SymbolType::VECTOR || arg_casted->ty == SymbolType::MATRIX)
 		{
 			// array arguments are of type double*, so use a pointer to the array
@@ -1151,6 +1156,7 @@ t_astret LLAsm::visit(const ASTCall* ast)
 
 			args.push_back(arrptr);
 		}
+
 		else
 		{
 			args.push_back(arg_casted);
@@ -1159,10 +1165,11 @@ t_astret LLAsm::visit(const ASTCall* ast)
 		++_idx;
 	}
 
-	// TODO: other return types
-	t_astret retvar = get_tmp_var(func->retty);
+
+	t_astret retvar = get_tmp_var(func->retty, &func->retdims);
 	std::string retty = get_type_name(func->retty);
 
+	// call function
 	if(func->retty != SymbolType::VOID)
 		(*m_ostr) << "%" << retvar->name << " = ";
 	(*m_ostr) << "call " << retty << " @" << funcname << "(";
@@ -1173,6 +1180,56 @@ t_astret LLAsm::visit(const ASTCall* ast)
 			(*m_ostr) << ", ";
 	}
 	(*m_ostr) << ")\n";
+
+
+	// allocate memory for local string copy
+	// TODO: free memory, if a heap pointer is returned
+	if(func->retty == SymbolType::STRING)
+	{
+		t_astret symcpy = get_tmp_var(func->retty, &func->retdims);
+		(*m_ostr) << "%" << symcpy->name << " = alloca [" << std::get<0>(func->retdims) << " x i8]\n";
+
+		t_astret strptr = get_tmp_var();
+		(*m_ostr) << "%" << strptr->name << " = getelementptr [" << std::get<0>(func->retdims) << " x i8], ["
+			<< std::get<0>(func->retdims) << " x i8]* %" << symcpy->name << ", i64 0, i64 0\n";
+
+		// copy string
+		(*m_ostr) << "call i8* @strncpy(i8* %" << strptr->name << ", i8* %" << retvar->name
+			<< ", i64 " << std::get<0>(func->retdims) << ")\n";
+
+		retvar = symcpy;
+	}
+
+	// allocate memory for local array copy
+	// TODO: free memory, if a heap pointer is returned
+	else if(func->retty == SymbolType::VECTOR || func->retty == SymbolType::MATRIX)
+	{
+		t_astret symcpy = get_tmp_var(func->retty, &func->retdims);
+		std::size_t argdim = std::get<0>(func->retdims);
+		if(func->retty == SymbolType::MATRIX)
+			argdim *= std::get<1>(func->retdims);
+
+		// allocate memory for local array copy
+		(*m_ostr) << "%" << symcpy->name << " = alloca [" << argdim << " x double]\n";
+
+		t_astret arrptr = get_tmp_var();
+		(*m_ostr) << "%" << arrptr->name << " = getelementptr [" << argdim << " x double], ["
+			<< argdim << " x double]* %" << symcpy->name << ", i64 0, i64 0\n";
+
+		// copy array
+		t_astret arrptr_cast = get_tmp_var();
+		t_astret arg_cast = get_tmp_var();
+
+		// cast to memcpy argument pointer type
+		(*m_ostr) << "%" << arrptr_cast->name << " = bitcast double* %" << arrptr->name << " to i8*\n";
+		(*m_ostr) << "%" << arg_cast->name << " = bitcast double* %" << retvar->name << " to i8*\n";
+
+		(*m_ostr) << "call i8* @memcpy(i8* %" << arrptr_cast->name << ", i8* %" << arg_cast->name
+			<< ", i64 " << argdim*sizeof(double) << ")\n";
+
+		retvar = symcpy;
+	}
+
 	return retvar;
 }
 
@@ -1242,7 +1299,7 @@ t_astret LLAsm::visit(const ASTFunc* ast)
 {
 	m_curscope.push_back(ast->GetIdent());
 
-	std::string rettype = get_type_name(ast->GetRetType());
+	std::string rettype = get_type_name(std::get<0>(ast->GetRetType()));
 	(*m_ostr) << "define " << rettype << " @" << ast->GetIdent() << "(";
 
 	auto argnames = ast->GetArgNames();
@@ -1319,7 +1376,7 @@ t_astret LLAsm::visit(const ASTFunc* ast)
 	t_astret lastres = ast->GetStatements()->accept(this);
 
 
-	if(ast->GetRetType() == SymbolType::VOID)
+	if(std::get<0>(ast->GetRetType()) == SymbolType::VOID)
 	{
 		(*m_ostr) << "ret void\n";
 	}
@@ -1345,7 +1402,68 @@ t_astret LLAsm::visit(const ASTReturn* ast)
 	if(ast->GetTerm())
 	{
 		t_astret term = ast->GetTerm()->accept(this);
-		(*m_ostr) << "ret " << get_type_name(term->ty) << " %" << term->name << "\n";
+
+		if(term->ty == SymbolType::SCALAR || term->ty == SymbolType::INT)
+		{
+			(*m_ostr) << "ret " << get_type_name(term->ty) << " %" << term->name << "\n";
+			return term;
+		}
+
+		// string and array pointers cannot be returned directly as they refer to the local stack
+		// returning a pointer to a copy on the heap instead (TODO: free mem)
+		else if(term->ty == SymbolType::STRING)
+		{
+			std::size_t dim = std::get<0>(term->dims);
+
+			t_astret termptr = get_tmp_var(SymbolType::STRING);
+			(*m_ostr) << "%" << termptr->name << " = bitcast [" << dim << " x i8]* %" << term->name << " to i8*\n";
+
+			t_astret strretlen = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << strretlen->name << " = call i64 @strlen(i8* %" << termptr->name << ")\n";
+
+			t_astret strretlen_z = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << strretlen_z->name << " = add i64 %" << strretlen->name << ", 1\n";
+
+			t_astret strret = get_tmp_var(SymbolType::STRING, &term->dims);
+			(*m_ostr) << "%" << strret->name << " = call i8* @malloc(i64 %" << strretlen_z->name << ")\n";
+
+			(*m_ostr) << "call i8* @strncpy(i8* %" << strret->name << ", i8* %" << termptr->name
+				<< ", i64 %" << strretlen_z->name << ")\n";
+
+			(*m_ostr) << "ret i8* %" << strret->name << "\n";
+			return strret;
+		}
+
+		// string and array pointers cannot be returned directly as they refer to the local stack
+		// returning a pointer to a copy on the heap instead (TODO: free mem)
+		else if(term->ty == SymbolType::VECTOR || term->ty == SymbolType::MATRIX)
+		{
+			std::size_t dim = std::get<0>(term->dims);
+			if(term->ty == SymbolType::MATRIX)
+				dim *= std::get<1>(term->dims);
+
+			t_astret termptr = get_tmp_var(term->ty);
+			(*m_ostr) << "%" << termptr->name << " = bitcast [" << dim << " x double]* %" << term->name << " to i8*\n";
+
+			t_astret arrret = get_tmp_var(term->ty, &term->dims);
+			(*m_ostr) << "%" << arrret->name << " = call i8* @malloc(i64 " << dim*sizeof(double) << ")\n";
+
+			(*m_ostr) << "call i8* @memcpy(i8* %" << arrret->name << ", i8* %" << termptr->name
+				<< ", i64 " << dim*sizeof(double) << ")\n";
+
+			// cast to the actual double*
+			t_astret arrret_double = get_tmp_var(term->ty, &term->dims);
+			(*m_ostr) << "%" << arrret_double->name << " = bitcast i8* %" << arrret->name << " to double*\n";
+
+			(*m_ostr) << "ret double* %" << arrret_double->name << "\n";
+			return arrret_double;
+		}
+
+		else
+		{
+			throw std::runtime_error("ASTReturn: Unhandled return type \""
+				+ get_type_name(term->ty) + "\".");
+		}
 	}
 	else
 	{
@@ -1371,6 +1489,7 @@ t_astret LLAsm::visit(const ASTAssign* ast)
 		std::string ty = get_type_name(expr->ty);
 		(*m_ostr) << "store " << ty << " %" << expr->name << ", "<< ty << "* %" << var << "\n";
 	}
+
 	else if(sym->ty == SymbolType::VECTOR || sym->ty == SymbolType::MATRIX)
 	{
 		if(sym->ty == SymbolType::VECTOR && expr->ty == SymbolType::VECTOR)
@@ -1440,6 +1559,7 @@ t_astret LLAsm::visit(const ASTAssign* ast)
 		(*m_ostr) << "br label %" << labelStart << "\n";
 		(*m_ostr) << labelEnd << ":  ; loop end\n";
 	}
+
 	else if(sym->ty == SymbolType::STRING)
 	{
 		std::size_t src_dim = std::get<0>(expr->dims);
@@ -1632,6 +1752,7 @@ t_astret LLAsm::visit(const ASTArrayAccess* ast)
 		return elem;
 
 	}
+
 	else if(term->ty == SymbolType::MATRIX)
 	{
 		if(!num2)	// second argument needed
@@ -1656,6 +1777,7 @@ t_astret LLAsm::visit(const ASTArrayAccess* ast)
 		(*m_ostr) << "%" << elem->name << " = load double, double* %" << elemptr->name << "\n";
 		return elem;
 	}
+
 	else if(term->ty == SymbolType::STRING)
 	{
 		if(num2)	// no second argument needed

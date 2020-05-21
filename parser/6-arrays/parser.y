@@ -195,7 +195,8 @@ function[res]
 			$res = std::make_shared<ASTFunc>($ident, $rettype, $args, $blk);
 
 			context.LeaveScope($ident);
-			context.AddFunc($ident, $rettype->GetType(), $args->GetArgTypes());
+			std::array<std::size_t, 2> retdims{{$rettype->GetDim(0), $rettype->GetDim(1)}};
+			context.AddFunc($ident, $rettype->GetType(), $args->GetArgTypes(), &retdims);
 		}
 	| FUNC IDENT[ident] {
 			context.EnterScope($ident);

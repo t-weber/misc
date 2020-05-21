@@ -60,9 +60,11 @@ public:
 	const Symbol* AddFunc(const std::string& name_with_scope,
 		const std::string& name, SymbolType retty,
 		const std::vector<SymbolType>& argtypes,
-		const std::array<std::size_t, 2>& retdims)
+		const std::array<std::size_t, 2>* retdims = nullptr)
 	{
-		Symbol sym{.name = name, .ty = SymbolType::FUNC, .argty = argtypes, .retty = retty, .retdims=retdims};
+		Symbol sym{.name = name, .ty = SymbolType::FUNC, .argty = argtypes, .retty = retty};
+		if(retdims)
+			sym.retdims = *retdims;
 		auto pair = m_syms.insert_or_assign(name_with_scope, sym);
 		return &pair.first->second;
 	}

@@ -55,7 +55,7 @@ func test_vec(vec 3 a)
 }
 
 
-func test_mat()
+func mat 3 3 test_mat()
 {
 	mat 3 3 M = [0., 1., 0.,  1., 0., 0.,  0., 0., 1.];
 	vec 3 v = [1., 5., 9.];
@@ -72,10 +72,12 @@ func test_mat()
 	putstr(M);
 
 	#putstr(ext_determinant(M, 3, 3));
+
+	ret M;
 }
 
 
-func test_str(str s)
+func str test_str(str s)
 {
 	putstr(s);
 	putstr(s[1]);
@@ -96,6 +98,8 @@ func test_str(str s)
 	putstr(l);
 
 	putint(strlen(j));
+
+	ret "Test" + " Return";
 }
 
 
@@ -126,10 +130,10 @@ func start()
 	test_vec(v);
 
 	putstr("----- matrices -----");
-	test_mat();
+	putstr("Returned: " + test_mat());
 
 	putstr("----- strings -----");
-	test_str("XYZ");
+	putstr(test_str("XYZ"));
 
 	putstr("----- norm -----");
 	test_norm();
