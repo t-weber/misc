@@ -1071,7 +1071,19 @@ t_astret LLAsm::visit(const ASTNorm* ast)
 	}
 	else if(term->ty == SymbolType::MATRIX)
 	{
-		// TODO: det
+		std::size_t dim1 = std::get<0>(term->dims);
+		std::size_t dim2 = std::get<1>(term->dims);
+		std::size_t dim = dim1*dim2;
+
+		// cast array pointer to element pointer
+		t_astret termptr = get_tmp_var();
+		(*m_ostr) << "%" << termptr->name << " = bitcast [" << dim << " x double]* %" << term->name << " to double*\n";
+
+		t_astret det = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << det->name << " = call double @ext_determinant(double* %"
+			<< termptr->name << ", i64 " << dim1 << ", i64 " << dim2 << ")\n";
+
+		return det;
 	}
 
 	throw std::runtime_error("ASTNorm: Invalid symbol type for \"" + term->name + "\".");

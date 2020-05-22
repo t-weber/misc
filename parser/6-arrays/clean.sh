@@ -14,16 +14,20 @@ rm -fv stack.hh
 rm -fv lexer_impl.cpp
 rm -fv lexer_impl.h
 
-rm -rfv runtime.o
+rm -fv runtime.o
+rm -fv runtime.asm
+rm -fv runtime.asm.bc
 
-rm -rfv test.asm
-rm -rfv test.asm.bc
-rm -rfv test.asm.s
-rm -rfv test.asm.o
-rm -rfv test-opt.asm
-rm -rfv test-opt.asm.bc
-rm -rfv test-opt.asm.s
-rm -rfv test-opt.asm.o
-rm -rfv test.o
+rm -fv test.asm
+rm -fv test.asm.bc
+rm -fv test.asm.s
+rm -fv test.asm.o
+rm -fv test-opt.asm
+rm -fv test-opt.asm.bc
+rm -fv test-opt.asm.s
+rm -fv test-opt.asm.o
+rm -fv test.o
+
+rm -fv test_linked.bc
 
 rm -fv 0

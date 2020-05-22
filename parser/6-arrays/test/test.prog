@@ -71,7 +71,7 @@ func mat 3 3 test_mat()
 	putstr(M[2,2] = 987);
 	putstr(M);
 
-	#putstr(ext_determinant(M, 3, 3));
+	putstr("det: " + |M|);
 
 	ret M;
 }
