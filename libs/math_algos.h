@@ -881,7 +881,7 @@ requires is_basic_vec<t_vec>
 	else if(iN == 2)
 		return mat[0]*mat[3] - mat[1]*mat[2];
 
-	// recursively expand determiant along a row
+
 	T fullDet = T(0);
 	std::size_t iRow = 0;
 
@@ -903,6 +903,8 @@ requires is_basic_vec<t_vec>
 		}
 	}
 
+
+	// recursively expand determiant along a row
 	for(std::size_t iCol=0; iCol<iN; ++iCol)
 	{
 		const T elem = mat[iRow*iN + iCol];

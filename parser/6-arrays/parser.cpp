@@ -88,7 +88,7 @@ int main(int argc, char** argv)
 		ctx.AddFunc("flt_to_str", SymbolType::VOID, {SymbolType::SCALAR, SymbolType::STRING, SymbolType::INT});
 		ctx.AddFunc("int_to_str", SymbolType::VOID, {SymbolType::INT, SymbolType::STRING, SymbolType::INT});
 
-		//ctx.AddFunc("ext_determinant", SymbolType::SCALAR, {SymbolType::MATRIX, SymbolType::INT, SymbolType::INT});
+		//ctx.AddFunc("ext_determinant", SymbolType::SCALAR, {SymbolType::MATRIX, SymbolType::INT});
 
 		yy::Parser parser(ctx);
 		int res = parser.parse();
@@ -134,7 +134,7 @@ declare void @free(i8*)
 
 ; -----------------------------------------------------------------------------
 ; external runtime functions from runtime.cpp
-declare double @ext_determinant(double*, i64, i64);
+declare double @ext_determinant(double*, i64);
 ; -----------------------------------------------------------------------------
 
 

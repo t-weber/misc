@@ -47,11 +47,11 @@ if ! ${CXX} -O2 -march=native -Wall -Wextra -std=c++17 -o ${OUTNAME} parser.cpp 
 	exit -1
 fi
 
-echo -e "\nBuilding runtime...\n"
-if ! ${CXX} -O2 -march=native -Wall -Wextra -std=c++17 -c runtime.cpp; then
-	echo -e "Compilation of runtime failed."
-	exit -1
-fi
+#echo -e "\nBuilding runtime...\n"
+#if ! ${CXX} -O2 -march=native -Wall -Wextra -std=c++17 -c runtime.cpp; then
+#	echo -e "Compilation of runtime failed."
+#	exit -1
+#fi
 
 echo -e "\nStripping ${OUTNAME} binary..."
 strip -v ${OUTNAME}

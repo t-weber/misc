@@ -60,6 +60,8 @@ func mat 3 3 test_mat()
 	mat 3 3 M = [0., 1., 0.,  1., 0., 0.,  0., 0., 1.];
 	vec 3 v = [1., 5., 9.];
 
+	putstr("det: " + |M*M|);
+
 	putstr(M*v);
 	putstr(M*M);
 
@@ -70,8 +72,6 @@ func mat 3 3 test_mat()
 	putstr(M);
 	putstr(M[2,2] = 987);
 	putstr(M);
-
-	putstr("det: " + |M|);
 
 	ret M;
 }
