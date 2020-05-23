@@ -16,6 +16,7 @@ rm -fv lexer_impl.h
 
 rm -fv runtime.o
 rm -fv runtime.asm
+rm -fv runtime_opt.asm
 rm -fv runtime.s
 rm -fv runtime.bc
 rm -fv runtime.asm.bc
@@ -32,6 +33,7 @@ rm -fv test.o
 
 rm -fv out
 rm -fv out.asm
+rm -fv out_opt.asm
 rm -fv out.bc
 rm -fv out.s
 rm -fv out_linked.bc

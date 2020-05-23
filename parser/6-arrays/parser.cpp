@@ -58,6 +58,7 @@ int main(int argc, char** argv)
 	try
 	{
 		// llvm toolchain
+		std::string tool_opt = "opt";
 		std::string tool_bc = "llvm-as";
 		std::string tool_bclink = "llvm-link";
 		std::string tool_interp = "lli";
@@ -73,6 +74,7 @@ int main(int argc, char** argv)
 		std::vector<std::string> vecProgs;
 		bool interpret = false;
 		bool optimise = false;
+		bool show_symbols = false;
 		std::string outprog;
 
 		args::options_description arg_descr("Compiler arguments");
@@ -80,6 +82,7 @@ int main(int argc, char** argv)
 			("out,o", args::value(&outprog), "compiled program output")
 			("optimise,O", args::bool_switch(&optimise), "optimise program")
 			("interpret,i", args::bool_switch(&interpret), "directly run program in interpreter")
+			("symbols,s", args::bool_switch(&show_symbols), "print symbol table")
 			("program", args::value<decltype(vecProgs)>(&vecProgs), "input program to compile");
 
 		args::positional_options_description posarg_descr;
@@ -87,6 +90,7 @@ int main(int argc, char** argv)
 
 		args::options_description arg_descr_toolchain("Toolchain programs");
 		arg_descr_toolchain.add_options()
+			("tool_opt", args::value(&tool_opt), "llvm optimiser")
 			("tool_bc", args::value(&tool_bc), "llvm bitcode assembler")
 			("tool_bclink", args::value(&tool_bclink), "llvm bitcode linker")
 			("tool_interp", args::value(&tool_interp), "llvm bitcode interpreter")
@@ -120,12 +124,13 @@ int main(int argc, char** argv)
 		}
 
 		std::string outprog_3ac = outprog + ".asm";
+		std::string outprog_3ac_opt = outprog + "_opt.asm";
 		std::string outprog_bc = outprog + ".bc";
 		std::string outprog_linkedbc = outprog + "_linked.bc";
 		std::string outprog_s = outprog + ".s";
 		std::string outprog_o = outprog + ".o";
 
-		std::string runtime_3ac = "runtime.asm";
+		std::string runtime_3ac = optimise ? "runtime_opt.asm" : "runtime.asm";
 		std::string runtime_bc = "runtime.bc";
 		// --------------------------------------------------------------------
 
@@ -165,12 +170,16 @@ int main(int argc, char** argv)
 
 		yy::Parser parser(ctx);
 		int res = parser.parse();
-
 		if(res != 0)
 		{
-			std::cerr << "Parser reports error.\n";
-			std::cerr << ctx.GetSymbols() << std::endl;
+			std::cerr << "Parser reports failure." << std::endl;
 			return res;
+		}
+
+		if(show_symbols)
+		{
+			std::cout << "\nSymbol table:\n";
+			std::cout << ctx.GetSymbols() << std::endl;
 		}
 		// --------------------------------------------------------------------
 
@@ -192,9 +201,9 @@ int main(int argc, char** argv)
 			(*ostr) << std::endl;
 		}
 
-		// additional code to make it run
-		{
-			std::string strStartup= R"START(
+
+		// additional runtime/startup code
+		(*ostr) << "\n" << R"START(
 ; -----------------------------------------------------------------------------
 ; imported libc functions
 declare double @pow(double, double)
@@ -300,7 +309,28 @@ define i32 @main()
 ; -----------------------------------------------------------------------------
 )START";
 
-			(*ostr) << "\n" << strStartup << std::endl;
+		(*ostr) << std::endl;
+		// --------------------------------------------------------------------
+
+
+
+		// --------------------------------------------------------------------
+		// 3AC optimisation
+		// --------------------------------------------------------------------
+		if(optimise)
+		{
+			std::cout << "Optimising intermediate code: \""
+				<< outprog_3ac << "\" -> \"" << outprog_3ac_opt << "\"..." << std::endl;
+
+			std::string cmd_opt = tool_opt + " -stats -S --strip-debug -o "
+				+ outprog_3ac_opt + " " + outprog_3ac;
+			if(std::system(cmd_opt.c_str()) != 0)
+			{
+				std::cerr << "Failed." << std::endl;
+				return -1;
+			}
+
+			outprog_3ac = outprog_3ac_opt;
 		}
 		// --------------------------------------------------------------------
 

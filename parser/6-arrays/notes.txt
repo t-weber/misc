@@ -1,10 +1,26 @@
-Run in interpreter:
-	./parser test/test.prog > test.asm && clang -S -emit-llvm -o runtime.asm runtime.cpp && llvm-as test.asm && llvm-as runtime.asm && llvm-link test.asm.bc runtime.asm.bc -o test_linked.bc && lli test_linked.bc
+Run an llvm assembly program in the interpreter:
+	llvm-as test.asm
+	llvm-as runtime.asm
+	llvm-link test.asm.bc runtime.asm.bc -o test_linked.bc
+	lli test_linked.bc
 
-Compilation:
-	./parser test/test.prog > test.asm && llvm-as test.asm && llc test.asm.bc && clang -o 0 test.asm.s runtime.cpp -lm
+Link an llvm assembly program:
+	llvm-as test.asm
+	llc test.asm.bc
+	clang -o 0 test.asm.s runtime.cpp -lm
 
-	./parser test/test.prog > test.asm && opt -stats -S --strip-debug -o test-opt.asm test.asm && llvm-as test-opt.asm && llc -O2 test-opt.asm.bc && as -o test.o test-opt.asm.s && clang -O2 -o 0 test.o runtime.cpp -lm && llvm-strip 0
+Link an llvm assembly program with optimisation:
+	opt -stats -S --strip-debug -o test-opt.asm test.asm
+	llvm-as test-opt.asm
+	llc -O2 test-opt.asm.bc
+	as -o test.o test-opt.asm.s
+	clang -O2 -o 0 test.o runtime.cpp -lm
+	llvm-strip 0
 
-No crt startup code:
-	./parser test/test.prog > test.asm && opt -stats -S --strip-debug -o test-opt.asm test.asm && llvm-as test-opt.asm && llc -O2 test-opt.asm.bc && as -o test.o test-opt.asm.s && ld -entry=main -o 0 test.o -lc --dynamic-linker=/lib64/ld-linux-x86-64.so.2 && llvm-strip 0
+Link an llvm assembly program ignoring the crt startup code:
+	opt -stats -S --strip-debug -o test-opt.asm test.asm
+	llvm-as test-opt.asm
+	llc -O2 test-opt.asm.bc
+	as -o test.o test-opt.asm.s
+	ld -entry=main -o 0 test.o -lc --dynamic-linker=/lib64/ld-linux-x86-64.so.2
+	llvm-strip 0

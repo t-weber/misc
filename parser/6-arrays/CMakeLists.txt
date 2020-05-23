@@ -13,7 +13,7 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 find_package(FLEX 2 REQUIRED)
 find_package(BISON 3 REQUIRED)
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS program_options)
 
 
 add_definitions(${Boost_CXX_FLAGS})
@@ -55,4 +55,10 @@ add_executable(parser
 )
 
 #add_dependencies(parser parser_impl lexer_impl)
-target_link_libraries(parser)
+target_link_libraries(parser ${Boost_LIBRARIES})
+
+
+
+# build runtime
+execute_process(COMMAND clang -O2 -S -emit-llvm -o runtime_opt.asm "${PROJECT_SOURCE_DIR}/runtime.cpp")
+execute_process(COMMAND clang -S -emit-llvm -o runtime.asm "${PROJECT_SOURCE_DIR}/runtime.cpp")

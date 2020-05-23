@@ -55,7 +55,12 @@ echo -e "-----------------------------------------------------------------------
 
 echo -e "\n--------------------------------------------------------------------------------"
 echo -e "\nBuilding runtime...\n"
-if ! clang -O2 -S -emit-llvm -o runtime.asm runtime.cpp; then
+if ! clang -O2 -S -emit-llvm -o runtime_opt.asm runtime.cpp; then
+	echo -e "Compilation of runtime failed."
+	exit -1
+fi
+
+if ! clang -S -emit-llvm -o runtime.asm runtime.cpp; then
 	echo -e "Compilation of runtime failed."
 	exit -1
 fi
