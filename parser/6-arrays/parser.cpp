@@ -5,11 +5,13 @@
  * @license: see 'LICENSE.GPL' file
  */
 
-#include <fstream>
-
 #include "ast.h"
 #include "parser.h"
 #include "llasm.h"
+
+#include <fstream>
+#include <boost/program_options.hpp>
+namespace args = boost::program_options;
 
 
 /**
@@ -55,16 +57,87 @@ int main(int argc, char** argv)
 {
 	try
 	{
-		if(argc <= 1)
+		// llvm toolchain
+		std::string tool_bc = "llvm-as";
+		std::string tool_bclink = "llvm-link";
+		std::string tool_interp = "lli";
+		std::string tool_s = "llc";
+		std::string tool_o = "clang";
+		std::string tool_exec = "clang";
+		std::string tool_strip = "llvm-strip";
+
+
+		// --------------------------------------------------------------------
+		// get program arguments
+		// --------------------------------------------------------------------
+		std::vector<std::string> vecProgs;
+		bool interpret = false;
+		bool optimise = false;
+		std::string outprog;
+
+		args::options_description arg_descr("Compiler arguments");
+		arg_descr.add_options()
+			("out,o", args::value(&outprog), "compiled program output")
+			("optimise,O", args::bool_switch(&optimise), "optimise program")
+			("interpret,i", args::bool_switch(&interpret), "directly run program in interpreter")
+			("program", args::value<decltype(vecProgs)>(&vecProgs), "input program to compile");
+
+		args::positional_options_description posarg_descr;
+		posarg_descr.add("program", -1);
+
+		args::options_description arg_descr_toolchain("Toolchain programs");
+		arg_descr_toolchain.add_options()
+			("tool_bc", args::value(&tool_bc), "llvm bitcode assembler")
+			("tool_bclink", args::value(&tool_bclink), "llvm bitcode linker")
+			("tool_interp", args::value(&tool_interp), "llvm bitcode interpreter")
+			("tool_bccomp", args::value(&tool_s), "llvm bitcode compiler")
+			("tool_asm", args::value(&tool_o), "native assembler")
+			("tool_link", args::value(&tool_exec), "native linker")
+			("tool_strip", args::value(&tool_strip), "strip tool");
+		arg_descr.add(arg_descr_toolchain);
+
+		auto argparser = args::command_line_parser{argc, argv};
+		argparser.style(args::command_line_style::default_style);
+		argparser.options(arg_descr);
+		argparser.positional(posarg_descr);
+
+		args::variables_map mapArgs;
+		auto parsedArgs = argparser.run();
+		args::store(parsedArgs, mapArgs);
+		args::notify(mapArgs);
+
+		if(vecProgs.size() == 0)
 		{
-			std::cerr << "Please specify a program." << std::endl;
-			return -1;
+			std::cerr << "Please specify an input program.\n" << std::endl;
+			std::cout << arg_descr << std::endl;
+			return 0;
 		}
 
-		std::ifstream ifstr{argv[1]};
+		if(outprog == "")
+		{
+			outprog = "out";
+			std::cerr << "No program output specified, using \"" << outprog << "\"." << std::endl;
+		}
+
+		std::string outprog_3ac = outprog + ".asm";
+		std::string outprog_bc = outprog + ".bc";
+		std::string outprog_linkedbc = outprog + "_linked.bc";
+		std::string outprog_s = outprog + ".s";
+		std::string outprog_o = outprog + ".o";
+
+		std::string runtime_3ac = "runtime.asm";
+		std::string runtime_bc = "runtime.bc";
+		// --------------------------------------------------------------------
 
 
-		// parsing
+
+		// --------------------------------------------------------------------
+		// parse input
+		// --------------------------------------------------------------------
+		const std::string& inprog = vecProgs[0];
+		std::cout << "Parsing \"" << inprog << "\"..." << std::endl;
+
+		std::ifstream ifstr{inprog};
 		yy::ParserContext ctx{ifstr};
 
 		// register runtime functions
@@ -94,18 +167,29 @@ int main(int argc, char** argv)
 		int res = parser.parse();
 
 		if(res != 0)
+		{
+			std::cerr << "Parser reports error.\n";
+			std::cerr << ctx.GetSymbols() << std::endl;
 			return res;
+		}
+		// --------------------------------------------------------------------
 
-		//std::cout << ctx.GetSymbols() << std::endl;
 
 
-		// code generation
-		LLAsm llasm{&ctx.GetSymbols()};
+		// --------------------------------------------------------------------
+		// 3AC generation
+		// --------------------------------------------------------------------
+		std::cout << "Generating intermediate code: \""
+			<< inprog << "\" -> \"" << outprog_3ac << "\"..." << std::endl;
+
+		std::ofstream ofstr{outprog_3ac};
+		std::ostream* ostr = &ofstr /*&std::cout*/;
+		LLAsm llasm{&ctx.GetSymbols(), ostr};
 		auto stmts = ctx.GetStatements()->GetStatementList();
 		for(auto iter=stmts.rbegin(); iter!=stmts.rend(); ++iter)
 		{
 			(*iter)->accept(&llasm);
-			std::cout << std::endl;
+			(*ostr) << std::endl;
 		}
 
 		// additional code to make it run
@@ -216,7 +300,118 @@ define i32 @main()
 ; -----------------------------------------------------------------------------
 )START";
 
-			std::cout << "\n" << strStartup << std::endl;
+			(*ostr) << "\n" << strStartup << std::endl;
+		}
+		// --------------------------------------------------------------------
+
+
+
+		// --------------------------------------------------------------------
+		// Bitcode generation
+		// --------------------------------------------------------------------
+		std::cout << "Assembling bitcode: \""
+			<< outprog_3ac << "\" -> \"" << outprog_bc << "\"..." << std::endl;
+
+		std::string cmd_bc = tool_bc + " -o " + outprog_bc + " " + outprog_3ac;
+		if(std::system(cmd_bc.c_str()) != 0)
+		{
+			std::cerr << "Failed." << std::endl;
+			return -1;
+		}
+
+
+		std::cout << "Assembling runtime bitcode: \""
+			<< runtime_3ac << "\" -> \"" << runtime_bc << "\"..." << std::endl;
+
+		cmd_bc = tool_bc + " -o " + runtime_bc + " " + runtime_3ac;
+		if(std::system(cmd_bc.c_str()) != 0)
+		{
+			std::cerr << "Failed." << std::endl;
+			return -1;
+		}
+		// --------------------------------------------------------------------
+
+
+
+		// --------------------------------------------------------------------
+		// Bitcode linking
+		// --------------------------------------------------------------------
+		std::cout << "Linking bitcode to runtime: \""
+			<< outprog_bc << "\" + \"" << runtime_bc  << "\" -> \""
+			<< outprog_linkedbc << "\"..." << std::endl;
+
+		std::string cmd_bclink = tool_bclink + " -o " + outprog_linkedbc + " " + outprog_bc + " " + runtime_bc;
+		if(std::system(cmd_bclink.c_str()) != 0)
+		{
+			std::cerr << "Failed." << std::endl;
+			return -1;
+		}
+		// --------------------------------------------------------------------
+
+
+		// interpret bitcode
+		if(interpret)
+		{
+			std::cout << "Interpreting bitcode \"" << outprog_linkedbc << "\"..." << std::endl;
+
+			std::string cmd_interp = tool_interp + " " + outprog_linkedbc;
+			if(std::system(cmd_interp.c_str()) != 0)
+			{
+				std::cerr << "Failed." << std::endl;
+				return -1;
+			}
+		}
+
+		// compile bitcode
+		else
+		{
+			std::cout << "Generating native assembly \""
+				<< outprog_linkedbc << "\" -> \"" << outprog_s << "\"..." << std::endl;
+
+			std::string opt_flag_s = optimise ? "-O2" : "";
+			std::string cmd_s = tool_s + " " + opt_flag_s + " -o " + outprog_s + " " + outprog_linkedbc;
+			if(std::system(cmd_s.c_str()) != 0)
+			{
+				std::cerr << "Failed." << std::endl;
+				return -1;
+			}
+
+
+			std::cout << "Assembling native code \""
+				<< outprog_s << "\" -> \"" << outprog_o << "\"..." << std::endl;
+
+			std::string opt_flag_o = optimise ? "-O2" : "";
+			std::string cmd_o = tool_o + " " + opt_flag_o + " -c -o " + outprog_o + " " + outprog_s;
+			if(std::system(cmd_o.c_str()) != 0)
+			{
+				std::cerr << "Failed." << std::endl;
+				return -1;
+			}
+
+
+			std::cout << "Generating native executable \""
+				<< outprog_o << "\" -> \"" << outprog << "\"..." << std::endl;
+
+			std::string opt_flag_exec = optimise ? "-O2" : "";
+			std::string cmd_exec = tool_exec + " " + opt_flag_exec + " -o " + outprog + " " + outprog_o + " -lm -lc";
+			if(std::system(cmd_exec.c_str()) != 0)
+			{
+				std::cerr << "Failed." << std::endl;
+				return -1;
+			}
+
+
+			if(optimise)
+			{
+				std::cout << "Stripping debug symbols from \"" << outprog << "\"..." << std::endl;
+
+				std::string cmd_strip = tool_strip + " " + outprog;
+				if(std::system(cmd_strip.c_str()) != 0)
+				{
+					std::cerr << "Failed." << std::endl;
+					return -1;
+				}
+			}
 		}
 	}
 	catch(const std::exception& ex)

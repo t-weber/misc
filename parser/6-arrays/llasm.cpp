@@ -266,7 +266,7 @@ std::string LLAsm::get_type_name(SymbolType ty)
 }
 
 
-LLAsm::LLAsm(SymTab* syms) : m_syms{syms}
+LLAsm::LLAsm(SymTab* syms, std::ostream* ostr) : m_syms{syms}, m_ostr{ostr}
 {}
 
 

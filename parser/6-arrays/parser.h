@@ -63,8 +63,7 @@ namespace yy
 		std::array<std::size_t, 2> m_symdims = {0, 0};
 
 	public:
-		ParserContext(std::istream& istr = std::cin) :
-			m_lex{istr}, m_statements{}
+		ParserContext(std::istream& istr = std::cin) : m_lex{istr}, m_statements{}
 		{}
 
 		yy::Lexer& GetLexer() { return m_lex; }

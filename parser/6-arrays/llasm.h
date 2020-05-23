@@ -20,7 +20,7 @@
 class LLAsm : public ASTVisitor
 {
 public:
-	LLAsm(SymTab* syms);
+	LLAsm(SymTab* syms, std::ostream* ostr=&std::cout);
 	virtual ~LLAsm() = default;
 
 

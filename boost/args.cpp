@@ -8,7 +8,7 @@
  *  * http://www.boost.org/doc/libs/1_65_1/doc/html/program_options.html
  *  * https://github.com/boostorg/program_options/tree/develop/example
  *
- * gcc -o args args.cpp -std=c++17 -lboost_program_options -lstdc++
+ * g++ -o args args.cpp -std=c++17 -lboost_program_options
  */
 
 #include <iostream>
@@ -86,7 +86,7 @@ int main(int argc, char** argv)
 
 	// arg parser
 	{
-		auto parser = args::command_line_parser(argc, argv);
+		auto parser = args::command_line_parser{argc, argv};
 		parser.style(args::command_line_style::default_style);
 		parser.options(arg_descr);
 		parser.positional(posarg_descr);
