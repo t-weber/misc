@@ -227,7 +227,9 @@ declare void @free(i8*)
 
 ; -----------------------------------------------------------------------------
 ; external runtime functions from runtime.cpp
-declare double @ext_determinant(double*, i64);
+declare double @ext_determinant(double*, i64)
+declare i64 @ext_power(double*, double*, i64, i64)
+declare i64 @ext_transpose(double*, double*, i64, i64)
 ; -----------------------------------------------------------------------------
 
 

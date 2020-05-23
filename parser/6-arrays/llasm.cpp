@@ -66,7 +66,7 @@ t_astret LLAsm::get_sym(const std::string& name) const
 	}
 
 	if(sym==nullptr)
-		std::cerr << "Error: \"" << scoped_name << "\" does not have an associated symbol." << std::endl;
+		throw std::runtime_error("get_sym: \"" + scoped_name + "\" does not have an associated symbol.");
 	return sym;
 }
 
@@ -157,7 +157,6 @@ t_astret LLAsm::convert_sym(t_astret sym, SymbolType ty_to)
 			t_astret strptr = get_tmp_var(SymbolType::STRING, &dims);
 
 			(*m_ostr) << "%" << str_mem->name << " = alloca [" << len << " x i8]\n";
-			//(*m_ostr) << "%" << strptr->name << " = bitcast [" << len << " x i8]* %" << str_mem->name << " to i8*\n";
 			(*m_ostr) << "%" << strptr->name << " = getelementptr ["
 				<< len << " x i8], [" << len << " x i8]* %"
 				<< str_mem->name << ", i64 0, i64 0\n";
@@ -208,7 +207,8 @@ t_astret LLAsm::convert_sym(t_astret sym, SymbolType ty_to)
 				(*m_ostr) << "call void @flt_to_str(double %"  << elem->name
 					<< ", i8* %" << strCompptr->name << ", i64 " << lenComp << ")\n";
 
-				(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %" << strCompptr->name << ", i64 3)\n";
+				(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %"
+					<< strCompptr->name << ", i64 " << lenComp << ")\n";
 
 
 				// separator ", " or "; "
@@ -259,10 +259,10 @@ std::string LLAsm::get_type_name(SymbolType ty)
 		case SymbolType::STRING: return "i8*";
 		case SymbolType::INT: return "i64";
 		case SymbolType::VOID: return "void";
+		case SymbolType::FUNC: return "func";
 	}
 
-	std::cerr << "Error: Unknown symbol type." << std::endl;
-	return "invalid";
+	return "unknown";
 }
 
 
@@ -428,11 +428,11 @@ t_astret LLAsm::visit(const ASTPlus* ast)
 
 		// copy first string
 		(*m_ostr) << "call i8* @strncpy(i8* %" << resptr->name << ", i8* %" << strptr1->name
-			<< ", i64 " << std::get<0>(dim) << ")\n";
+			<< ", i64 " << std::get<0>(term1->dims) << ")\n";
 
 		// concatenate second string
 		(*m_ostr) << "call i8* @strncat(i8* %" << resptr->name << ", i8* %" << strptr2->name
-			<< ", i64 " << std::get<0>(dim) << ")\n";
+			<< ", i64 " << std::get<0>(term2->dims) << ")\n";
 
 		return res;
 	}
@@ -966,20 +966,103 @@ t_astret LLAsm::visit(const ASTPow* ast)
 	t_astret term1 = ast->GetTerm1()->accept(this);
 	t_astret term2 = ast->GetTerm2()->accept(this);
 
-	// cast if needed
-	SymbolType ty = term1->ty;
-	if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
-		ty = SymbolType::SCALAR;
-	t_astret var = get_tmp_var(ty, &term1->dims);
+	if(term1->ty == SymbolType::MATRIX)
+	{
+		// only integer powers are supported for matrix powers
+		term2 = convert_sym(term2, SymbolType::INT);
 
-	term1 = convert_sym(term1, ty);
-	term2 = convert_sym(term2, ty);
+		std::size_t dim1 = std::get<0>(term1->dims);
+		std::size_t dim2 = std::get<1>(term1->dims);
+		std::size_t dim = dim1*dim2;
 
-	(*m_ostr) << "%" << var->name << " = call double @pow("
-		<< get_type_name(ty) << " %" << term1->name << ", "
-		<< get_type_name(ty) << " %" << term2->name << ")\n";
+		if(dim1 != dim2)
+			throw std::runtime_error("ASTPow: Matrix power needs square matrix\n");
 
-	return var;
+		// cast input matrix pointer to element pointer
+		t_astret termptr = get_tmp_var();
+		(*m_ostr) << "%" << termptr->name << " = bitcast ["
+			<< dim << " x double]* %" << term1->name << " to double*\n";
+
+		// allocate result matrix
+		t_astret result_mem = get_tmp_var(SymbolType::MATRIX, &term1->dims);
+		(*m_ostr) << "%" << result_mem->name << " = alloca [" << dim << " x double]\n";
+
+		// cast result matrix pointer to element pointer
+		t_astret result_ptr = get_tmp_var();
+		(*m_ostr) << "%" << result_ptr->name << " = bitcast ["
+			<< dim << " x double]* %" << result_mem->name << " to double*\n";
+
+		// call runtime function
+		t_astret result_status = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << result_status->name << " = call i64 @ext_power(double* %"
+			<< termptr->name << ", double* %" << result_ptr->name
+			<< ", i64 " << dim1 << ", i64 %" << term2->name << ")\n";
+
+		// TODO: check result_status
+		return result_mem;
+	}
+
+	// scalar types
+	else
+	{
+		// cast if needed
+		SymbolType ty = term1->ty;
+		if(term1->ty==SymbolType::SCALAR || term2->ty==SymbolType::SCALAR)
+			ty = SymbolType::SCALAR;
+		t_astret var = get_tmp_var(ty, &term1->dims);
+
+		term1 = convert_sym(term1, ty);
+		term2 = convert_sym(term2, ty);
+
+		(*m_ostr) << "%" << var->name << " = call double @pow("
+			<< get_type_name(ty) << " %" << term1->name << ", "
+			<< get_type_name(ty) << " %" << term2->name << ")\n";
+
+		return var;
+	}
+
+	throw std::runtime_error("ASTPow: Invalid power operation between \""
+		+ term1->name + "\" and \"" + term2->name + "\".");
+	return nullptr;
+}
+
+
+t_astret LLAsm::visit(const ASTTransp* ast)
+{
+	t_astret term = ast->GetTerm()->accept(this);
+
+	if(term->ty == SymbolType::MATRIX)
+	{	// TODO: implement directly without external runtime function
+		std::size_t dim1 = std::get<0>(term->dims);
+		std::size_t dim2 = std::get<1>(term->dims);
+		std::size_t dim = dim1*dim2;
+
+		// cast input matrix pointer to element pointer
+		t_astret termptr = get_tmp_var();
+		(*m_ostr) << "%" << termptr->name << " = bitcast ["
+		<< dim << " x double]* %" << term->name << " to double*\n";
+
+		// allocate result matrix
+		std::array<std::size_t, 2> dimtrans{{dim2, dim1}};
+		t_astret result_mem = get_tmp_var(SymbolType::MATRIX, &dimtrans);
+		(*m_ostr) << "%" << result_mem->name << " = alloca [" << dim << " x double]\n";
+
+		// cast result matrix pointer to element pointer
+		t_astret result_ptr = get_tmp_var();
+		(*m_ostr) << "%" << result_ptr->name << " = bitcast ["
+			<< dim << " x double]* %" << result_mem->name << " to double*\n";
+
+		// call runtime function
+		t_astret result_status = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << result_status->name << " = call i64 @ext_transpose(double* %"
+			<< termptr->name << ", double* %" << result_ptr->name
+			<< ", i64 " << dim1 << ", i64 " << dim2 << ")\n";
+
+		return result_mem;
+	}
+
+	throw std::runtime_error("ASTTrans: Transposing is not possible for \"" + term->name + "\".");
+	return nullptr;
 }
 
 
@@ -1450,7 +1533,7 @@ t_astret LLAsm::visit(const ASTReturn* ast)
 			(*m_ostr) << "%" << strret->name << " = call i8* @malloc(i64 %" << strretlen_z->name << ")\n";
 
 			(*m_ostr) << "call i8* @strncpy(i8* %" << strret->name << ", i8* %" << termptr->name
-				<< ", i64 %" << strretlen_z->name << ")\n";
+				<< ", i64 " << dim << ")\n";
 
 			(*m_ostr) << "ret i8* %" << strret->name << "\n";
 			return strret;

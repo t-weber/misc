@@ -32,7 +32,7 @@ extern "C" bool ext_equals(t_real x, t_real y, t_real eps)
 /**
  * removes a given row and column of a square matrix
  */
-extern "C" void ext_submat(t_real* M, t_int N, t_real* M_new, t_int iremove, t_int jremove)
+extern "C" void ext_submat(const t_real* M, t_int N, t_real* M_new, t_int iremove, t_int jremove)
 {
 	t_int row_new = 0;
 	for(t_int row=0; row<N; ++row)
@@ -65,7 +65,7 @@ extern "C" void ext_submat(t_real* M, t_int N, t_real* M_new, t_int iremove, t_i
 /**
  * calculates the determinant
  */
-extern "C" t_real ext_determinant(t_real* M, t_int N)
+extern "C" t_real ext_determinant(const t_real* M, t_int N)
 {
 	// special cases
 	if(N == 0)
@@ -108,12 +108,111 @@ extern "C" t_real ext_determinant(t_real* M, t_int N)
 			continue;
 
 		ext_submat(M, N, submat, row, col);
-
 		const t_real sgn = ((row+col) % 2) == 0 ? t_real(1) : t_real(-1);
 		fullDet += elem * ext_determinant(submat, N-1) * sgn;
 	}
 	std::free(submat);
 
-	//std::printf("full det: %g\n", fullDet);
 	return fullDet;
+}
+
+
+
+/**
+ * inverted matrix
+ */
+extern "C" t_int ext_inverse(const t_real* M, t_real* I, t_int N)
+{
+	t_real fullDet = ext_determinant(M, N);
+
+	// fail if determinant is zero
+	if(ext_equals(fullDet, 0., g_eps))
+		return 0;
+
+	t_real *submat = reinterpret_cast<t_real*>(std::malloc(sizeof(t_real)*(N-1)*(N-1)));
+	for(t_int i=0; i<N; ++i)
+	{
+		for(t_int j=0; j<N; ++j)
+		{
+			ext_submat(M, N, submat, i, j);
+			const t_real sgn = ((i+j) % 2) == 0 ? t_real(1) : t_real(-1);
+			I[j*N + i] = ext_determinant(submat, N-1) * sgn / fullDet;
+		}
+	}
+	std::free(submat);
+
+	return 1;
+}
+
+
+/**
+ * matrix-matrix product: RES^i_j = M1^i_k M2^k_j
+ */
+extern "C" void ext_mult(const t_real* M1, const t_real* M2, t_real *RES, t_int I, t_int J, t_int K)
+{
+	for(t_int i=0; i<I; ++i)
+	{
+		for(t_int j=0; j<J; ++j)
+		{
+			RES[i*J + j] = t_real(0);
+
+			for(t_int k=0; k<K; ++k)
+				RES[i*J + j] += M1[i*K + k]*M2[k*J + j];
+		}
+	}
+}
+
+
+/**
+ * matrix power
+ */
+extern "C" t_int ext_power(const t_real* M, t_real* P, t_int N, t_int POW)
+{
+	t_int POW_pos = POW<0 ? -POW : POW;
+	t_int status = 1;
+
+	// temporary matrices
+	t_real *Mtmp = reinterpret_cast<t_real*>(std::malloc(sizeof(t_real)*N*N));
+	t_real *Mtmp2 = reinterpret_cast<t_real*>(std::malloc(sizeof(t_real)*N*N));
+
+	// Mtmp = M
+	for(t_int i=0; i<N; ++i)
+		for(t_int j=0; j<N; ++j)
+			Mtmp[i*N + j] = M[i*N + j];
+
+	// matrix power
+	for(t_int i=0; i<POW_pos-1; ++i)
+	{
+		ext_mult(Mtmp, M, Mtmp2, N, N, N);
+
+		// Mtmp = Mtmp2
+		for(t_int i=0; i<N; ++i)
+			for(t_int j=0; j<N; ++j)
+				Mtmp[i*N + j] = Mtmp2[i*N + j];
+	}
+
+	// invert
+	if(POW < 0)
+		status = ext_inverse(Mtmp, Mtmp2, N);
+
+	// P = Mtmp2
+	for(t_int i=0; i<N; ++i)
+		for(t_int j=0; j<N; ++j)
+			P[i*N + j] = Mtmp2[i*N + j];
+
+	std::free(Mtmp);
+	std::free(Mtmp2);
+	return status;
+}
+
+
+
+/**
+ * transposed matrix
+ */
+extern "C" void ext_transpose(const t_real* M, t_real* T, t_int rows, t_int cols)
+{
+	for(t_int i=0; i<rows; ++i)
+		for(t_int j=0; j<cols; ++j)
+			T[j*rows + i] = M[i*cols + j];
 }

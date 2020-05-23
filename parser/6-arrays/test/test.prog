@@ -73,6 +73,12 @@ func mat 3 3 test_mat()
 	putstr(M[2,2] = 987);
 	putstr(M);
 
+	mat 3 3 N = [1.01,2,3,  0,2,1,  3,4,5];
+	mat 3 3 Ninv = N^(-1);
+	putstr("inv: " + Ninv);
+	putstr("inv-trans: " + Ninv');
+	putstr(N * Ninv);
+
 	ret M;
 }
 

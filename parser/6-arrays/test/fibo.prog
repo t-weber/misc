@@ -18,6 +18,8 @@ func int fac(int n)
 
 func start()
 {
-	putint(fac(5));
-	putint(fibo(16));
+	int n = 7;
+
+	putstr(n + "! = " + fac(n));
+	putstr("fib(" + n + ") = " + fibo(n));
 }

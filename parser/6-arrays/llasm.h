@@ -29,6 +29,7 @@ public:
 	virtual t_astret visit(const ASTMult* ast) override;
 	virtual t_astret visit(const ASTMod* ast) override;
 	virtual t_astret visit(const ASTPow* ast) override;
+	virtual t_astret visit(const ASTTransp* ast) override;
 	virtual t_astret visit(const ASTNorm* ast) override;
 	virtual t_astret visit(const ASTVar* ast) override;
 	virtual t_astret visit(const ASTCall* ast) override;
@@ -84,14 +85,14 @@ protected:
 
 
 private:
-	std::ostream* m_ostr = &std::cout;
-
 	std::size_t m_varCount = 0;	// # of tmp vars
 	std::size_t m_labelCount = 0;	// # of labels
 
 	std::vector<std::string> m_curscope;
 
 	SymTab* m_syms = nullptr;
+
+	std::ostream* m_ostr = &std::cout;
 };
 
 

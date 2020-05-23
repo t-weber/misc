@@ -25,6 +25,7 @@ class ASTPlus;
 class ASTMult;
 class ASTMod;
 class ASTPow;
+class ASTTransp;
 class ASTNorm;
 class ASTStrConst;
 class ASTVar;
@@ -53,6 +54,7 @@ enum class ASTType
 	Mult,
 	Mod,
 	Pow,
+	Transp,
 	Norm,
 	StrConst,
 	Var,
@@ -91,6 +93,7 @@ public:
 	virtual t_astret visit(const ASTMult* ast) = 0;
 	virtual t_astret visit(const ASTMod* ast) = 0;
 	virtual t_astret visit(const ASTPow* ast) = 0;
+	virtual t_astret visit(const ASTTransp* ast) = 0;
 	virtual t_astret visit(const ASTNorm* ast) = 0;
 	virtual t_astret visit(const ASTVar* ast) = 0;
 	virtual t_astret visit(const ASTStmts* ast) = 0;
@@ -222,6 +225,22 @@ public:
 
 private:
 	std::shared_ptr<AST> term1, term2;
+};
+
+
+class ASTTransp : public AST
+{
+public:
+	ASTTransp(std::shared_ptr<AST> term) : term{term}
+	{}
+
+	const std::shared_ptr<AST> GetTerm() const { return term; }
+
+	virtual ASTType type() override { return ASTType::Transp; }
+	ASTVISITOR_ACCEPT
+
+private:
+	std::shared_ptr<AST> term;
 };
 
 

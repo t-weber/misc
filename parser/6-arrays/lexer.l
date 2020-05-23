@@ -36,7 +36,7 @@ ident	[A-Za-z_]+[A-Za-z0-9_]*
 ";"			{ return yytext[0]; }
 "+"|"-"		{ return yytext[0]; }
 "*"|"/"|"%"	{ return yytext[0]; }
-"^"			{ return yytext[0]; }
+"^"|"'"			{ return yytext[0]; }
 "("|")"		{ return yytext[0]; }
 "{"|"}"		{ return yytext[0]; }
 "["|"]"		{ return yytext[0]; }
