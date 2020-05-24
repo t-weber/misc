@@ -18,8 +18,11 @@ func int fac(int n)
 
 func start()
 {
-	int n = 7;
+	loop 1==1 do
+	{
+		int n = getint("n = ");
 
-	putstr(n + "! = " + fac(n));
-	putstr("fib(" + n + ") = " + fibo(n));
+		putstr(n + "! = " + fac(n));
+		putstr("fib(" + n + ") = " + fibo(n));
+	}
 }

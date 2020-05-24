@@ -1,7 +1,7 @@
 /**
  * parser test - generate llvm three-address code
  * @author Tobias Weber
- * @date 11-apr-20
+ * @date apr/may-2020
  * @license: see 'LICENSE.GPL' file
  *
  * References:
@@ -370,18 +370,88 @@ t_astret LLAsm::visit(const ASTUMinus* ast)
 	t_astret term = ast->GetTerm()->accept(this);
 	t_astret var = get_tmp_var(term->ty, &term->dims);
 
-	if(term->ty == SymbolType::SCALAR)
+	// array types
+	if(term->ty == SymbolType::VECTOR || term->ty == SymbolType::MATRIX)
+	{
+		std::size_t dim = std::get<0>(term->dims);
+		if(term->ty == SymbolType::MATRIX)
+			dim *= std::get<1>(term->dims);
+
+		// allocate double array for result
+		t_astret vec_mem = get_tmp_var(term->ty, &term->dims);
+		(*m_ostr) << "%" << vec_mem->name << " = alloca [" << dim << " x double]\n";
+
+		// copy array elements in a loop
+		std::string labelStart = get_label();
+		std::string labelBegin = get_label();
+		std::string labelEnd = get_label();
+
+		// loop counter
+		t_astret ctr = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctr->name << " = alloca i64\n";
+		(*m_ostr) << "store i64 0, i64* %" << ctr->name << "\n";
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelStart << ":  ; loop start\n";
+
+		// loop condition: ctr < dim
+		t_astret ctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctrval->name << " = load i64, i64* %" << ctr->name << "\n";
+
+		t_astret cond = get_tmp_var();
+		(*m_ostr) << "%" << cond->name << " = icmp slt i64 %" << ctrval->name <<  ", " << dim << "\n";
+		(*m_ostr) << "br i1 %" << cond->name << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+		(*m_ostr) << labelBegin << ":  ; loop begin\n";
+
+		// ---------------
+		// loop statements
+		t_astret elemptr_src = get_tmp_var();
+		t_astret elem_src = get_tmp_var();
+
+		(*m_ostr) << "%" << elemptr_src->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << term->name << ", i64 0, i64 %" << ctrval->name << "\n";
+		(*m_ostr) << "%" << elem_src->name << " = load double, double* %" << elemptr_src->name << "\n";
+
+		t_astret elemptr_dst = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_dst->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << vec_mem->name << ", i64 0, i64 %" << ctrval->name << "\n";
+
+		// unary minus
+		t_astret elem_dst = get_tmp_var(SymbolType::SCALAR);
+		(*m_ostr) << "%" << elem_dst->name << " = fsub double 0." << ", %" << elem_src->name << "\n";
+
+		// save result in array
+		(*m_ostr) << "store double %" << elem_dst->name << ", double* %" << elemptr_dst->name << "\n";
+
+		// increment counter
+		t_astret newctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << newctrval->name << " = add i64 %" << ctrval->name << ", 1\n";
+		(*m_ostr) << "store i64 %" << newctrval->name << ", i64* %" << ctr->name << "\n";
+		// ---------------
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelEnd << ":  ; loop end\n";
+
+		return vec_mem;
+	}
+
+	else if(term->ty == SymbolType::SCALAR)
 	{
 		(*m_ostr) << "%" << var->name << " = fneg " << get_type_name(term->ty)
 			<< " %" << term->name << "\n";
+		return var;
 	}
+
 	else if(term->ty == SymbolType::INT)
 	{
 		(*m_ostr) << "%" << var->name << " = sub " << get_type_name(term->ty) << " "
 			<< "0, %" << term->name << "\n";
+		return var;
 	}
 
-	return var;
+	throw std::runtime_error("ASTUMinus: Invalid unary subtraction operation of \"" + term->name + "\".");
+	return nullptr;
 }
 
 
@@ -1250,7 +1320,7 @@ t_astret LLAsm::visit(const ASTTransp* ast)
 	t_astret term = ast->GetTerm()->accept(this);
 
 	if(term->ty == SymbolType::MATRIX)
-	{	// TODO: implement directly without external runtime function
+	{
 		std::size_t dim1 = std::get<0>(term->dims);
 		std::size_t dim2 = std::get<1>(term->dims);
 		std::size_t dim = dim1*dim2;
@@ -2252,6 +2322,7 @@ t_astret LLAsm::visit(const ASTArrayAssign* ast)
 		// assign vector element
 		(*m_ostr) << "store double %" << expr->name << ", double* %" << elemptr->name << "\n";
 	}
+
 	else if(sym->ty == SymbolType::MATRIX)
 	{
 		// cast if needed
@@ -2278,9 +2349,37 @@ t_astret LLAsm::visit(const ASTArrayAssign* ast)
 		// assign matrix element
 		(*m_ostr) << "store double %" << expr->name << ", double* %" << elemptr->name << "\n";
 	}
+
 	else if(sym->ty == SymbolType::STRING)
 	{
-		// TODO
+		// cast if needed
+		if(expr->ty != SymbolType::STRING)
+			expr = convert_sym(expr, SymbolType::STRING);
+
+		if(num2)	// no second argument needed
+			throw std::runtime_error("ASTArrayAssign: Invalid element assignment for string \"" + sym->name + "\".");
+
+		// target string dimensions
+		std::size_t dim = std::get<0>(sym->dims);
+		// source string dimensions
+		std::size_t dim_src = std::get<0>(expr->dims);
+
+		// source string element pointer
+		t_astret elemptr_src = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_src->name << " = getelementptr [" << dim_src << " x i8], ["
+			<< dim_src << " x i8]* %" << expr->name << ", i64 0, i64 0\n";
+
+		// char at that pointer position
+		t_astret elem_src = get_tmp_var();
+		(*m_ostr) << "%" << elem_src->name << " = load i8, i8* %" << elemptr_src->name << "\n";
+
+		// target string element pointer
+		t_astret elemptr = get_tmp_var();
+		(*m_ostr) << "%" << elemptr->name << " = getelementptr [" << dim << " x i8], ["
+			<< dim << " x i8]* %" << sym->name << ", i64 0, i64 %" << num1->name << "\n";
+
+		// assign string element
+		(*m_ostr) << "store i8 %" << elem_src->name << ", i8* %" << elemptr->name << "\n";
 	}
 
 	return expr;

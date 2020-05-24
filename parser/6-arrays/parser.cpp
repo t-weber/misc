@@ -162,6 +162,9 @@ int main(int argc, char** argv)
 		ctx.AddFunc("putstr", SymbolType::VOID, {SymbolType::STRING});
 		ctx.AddFunc("putflt", SymbolType::VOID, {SymbolType::SCALAR});
 		ctx.AddFunc("putint", SymbolType::VOID, {SymbolType::INT});
+		ctx.AddFunc("getflt", SymbolType::SCALAR, {SymbolType::STRING});
+		ctx.AddFunc("getint", SymbolType::INT, {SymbolType::STRING});
+
 
 		ctx.AddFunc("flt_to_str", SymbolType::VOID, {SymbolType::SCALAR, SymbolType::STRING, SymbolType::INT});
 		ctx.AddFunc("int_to_str", SymbolType::VOID, {SymbolType::INT, SymbolType::STRING, SymbolType::INT});
@@ -219,6 +222,8 @@ declare i8* @strncpy(i8*, i8*, i64)
 declare i8* @strncat(i8*, i8*, i64)
 declare i32 @puts(i8*)
 declare i32 @snprintf(i8*, i64, i8*, ...)
+declare i32 @printf(i8*, ...)
+declare i32 @scanf(i8*, ...)
 declare i8* @memcpy(i8*, i8*, i64)
 declare i8* @malloc(i64)
 declare void @free(i8*)
@@ -235,7 +240,8 @@ declare i64 @ext_transpose(double*, double*, i64, i64)
 
 ; -----------------------------------------------------------------------------
 ; constants
-@__strfmt_g = constant [3 x i8] c"%g\00"
+@__strfmt_s = constant [3 x i8] c"%s\00"
+@__strfmt_lg = constant [4 x i8] c"%lg\00"
 @__strfmt_ld = constant [4 x i8] c"%ld\00"
 @__str_vecbegin = constant [3 x i8] c"[ \00"
 @__str_vecend = constant [3 x i8] c" ]\00"
@@ -250,7 +256,7 @@ declare i64 @ext_transpose(double*, double*, i64, i64)
 ; double -> string
 define void @flt_to_str(double %flt, i8* %strptr, i64 %len)
 {
-	%fmtptr = bitcast [3 x i8]* @__strfmt_g to i8*
+	%fmtptr = bitcast [4 x i8]* @__strfmt_lg to i8*
 	call i32 (i8*, i64, i8*, ...) @snprintf(i8* %strptr, i64 %len, i8* %fmtptr, double %flt)
 	ret void
 }
@@ -294,6 +300,42 @@ define void @putint(i64 %val)
 	; output string
 	call void (i8*) @putstr(i8* %strvalptr)
 	ret void
+}
+
+; input a float
+define double @getflt(i8* %str)
+{
+	; output given string
+	%fmtptr_s = bitcast [3 x i8]* @__strfmt_s to i8*
+	call i32 (i8*, ...) @printf(i8* %fmtptr_s, i8* %str)
+
+	; alloc double
+	%d_ptr = alloca double
+
+	; read double from stdin
+	%fmtptr_g = bitcast [4 x i8]* @__strfmt_lg to i8*
+	call i32 (i8*, ...) @scanf(i8* %fmtptr_g, double* %d_ptr)
+
+	%d = load double, double* %d_ptr
+	ret double %d
+}
+
+; input an int
+define i64 @getint(i8* %str)
+{
+	; output given string
+	%fmtptr_s = bitcast [3 x i8]* @__strfmt_s to i8*
+	call i32 (i8*, ...) @printf(i8* %fmtptr_s, i8* %str)
+
+	; alloc int
+	%i_ptr = alloca i64
+
+	; read int from stdin
+	%fmtptr_ld = bitcast [4 x i8]* @__strfmt_ld to i8*
+	call i32 (i8*, ...) @scanf(i8* %fmtptr_ld, i64* %i_ptr)
+
+	%i = load i64, i64* %i_ptr
+	ret i64 %i
 }
 
 ; -----------------------------------------------------------------------------
