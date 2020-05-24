@@ -182,52 +182,147 @@ t_astret LLAsm::convert_sym(t_astret sym, SymbolType ty_to)
 			// vector start: "[ "
 			(*m_ostr) << "call i8* @strncpy(i8* %" << strptr->name << ", i8* %" << vecbegin->name << ", i64 3)\n";
 
-			for(std::size_t i=0; i<num_floats; ++i)
+
+
+			// output array elements in a loop
+			std::string labelStart = get_label();
+			std::string labelBegin = get_label();
+			std::string labelEnd = get_label();
+
+			// loop counter
+			t_astret ctr = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << ctr->name << " = alloca i64\n";
+			(*m_ostr) << "store i64 0, i64* %" << ctr->name << "\n";
+
+			(*m_ostr) << "br label %" << labelStart << "\n";
+			(*m_ostr) << labelStart << ":  ; loop start\n";
+
+			// loop condition: ctr < num_floats
+			t_astret ctrval = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << ctrval->name << " = load i64, i64* %" << ctr->name << "\n";
+
+			t_astret cond = get_tmp_var();
+			(*m_ostr) << "%" << cond->name << " = icmp slt i64 %" << ctrval->name <<  ", " << num_floats << "\n";
+			(*m_ostr) << "br i1 %" << cond->name << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+			(*m_ostr) << labelBegin << ":  ; loop begin\n";
+
+			// ---------------
+			// loop statements
+
+			// get vector/matrix element
+			t_astret elemptr = get_tmp_var();
+			t_astret elem = get_tmp_var();
+
+			(*m_ostr) << "%" << elemptr->name << " = getelementptr [" << num_floats << " x double], ["
+				<< num_floats << " x double]* %" << sym->name << ", i64 0, i64 %" << ctrval->name << "\n";
+			(*m_ostr) << "%" << elem->name << " = load double, double* %" << elemptr->name << "\n";
+
+
+			// convert vector/matrix component to string
+			std::size_t lenComp = 32;
+			std::array<std::size_t, 2> dimsComp{{lenComp, 0}};
+			t_astret strComp_mem = get_tmp_var(SymbolType::STRING, &dimsComp);
+			t_astret strCompptr = get_tmp_var(SymbolType::STRING, &dimsComp);
+
+			(*m_ostr) << "%" << strComp_mem->name << " = alloca [" << lenComp << " x i8]\n";
+			(*m_ostr) << "%" << strCompptr->name << " = getelementptr ["
+				<< lenComp << " x i8], [" << lenComp << " x i8]* %"
+				<< strComp_mem->name << ", i64 0, i64 0\n";
+
+			(*m_ostr) << "call void @flt_to_str(double %"  << elem->name
+				<< ", i8* %" << strCompptr->name << ", i64 " << lenComp << ")\n";
+
+			(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %"
+				<< strCompptr->name << ", i64 " << lenComp << ")\n";
+
+
+			// separator ", " or "; "
+			if(sym->ty == SymbolType::MATRIX)
 			{
-				// get vector/matrix element
-				t_astret elemptr = get_tmp_var();
-				t_astret elem = get_tmp_var();
+				// don't output last "; " or ", ": i < num_floats-1
+				t_astret cond = get_tmp_var(SymbolType::INT);
+				(*m_ostr) << "%" << cond->name << " = icmp slt i64 %"
+					<< ctrval->name << ", " << num_floats-1 << "\n";
 
-				(*m_ostr) << "%" << elemptr->name << " = getelementptr [" << num_floats << " x double], ["
-					<< num_floats << " x double]* %" << sym->name << ", i64 0, i64 " << i << "\n";
-				(*m_ostr) << "%" << elem->name << " = load double, double* %" << elemptr->name << "\n";
+				std::string labelIf = get_label();
+				std::string labelEnd = get_label();
 
+				(*m_ostr) << "br i1 %" << cond->name << ", label %"
+					<< labelIf << ", label %" << labelEnd << "\n";
 
-				// convert vector/matrix component to string
-				std::size_t lenComp = 32;
-				std::array<std::size_t, 2> dimsComp{{lenComp, 0}};
-				t_astret strComp_mem = get_tmp_var(SymbolType::STRING, &dimsComp);
-				t_astret strCompptr = get_tmp_var(SymbolType::STRING, &dimsComp);
-
-				(*m_ostr) << "%" << strComp_mem->name << " = alloca [" << lenComp << " x i8]\n";
-				(*m_ostr) << "%" << strCompptr->name << " = getelementptr ["
-					<< lenComp << " x i8], [" << lenComp << " x i8]* %"
-					<< strComp_mem->name << ", i64 0, i64 0\n";
-
-				(*m_ostr) << "call void @flt_to_str(double %"  << elem->name
-					<< ", i8* %" << strCompptr->name << ", i64 " << lenComp << ")\n";
-
-				(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %"
-					<< strCompptr->name << ", i64 " << lenComp << ")\n";
-
-
-				// separator ", " or "; "
-				if(sym->ty == SymbolType::MATRIX && (i+1) % std::get<0>(sym->dims) == 0)
+				(*m_ostr) << labelIf << ":\n";
 				{
-					std::size_t idx0 = (i+1) % std::get<0>(sym->dims);
-					std::size_t idx1 = i / std::get<0>(sym->dims);
+					//output ';' or ','?: ((i+1) % std::get<1>(sym->dims)) == 0
+					t_astret cond_M_or_v = get_tmp_var(SymbolType::INT);
+					t_astret ctr_1 = get_tmp_var(SymbolType::INT);
+					t_astret ctr_mod_cols = get_tmp_var(SymbolType::INT);
+					(*m_ostr) << "%" << ctr_1->name << " = add i64 %" << ctrval->name << ", 1\n";
+					(*m_ostr) << "%" << ctr_mod_cols->name << " = srem i64 %" << ctr_1->name
+						<< ", " << std::get<0>(sym->dims) << "\n";
+					(*m_ostr) << "%" << cond_M_or_v->name << " = icmp eq i64 %"
+						<< ctr_mod_cols->name << ", 0\n";
 
-					// don't output last "; "
-					if(idx0 < std::get<1>(sym->dims)-1 && idx1 < std::get<1>(sym->dims)-1)
-						(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %" << matsep->name << ", i64 3)\n";
+					std::string labelIf_M_or_v = get_label();
+					std::string labelElse_M_or_v = get_label();
+					std::string labelEnd_M_or_v = get_label();
+
+					(*m_ostr) << "br i1 %" << cond_M_or_v->name << ", label %"
+						<< labelIf_M_or_v << ", label %" << labelElse_M_or_v << "\n";
+
+					// if: matrix separator case
+					(*m_ostr) << labelIf_M_or_v << ":\n";
+					{
+						(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name
+							<< ", i8* %" << matsep->name << ", i64 3)\n";
+					}
+					(*m_ostr) << "br label %" << labelEnd_M_or_v << "\n";
+
+					// else: vector separator case
+					(*m_ostr) << labelElse_M_or_v << ":\n";
+					{
+						(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name
+							<< ", i8* %" << vecsep->name << ", i64 3)\n";
+					}
+					(*m_ostr) << "br label %" << labelEnd_M_or_v << "\n";
+
+					(*m_ostr) << labelEnd_M_or_v << ":\n";
 				}
-				else
-				{
-					// don't output last ", "
-					if(i < num_floats-1)
-						(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %" << vecsep->name << ", i64 3)\n";
-				}
+				(*m_ostr) << "br label %" << labelEnd << "\n";
+
+				(*m_ostr) << labelEnd << ":\n";
 			}
+
+			else if(sym->ty == SymbolType::VECTOR)
+			{
+				// don't output last ", ": i < num_floats-1
+				t_astret cond = get_tmp_var(SymbolType::INT);
+				(*m_ostr) << "%" << cond->name << " = icmp slt i64 %"
+					<< ctrval->name << ", " << num_floats-1 << "\n";
+
+				std::string labelIf = get_label();
+				std::string labelEnd = get_label();
+
+				(*m_ostr) << "br i1 %" << cond->name << ", label %"
+					<< labelIf << ", label %" << labelEnd << "\n";
+
+				(*m_ostr) << labelIf << ":\n";
+				(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name
+					<< ", i8* %" << vecsep->name << ", i64 3)\n";
+				(*m_ostr) << "br label %" << labelEnd << "\n";
+
+				(*m_ostr) << labelEnd << ":\n";
+			}
+
+			// increment counter
+			t_astret newctrval = get_tmp_var(SymbolType::INT);
+			(*m_ostr) << "%" << newctrval->name << " = add i64 %" << ctrval->name << ", 1\n";
+			(*m_ostr) << "store i64 %" << newctrval->name << ", i64* %" << ctr->name << "\n";
+			// ---------------
+
+			(*m_ostr) << "br label %" << labelStart << "\n";
+			(*m_ostr) << labelEnd << ":  ; loop end\n";
+
 
 			// vector end: " ]"
 			(*m_ostr) << "call i8* @strncat(i8* %" << strptr->name << ", i8* %" << vecend->name << ", i64 3)\n";
@@ -259,7 +354,7 @@ std::string LLAsm::get_type_name(SymbolType ty)
 		case SymbolType::STRING: return "i8*";
 		case SymbolType::INT: return "i64";
 		case SymbolType::VOID: return "void";
-		case SymbolType::FUNC: return "func";
+		case SymbolType::FUNC: return "func";	// TODO: function pointers
 	}
 
 	return "unknown";
@@ -459,9 +554,89 @@ t_astret LLAsm::visit(const ASTPlus* ast)
 		return var;
 	}
 
-	throw std::runtime_error("ASTMult: Invalid addition operation between \""
+	throw std::runtime_error("ASTPlus: Invalid addition operation between \""
 		+ term1->name + "\" and \"" + term2->name + "\".");
 	return nullptr;
+}
+
+
+/**
+ * product between a scalar and a matrix (or vector)
+ */
+t_astret LLAsm::scalar_matrix_prod(t_astret scalar, t_astret matrix, bool mul_or_div)
+{
+	scalar = convert_sym(scalar, SymbolType::SCALAR);
+
+	std::size_t dim = std::get<0>(matrix->dims);
+	if(matrix->ty == SymbolType::MATRIX)
+		dim *= std::get<1>(matrix->dims);
+
+	// allocate double array for result
+	t_astret vec_mem = get_tmp_var(matrix->ty, &matrix->dims);
+	(*m_ostr) << "%" << vec_mem->name << " = alloca [" << dim << " x double]\n";
+
+	// copy matrix elements in a loop
+	std::string labelStart = get_label();
+	std::string labelBegin = get_label();
+	std::string labelEnd = get_label();
+
+	// loop counter
+	t_astret ctr = get_tmp_var(SymbolType::INT);
+	(*m_ostr) << "%" << ctr->name << " = alloca i64\n";
+	(*m_ostr) << "store i64 0, i64* %" << ctr->name << "\n";
+
+	(*m_ostr) << "br label %" << labelStart << "\n";
+	(*m_ostr) << labelStart << ":  ; loop start\n";
+
+	// loop condition: ctr < dim
+	t_astret ctrval = get_tmp_var(SymbolType::INT);
+	(*m_ostr) << "%" << ctrval->name << " = load i64, i64* %" << ctr->name << "\n";
+
+	t_astret cond = get_tmp_var();
+	(*m_ostr) << "%" << cond->name << " = icmp slt i64 %" << ctrval->name <<  ", " << dim << "\n";
+	(*m_ostr) << "br i1 %" << cond->name << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+	(*m_ostr) << labelBegin << ":  ; loop begin\n";
+
+	// ---------------
+	// loop statements
+	t_astret elemptr_src = get_tmp_var();
+	t_astret elem_src = get_tmp_var();
+	(*m_ostr) << "%" << elemptr_src->name << " = getelementptr [" << dim << " x double], ["
+	<< dim << " x double]* %" << matrix->name << ", i64 0, i64 %" << ctrval->name << "\n";
+	(*m_ostr) << "%" << elem_src->name << " = load double, double* %" << elemptr_src->name << "\n";
+
+	t_astret elemptr_dst = get_tmp_var();
+	(*m_ostr) << "%" << elemptr_dst->name << " = getelementptr [" << dim << " x double], ["
+	<< dim << " x double]* %" << vec_mem->name << ", i64 0, i64 %" << ctrval->name << "\n";
+
+	// multiply element value with scalar
+	t_astret elem_dst = get_tmp_var(SymbolType::SCALAR);
+
+	if(mul_or_div)
+	{
+		(*m_ostr) << "%" << elem_dst->name << " = fmul double %"
+			<< elem_src->name << ", %" << scalar->name << "\n";
+	}
+	else
+	{
+		(*m_ostr) << "%" << elem_dst->name << " = fdiv double %"
+			<< elem_src->name << ", %" << scalar->name << "\n";
+	}
+
+	// save result in array
+	(*m_ostr) << "store double %" << elem_dst->name << ", double* %" << elemptr_dst->name << "\n";
+
+	// increment counter
+	t_astret newctrval = get_tmp_var(SymbolType::INT);
+	(*m_ostr) << "%" << newctrval->name << " = add i64 %" << ctrval->name << ", 1\n";
+	(*m_ostr) << "store i64 %" << newctrval->name << ", i64* %" << ctr->name << "\n";
+	// ---------------
+
+	(*m_ostr) << "br label %" << labelStart << "\n";
+	(*m_ostr) << labelEnd << ":  ; loop end\n";
+
+	return vec_mem;
 }
 
 
@@ -473,6 +648,13 @@ t_astret LLAsm::visit(const ASTMult* ast)
 	// inner product of vectors: s = v^i v_i
 	if(term1->ty == SymbolType::VECTOR && term2->ty == SymbolType::VECTOR)
 	{
+		if(ast->IsInverted())
+		{
+			throw std::runtime_error("ASTMult: Cannot divide vector \"" + term1->name
+				+ "\" by vector \"" + term2->name + "\".\n");
+			return nullptr;
+		}
+
 		if(std::get<0>(term1->dims) != std::get<0>(term2->dims))
 		{
 			throw std::runtime_error("ASTMult: Dimension mismatch in inner product of \""
@@ -554,6 +736,13 @@ t_astret LLAsm::visit(const ASTMult* ast)
 	// matrix-vector product: w^i = M^i_j v^j
 	else if(term1->ty == SymbolType::MATRIX && term2->ty == SymbolType::VECTOR)
 	{
+		if(ast->IsInverted())
+		{
+			throw std::runtime_error("ASTMult: Cannot divide matrix \"" + term1->name
+				+ "\" by vector \"" + term2->name + "\".\n");
+			return nullptr;
+		}
+
 		if(std::get<1>(term1->dims) != std::get<0>(term2->dims))
 		{
 			throw std::runtime_error("ASTMult: Dimension mismatch in matrix-vector product of \""
@@ -696,6 +885,13 @@ t_astret LLAsm::visit(const ASTMult* ast)
 	// matrix-matrix product: L^i_j = M^i_k N^k_j
 	else if(term1->ty == SymbolType::MATRIX && term2->ty == SymbolType::MATRIX)
 	{
+		if(ast->IsInverted())
+		{
+			throw std::runtime_error("ASTMult: Cannot divide matrix \"" + term1->name
+				+ "\" by matrix \"" + term2->name + "\".\n");
+			return nullptr;
+		}
+
 		if(std::get<1>(term1->dims) != std::get<0>(term2->dims))
 		{
 			throw std::runtime_error("ASTMult: Dimension mismatch in matrix-matrix product of \""
@@ -902,6 +1098,28 @@ t_astret LLAsm::visit(const ASTMult* ast)
 		return L_mem;
 	}
 
+	// scalar-matrix/vector product
+	else if((term1->ty == SymbolType::SCALAR || term1->ty == SymbolType::INT)
+		&& (term2->ty == SymbolType::MATRIX || term2->ty == SymbolType::VECTOR))
+	{
+		if(ast->IsInverted())
+		{
+			throw std::runtime_error("ASTMult: Cannot divide scalar \"" + term1->name
+				+ "\" by vector or matrix \"" + term2->name + "\".\n");
+			return nullptr;
+		}
+
+		return scalar_matrix_prod(term1, term2, 1);
+	}
+
+	// scalar-matrix/vector product
+	else if((term2->ty == SymbolType::SCALAR || term2->ty == SymbolType::INT)
+		&& (term1->ty == SymbolType::MATRIX || term1->ty == SymbolType::VECTOR))
+	{
+		bool bMul = !ast->IsInverted();
+		return scalar_matrix_prod(term2, term1, bMul);
+	}
+
 	// scalar types
 	else
 	{
@@ -1037,15 +1255,77 @@ t_astret LLAsm::visit(const ASTTransp* ast)
 		std::size_t dim2 = std::get<1>(term->dims);
 		std::size_t dim = dim1*dim2;
 
-		// cast input matrix pointer to element pointer
-		t_astret termptr = get_tmp_var();
-		(*m_ostr) << "%" << termptr->name << " = bitcast ["
-		<< dim << " x double]* %" << term->name << " to double*\n";
-
 		// allocate result matrix
 		std::array<std::size_t, 2> dimtrans{{dim2, dim1}};
 		t_astret result_mem = get_tmp_var(SymbolType::MATRIX, &dimtrans);
 		(*m_ostr) << "%" << result_mem->name << " = alloca [" << dim << " x double]\n";
+
+
+		// copy elements in a loop
+		std::string labelStart = get_label();
+		std::string labelBegin = get_label();
+		std::string labelEnd = get_label();
+
+		// loop counter
+		t_astret ctr = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctr->name << " = alloca i64\n";
+		(*m_ostr) << "store i64 0, i64* %" << ctr->name << "\n";
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelStart << ":  ; loop start\n";
+
+		// loop condition: ctr < dim
+		t_astret ctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctrval->name << " = load i64, i64* %" << ctr->name << "\n";
+
+		t_astret cond = get_tmp_var();
+		(*m_ostr) << "%" << cond->name << " = icmp slt i64 %" << ctrval->name <<  ", " << dim << "\n";
+		(*m_ostr) << "br i1 %" << cond->name << ", label %" << labelBegin << ", label %" << labelEnd << "\n";
+
+		(*m_ostr) << labelBegin << ":  ; loop begin\n";
+
+		// ---------------
+		// loop statements
+		// ctr_result = (ctr%cols)*rows + ctr/cols
+		t_astret ctr_mod_cols = get_tmp_var(SymbolType::INT);
+		t_astret ctr_div_cols = get_tmp_var(SymbolType::INT);
+		t_astret ctr_mul_rows = get_tmp_var(SymbolType::INT);
+		t_astret ctr_result = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << ctr_mod_cols->name << " = srem i64 %" << ctrval->name << ", " << dim2 << "\n";
+		(*m_ostr) << "%" << ctr_div_cols->name << " = sdiv i64 %" << ctrval->name << ", " << dim2 << "\n";
+		(*m_ostr) << "%" << ctr_mul_rows->name << " = mul i64 %" << ctr_mod_cols->name << ", " << dim1 << "\n";
+		(*m_ostr) << "%" << ctr_result->name << " = add i64 %" << ctr_mul_rows->name
+			<< ", %" << ctr_div_cols->name << "\n";
+
+		// get matrix element pointers
+		t_astret elemptr_term = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_term->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << term->name << ", i64 0, i64 %" << ctrval->name << "\n";
+		t_astret elemptr_result = get_tmp_var();
+		(*m_ostr) << "%" << elemptr_result->name << " = getelementptr [" << dim << " x double], ["
+			<< dim << " x double]* %" << result_mem->name << ", i64 0, i64 %" << ctr_result->name << "\n";
+
+		t_astret elem_term = get_tmp_var();
+		(*m_ostr) << "%" << elem_term->name << " = load double, double* %" << elemptr_term->name << "\n";
+
+		// save result
+		(*m_ostr) << "store double %" << elem_term->name << ", double* %" << elemptr_result->name << "\n";
+
+		// increment counter
+		t_astret newctrval = get_tmp_var(SymbolType::INT);
+		(*m_ostr) << "%" << newctrval->name << " = add i64 %" << ctrval->name << ", 1\n";
+		(*m_ostr) << "store i64 %" << newctrval->name << ", i64* %" << ctr->name << "\n";
+		// ---------------
+
+		(*m_ostr) << "br label %" << labelStart << "\n";
+		(*m_ostr) << labelEnd << ":  ; loop end\n";
+
+
+		/*
+		// cast input matrix pointer to element pointer
+		t_astret termptr = get_tmp_var();
+		(*m_ostr) << "%" << termptr->name << " = bitcast ["
+			<< dim << " x double]* %" << term->name << " to double*\n";
 
 		// cast result matrix pointer to element pointer
 		t_astret result_ptr = get_tmp_var();
@@ -1057,6 +1337,7 @@ t_astret LLAsm::visit(const ASTTransp* ast)
 		(*m_ostr) << "%" << result_status->name << " = call i64 @ext_transpose(double* %"
 			<< termptr->name << ", double* %" << result_ptr->name
 			<< ", i64 " << dim1 << ", i64 " << dim2 << ")\n";
+		*/
 
 		return result_mem;
 	}

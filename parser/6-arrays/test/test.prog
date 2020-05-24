@@ -57,6 +57,10 @@ func test_vec(vec 3 a)
 
 func mat 3 3 test_mat()
 {
+	mat 2 3 A = [1,2,3, 4,5,6];
+	putstr(A/2);
+	putstr(A');
+
 	mat 3 3 M = [0., 1., 0.,  1., 0., 0.,  0., 0., 1.];
 	vec 3 v = [1., 5., 9.];
 

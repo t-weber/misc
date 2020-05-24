@@ -93,6 +93,9 @@ private:
 	SymTab* m_syms = nullptr;
 
 	std::ostream* m_ostr = &std::cout;
+
+	// helper functions to reduce code redundancy
+	t_astret scalar_matrix_prod(t_astret scalar, t_astret matrix, bool mul_or_div=1);
 };
 
 

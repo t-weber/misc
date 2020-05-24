@@ -212,7 +212,10 @@ extern "C" t_int ext_power(const t_real* M, t_real* P, t_int N, t_int POW)
  */
 extern "C" void ext_transpose(const t_real* M, t_real* T, t_int rows, t_int cols)
 {
-	for(t_int i=0; i<rows; ++i)
-		for(t_int j=0; j<cols; ++j)
-			T[j*rows + i] = M[i*cols + j];
+	for(t_int ctr=0; ctr<rows*cols; ++ctr)
+	{
+		t_int i = ctr/cols;
+		t_int j = ctr%cols;
+		T[j*rows + i] = M[i*cols + j];
+	}
 }
