@@ -462,9 +462,10 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 
 	t_mat mat;
 	if constexpr(is_dyn_mat<t_mat>)
-		mat = t_mat(N1, N2);
+		mat = t_mat{N1, N2};
 
 	for(std::size_t n1=0; n1<N1; ++n1)
+	{
 		for(std::size_t n2=0; n2<N2; ++n2)
 		{
 			if constexpr(is_complex<typename t_vec::value_type>)
@@ -472,6 +473,7 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 			else
 				mat(n1, n2) = vec1[n1]*vec2[n2];
 		}
+	}
 
 	return mat;
 }
@@ -2735,12 +2737,41 @@ requires is_mat<t_mat>
 	const t_real ca = std::cos(_aa);
 	const t_real cb = std::cos(_bb);
 	const t_real cc = std::cos(_cc);
-	const t_real rr = std::sqrt(1. + 2.*ca*cb*cc - (ca*ca + cb*cb + cc*cc));
+	const t_real rr = std::sqrt(t_real{1} + t_real{2}*ca*cb*cc - (ca*ca + cb*cb + cc*cc));
 
-	return t_real(2)*pi<t_real> * create<t_mat>({
-		1./a,				0.,				0.,
-		-1./a * cc/sc,		1./b * 1./sc,			0.,
-		(cc*ca - cb)/(a*sc*rr), 	(cb*cc-ca)/(b*sc*rr),		sc/(c*rr)
+	return t_real{2}*pi<t_real> * create<t_mat>({
+		t_real{1}/a,				t_real{0},						t_real{0},
+		t_real{-1}/a * cc/sc,		t_real{1}/b * t_real{1}/sc,		t_real{0},
+		(cc*ca - cb)/(a*sc*rr), 	(cb*cc-ca)/(b*sc*rr),			sc/(c*rr)
+	});
+}
+
+
+/**
+ * crystallographic A matrix, B = 2pi * A^(-T)
+ * after: https://en.wikipedia.org/wiki/Fractional_coordinates
+ */
+template<class t_mat, class t_vec, class t_real = typename t_mat::value_type>
+t_mat A_matrix(t_real a, t_real b, t_real c, t_real _aa, t_real _bb, t_real _cc)
+requires is_mat<t_mat>
+{
+	t_vec va = create<t_vec>({a, 0, 0});
+	t_vec vb = rotation<t_mat, t_vec>(create<t_vec>({0,0,1}), _cc, 1)*va * b/a;
+
+	t_vec vc;
+	if constexpr(is_dyn_vec<t_vec>)
+		vc = t_vec(va.size());
+
+	// derived using dot products <va|vc>=cos(_bb), and <vb|vc>=cos(_aa)
+	vc[0] = std::cos(_bb)*c;
+	vc[1] = (std::cos(_aa) * b*c - vb[0]*vc[0]) / vb[1];
+	vc[2] = t_real{0};
+	vc[2] = std::sqrt(c*c - inner<t_vec>(vc, vc));
+
+	return create<t_mat>({
+		va[0], vb[0], vc[0],
+		va[1], vb[1], vc[1],
+		va[2], vb[2], vc[2],
 	});
 }
 
@@ -2791,7 +2822,7 @@ requires is_basic_vec<t_vec>
 		}
 
 		// structure factor
-		F += (*iterM_or_b) * f * std::exp(expsign * cI * twopi * inner<t_vec>(Q, *iterR));
+		F += (*iterM_or_b) * (f * std::exp(expsign * cI * twopi * inner<t_vec>(Q, *iterR)));
 
 		// next M or b if available (otherwise keep current)
 		auto iterM_or_b_next = std::next(iterM_or_b, 1);

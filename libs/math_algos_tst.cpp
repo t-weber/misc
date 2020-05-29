@@ -16,10 +16,12 @@ using namespace m_ops;
 #include <vector>
 #include <array>
 
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/vector.hpp>
-#include <boost/numeric/ublas/io.hpp>
-namespace ublas = boost::numeric::ublas;
+#ifdef USE_UBLAS	// ublas containers use deprecated std::allocator::construct
+	#include <boost/numeric/ublas/matrix.hpp>
+	#include <boost/numeric/ublas/vector.hpp>
+	#include <boost/numeric/ublas/io.hpp>
+	namespace ublas = boost::numeric::ublas;
+#endif
 
 #include <boost/type_index.hpp>
 namespace ty = boost::typeindex;
@@ -30,6 +32,7 @@ namespace ty = boost::typeindex;
 #include <QtGui/QVector4D>
 
 
+#ifdef USE_UBLAS
 template<class T>
 ublas::vector<T> operator*(const ublas::matrix<T>& mat, const ublas::vector<T>& vec)
 {
@@ -41,6 +44,7 @@ ublas::matrix<T> operator*(const ublas::matrix<T>& m1, const ublas::matrix<T>& m
 {
 	return ublas::prod(m1, m2);
 }
+#endif
 
 
 template<class t_vec, class t_mat>
@@ -255,6 +259,25 @@ void vecmat_tsts()
 		<< inner<t_vec>(realbase[1], recipbase[2]) << ", "
 		<< inner<t_vec>(realbase[2], recipbase[0]) << ", "
 		<< inner<t_vec>(realbase[2], recipbase[1]) << "\n";
+
+
+	t_mat B = B_matrix<t_mat, t_real>(4.,5.,6., M_PI/5., M_PI/6., M_PI/7.);
+	std::cout << "\nB\n";
+	std::cout << B(0,0) << " " << B(0,1) << " " << B(0,2) << "\n";
+	std::cout << B(1,0) << " " << B(1,1) << " " << B(1,2) << "\n";
+	std::cout << B(2,0) << " " << B(2,1) << " " << B(2,2) << "\n";
+
+	t_mat A = A_matrix<t_mat, t_vec, t_real>(4.,5.,6., M_PI/5., M_PI/6., M_PI/7.);
+	std::cout << "\nA\n";
+	std::cout << A(0,0) << " " << A(0,1) << " " << A(0,2) << "\n";
+	std::cout << A(1,0) << " " << A(1,1) << " " << A(1,2) << "\n";
+	std::cout << A(2,0) << " " << A(2,1) << " " << A(2,2) << "\n";
+
+	auto [B2, B2Ok] = inv<t_mat>(trans<t_mat>(A/t_real(2*M_PI)));
+	std::cout << "\nB2\n";
+	std::cout << B2(0,0) << " " << B2(0,1) << " " << B2(0,2) << "\n";
+	std::cout << B2(1,0) << " " << B2(1,1) << " " << B2(1,2) << "\n";
+	std::cout << B2(2,0) << " " << B2(2,1) << " " << B2(2,2) << "\n";
 }
 
 
@@ -370,11 +393,12 @@ void complex_tsts()
 
 int main()
 {
-	constexpr bool bUseSTL = 1;
+	constexpr bool bUseSTL = 0;
 	constexpr bool bUseQt = 1;
-	constexpr bool bUseUblas = 1;
+	constexpr bool bUseUblas = 0;
 	constexpr bool bUseInternals = 1;
 
+#ifdef USE_UBLAS
 	// using dynamic STL containers
 	if constexpr(bUseSTL)
 	{
@@ -415,6 +439,7 @@ int main()
 		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
+#endif
 
 
 	// using Qt classes
@@ -457,6 +482,7 @@ int main()
 	}
 
 
+#ifdef USE_UBLAS
 	// using ublas classes
 	if constexpr(bUseUblas)
 	{
@@ -477,6 +503,7 @@ int main()
 		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
 	}
+#endif
 
 
 	// using internal classes
