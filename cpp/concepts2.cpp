@@ -5,6 +5,7 @@
  * @license: see 'LICENSE.EUPL' file
  *
  * enabled concepts:
+ * g++ -o concepts2 concepts2.cpp -std=c++20
  * g++ -o concepts2 concepts2.cpp -std=c++17 -fconcepts
  *
  * disabled concepts:
@@ -22,7 +23,7 @@ namespace ublas = boost::numeric::ublas;
 #ifdef __cpp_concepts
 // requirements of a vector type
 template<class T>
-concept bool is_vec = requires(const T& a)
+concept is_vec = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 	T(3);				// constructor
@@ -32,7 +33,7 @@ concept bool is_vec = requires(const T& a)
 
 // second requirement
 template<class T>
-concept bool is_vec2 = requires(const T& a)
+concept is_vec2 = requires(const T& a)
 {
 	T();
 };

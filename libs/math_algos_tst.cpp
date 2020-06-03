@@ -4,7 +4,7 @@
  * @date 9-dec-17
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -fPIC -I/usr/include/qt5 -o math_algos_tst math_algos_tst.cpp -std=c++2a -fconcepts -lQt5Core -lQt5Gui
+ * g++ -fPIC -I/usr/include/qt5 -o math_algos_tst math_algos_tst.cpp -std=c++20 -lQt5Core -lQt5Gui
  */
 
 #include <iostream>
@@ -393,7 +393,7 @@ void complex_tsts()
 
 int main()
 {
-	constexpr bool bUseSTL = 0;
+	constexpr bool bUseSTL = 1;
 	constexpr bool bUseQt = 1;
 	constexpr bool bUseUblas = 0;
 	constexpr bool bUseInternals = 1;
@@ -511,9 +511,9 @@ int main()
 	{
 		using t_real = double;
 		using t_cplx = std::complex<t_real>;
-		using t_vec = std::vector<t_real>;
+		using t_vec = vec<t_real, std::vector>;
 		using t_mat = mat<t_real, std::vector>;
-		using t_vec_cplx = std::vector<t_cplx>;
+		using t_vec_cplx = vec<t_cplx, std::vector>;
 		using t_mat_cplx = mat<t_cplx, std::vector>;
 
 		vecmat_tsts<t_vec, t_mat>();

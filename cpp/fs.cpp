@@ -4,6 +4,7 @@
  * @date 11-nov-17
  * @license: see 'LICENSE.EUPL' file
  *
+ * g++ -o fs fs.cpp -std=c++20
  * gcc -o fs fs.cpp -std=c++14 -lstdc++ -lstdc++fs
  * gcc -o fs fs.cpp -std=c++14 -lstdc++ -lboost_filesystem -lboost_system
  */
@@ -11,12 +12,15 @@
 #include <iostream>
 
 #if __has_include(<filesystem>)
+	#pragma message("Using filesystem header.")
 	#include <filesystem>
 	namespace fs = std::filesystem;
 #elif __has_include(<experimental/filesystem>)
+	#pragma message("Using experimental filesystem header.")
 	#include <experimental/filesystem>
 	namespace fs = std::experimental::filesystem;
 #else
+	#pragma message("Using Boost filesystem header.")
 	#include <boost/filesystem.hpp>
 	namespace fs = boost::filesystem;
 #endif

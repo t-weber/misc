@@ -21,37 +21,6 @@
 #define ROWSEP '|'
 
 
-namespace m {
-
-// ----------------------------------------------------------------------------
-// matrix
-// ----------------------------------------------------------------------------
-
-template<class T=double, template<class...> class t_cont = std::vector>
-requires is_basic_vec<t_cont<T>> && is_dyn_vec<t_cont<T>>
-class mat
-{
-public:
-	using value_type = T;
-	using container_type = t_cont<T>;
-
-	mat() = default;
-	mat(std::size_t ROWS, std::size_t COLS) : m_data(ROWS*COLS), m_rowsize(ROWS), m_colsize(COLS) {}
-	~mat() = default;
-
-	std::size_t size1() const { return m_rowsize; }
-	std::size_t size2() const { return m_colsize; }
-	const T& operator()(std::size_t row, std::size_t col) const { return m_data[row*m_colsize + col]; }
-	T& operator()(std::size_t row, std::size_t col) { return m_data[row*m_colsize + col]; }
-
-private:
-	container_type m_data;
-	std::size_t m_rowsize, m_colsize;
-};
-// ----------------------------------------------------------------------------
-
-}
-
 
 namespace m_ops {
 // ----------------------------------------------------------------------------
@@ -497,4 +466,95 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 // ----------------------------------------------------------------------------
 
 }
+
+
+
+namespace m {
+
+// ----------------------------------------------------------------------------
+// vector and matrix containers
+// ----------------------------------------------------------------------------
+
+template<class T=double, template<class...> class t_cont = std::vector>
+requires is_basic_vec<t_cont<T>> && is_dyn_vec<t_cont<T>>
+class vec : public t_cont<T>
+{
+public:
+	using value_type = T;
+	using container_type = t_cont<T>;
+
+	vec() = default;
+	vec(std::size_t SIZE) : t_cont<T>(SIZE) {}
+	~vec() = default;
+
+	const value_type& operator()(std::size_t i) const { return this->operator[](i); }
+	value_type& operator()(std::size_t i) { return this->operator[](i); }
+
+
+	friend vec operator+(const vec& vec1, const vec& vec2) { return m_ops::operator+(vec1, vec2); }
+	friend vec operator-(const vec& vec1, const vec& vec2) { return m_ops::operator-(vec1, vec2); }
+	friend const vec& operator+(const vec& vec1) { return m_ops::operator+(vec1); }
+	friend vec operator-(const vec& vec1) { return m_ops::operator-(vec1); }
+
+	friend vec operator*(value_type d, const vec& vec1) { return m_ops::operator*(d, vec1); }
+	friend vec operator*(const vec& vec1, value_type d) { return m_ops::operator*(vec1, d); }
+	friend vec operator/(const vec& vec1, value_type d) { return m_ops::operator/(vec1, d); }
+
+	vec& operator*=(const vec& vec2) { return m_ops::operator*=(*this, vec2); }
+	vec& operator+=(const vec& vec2) { return m_ops::operator+=(*this, vec2); }
+	vec& operator-=(const vec& vec2) { return m_ops::operator-=(*this, vec2); }
+	vec& operator*=(value_type d) { return m_ops::operator*=(*this, d); }
+	vec& operator/=(value_type d) { return m_ops::operator/=(*this, d); }
+
+private:
+};
+
+
+template<class T=double, template<class...> class t_cont = std::vector>
+requires is_basic_vec<t_cont<T>> && is_dyn_vec<t_cont<T>>
+class mat
+{
+public:
+	using value_type = T;
+	using container_type = t_cont<T>;
+
+	mat() = default;
+	mat(std::size_t ROWS, std::size_t COLS) : m_data(ROWS*COLS), m_rowsize{ROWS}, m_colsize{COLS} {}
+	~mat() = default;
+
+	std::size_t size1() const { return m_rowsize; }
+	std::size_t size2() const { return m_colsize; }
+	const T& operator()(std::size_t row, std::size_t col) const { return m_data[row*m_colsize + col]; }
+	T& operator()(std::size_t row, std::size_t col) { return m_data[row*m_colsize + col]; }
+
+
+	friend mat operator+(const mat& mat1, const mat& mat2) { return m_ops::operator+(mat1, mat2); }
+	friend mat operator-(const mat& mat1, const mat& mat2) { return m_ops::operator-(mat1, mat2); }
+	friend const mat& operator+(const mat& mat1) { return m_ops::operator+(mat1); }
+	friend mat operator-(const mat& mat1) { return m_ops::operator-(mat1); }
+
+	friend mat operator*(const mat& mat1, const mat& mat2) { return m_ops::operator*(mat1, mat2); }
+	friend mat operator*(const mat& mat1, value_type d) { return m_ops::operator*(mat1, d); }
+	friend mat operator*(value_type d, const mat& mat1) { return m_ops::operator*(d, mat1); }
+	friend mat operator/(const mat& mat1, value_type d) { return m_ops::operator/(mat1, d); }
+
+	template<class t_vec> requires is_basic_vec<t_cont<T>> && is_dyn_vec<t_cont<T>>
+	friend t_vec operator*(const mat& mat1, const t_vec& vec2) { return m_ops::operator*(mat1, vec2); }
+
+	mat& operator*=(const mat& mat2) { return m_ops::operator*=(*this, mat2); }
+	mat& operator+=(const mat& mat2) { return m_ops::operator+=(*this, mat2); }
+	mat& operator-=(const mat& mat2) { return m_ops::operator-=(*this, mat2); }
+	mat& operator*=(value_type d) { return m_ops::operator*=(*this, d); }
+	mat& operator/=(value_type d) { return m_ops::operator/=(*this, d); }
+
+private:
+	container_type m_data;
+	std::size_t m_rowsize, m_colsize;
+};
+
+// ----------------------------------------------------------------------------
+
+}
+
+
 #endif

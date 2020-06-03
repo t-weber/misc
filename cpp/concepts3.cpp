@@ -15,7 +15,7 @@
 
 // requirements of a vector type (as concept variable)
 template<class T>
-concept bool is_vec = requires(const T& a)
+concept is_vec = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 	a.operator[](1);		// must have operator[]
@@ -37,7 +37,7 @@ concept bool is_vec_func()
 
 // requirements of a vector type with a dynamic size
 template<class T>
-concept bool is_dyn_vec = requires(const T& a)
+concept is_dyn_vec = requires(const T& a)
 {
 	T(3);						// constructor
 };
@@ -68,7 +68,7 @@ t_vec vector_func(const t_vec& vec1, const t_vec& vec2)
 }
 
 
-template<class T> concept bool has_size = requires(const T& t) { t.size(); };
+template<class T> concept has_size = requires(const T& t) { t.size(); };
 
 int main()
 {

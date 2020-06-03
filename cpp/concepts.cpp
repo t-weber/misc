@@ -4,7 +4,7 @@
  * @date 11-nov-17
  * @license: see 'LICENSE.EUPL' file
  *
- * gcc -o concepts concepts.cpp -std=c++17 -fconcepts -lstdc++
+ * g++ -o concepts concepts.cpp -std=c++20
  */
 
 #include <iostream>
@@ -36,9 +36,9 @@ void print(const auto& a, const auto&... rest)
 // ----------------------------------------------------------------------------
 // constrained functions
 
-template<typename T> concept bool c_onlyint = std::is_integral_v<T>;
+template<typename T> concept c_onlyint = std::is_integral_v<T>;
 
-void print_constrained(const c_onlyint& i)
+void print_constrained(const c_onlyint auto& i)
 {
 	std::cout << "int: " << i << std::endl;
 }
@@ -62,7 +62,7 @@ void print_constrained(const T& f)
 
 // requires a class which as a member named "fkt()"
 template<class T>
-concept bool has_func = requires(const T& a) { a.fkt(); };
+concept has_func = requires(const T& a) { a.fkt(); };
 
 struct HasFkt { int fkt() const { return 159; }};
 struct NoFkt { };
@@ -75,7 +75,7 @@ void print_fkt(const auto& a) requires has_func<decltype(a)>
 
 // constrain to classes with a value_type
 template<class T>
-concept bool has_value_type = requires { typename T::value_type; };
+concept has_value_type = requires { typename T::value_type; };
 
 template<has_value_type T> void print_value_type()
 {
@@ -132,7 +132,7 @@ int main()
 
 	// ----------------------------------------------------------------------------
 	// constrained template lambda
-	auto lam = [](const c_onlyint& a) -> void
+	auto lam = [](const c_onlyint auto& a) -> void
 	{
 		std::cout << "lam: " << a << std::endl;
 	};

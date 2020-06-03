@@ -44,7 +44,7 @@ concept /*bool*/ is_basic_vec = requires(const T& a)
 template<class T>
 concept /*bool*/ is_dyn_vec = requires(const T& a)
 {
-	T(3);						// constructor
+	T(3);						// constructor with size
 };
 
 /**
@@ -80,7 +80,7 @@ concept /*bool*/ is_basic_mat = requires(const T& a)
 template<class T>
 concept /*bool*/ is_dyn_mat = requires(const T& a)
 {
-	T(3,3);						// constructor
+	T(3,3);						// constructor with sizes
 };
 
 /**

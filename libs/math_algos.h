@@ -2707,7 +2707,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 	constexpr t_cplx c1(1,0);
 	constexpr t_cplx c2(2,0);
 	constexpr t_cplx cI(0,1);
-	constexpr t_real s3 = std::sqrt(3.);
+	/*constexpr*/ t_real s3 = std::sqrt(3.);
 
 	static const t_mat mat[] =
 	{
