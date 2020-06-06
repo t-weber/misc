@@ -8,6 +8,7 @@
  *	- http://www.cs.ecu.edu/karl/5220/spr16/Notes/Bottom-up/slr1table.html
  *	- https://en.wikipedia.org/wiki/LR_parser
  *	- https://www.cs.uaf.edu/~cs331/notes/FirstFollow.pdf
+ *  - http://www.cs.ecu.edu/karl/5220/spr16/Notes/Bottom-up/lr1.html
  *	- https://de.wikipedia.org/wiki/LL(k)-Grammatik
  *	- "Compilerbau Teil 1", ISBN: 3-486-25294-1, 1999, p. 267
  */
@@ -41,8 +42,9 @@ class Symbol
 {
 public:
 	Symbol(const std::string& id, bool bEps=false, bool bEnd=false)
-		: m_id{id}, m_iseps{bEps}, m_isend{false} {}
+		: m_id{id}, m_iseps{bEps}, m_isend{bEnd} {}
 	Symbol() = delete;
+	virtual ~Symbol() = default;
 
 	virtual SymbolType GetType() const = 0;
 	const std::string& GetId() const { return m_id; }
@@ -68,6 +70,7 @@ class Terminal : public Symbol
 public:
 	Terminal(const std::string& id, bool bEps=false, bool bEnd=false) : Symbol{id, bEps, bEnd} {}
 	Terminal() = delete;
+	virtual ~Terminal() = default;
 
 	virtual SymbolType GetType() const override { return SymbolType::TERM; }
 };
@@ -84,6 +87,7 @@ class NonTerminal : public Symbol
 public:
 	NonTerminal(const std::string& id) : Symbol{id} {}
 	NonTerminal() = delete;
+	virtual ~NonTerminal() = default;
 
 	virtual SymbolType GetType() const override { return SymbolType::NONTERM; }
 
@@ -209,10 +213,12 @@ protected:
 	/**
 	 * calculate first set
 	 */
-	void CalcFirst(const std::shared_ptr<NonTerminal>& nonterm)
+	static void CalcFirst(const std::shared_ptr<NonTerminal>& nonterm,
+		std::map<std::string, std::set<std::shared_ptr<Symbol>>>& _first,
+		std::map<std::string, std::vector<std::set<std::shared_ptr<Symbol>>>>* _first_perrule=nullptr)
 	{
 		// set already calculated?
-		if(m_first.find(nonterm->GetId()) != m_first.end())
+		if(_first.find(nonterm->GetId()) != _first.end())
 			return;
 
 		std::set<std::shared_ptr<Symbol>> first;
@@ -240,15 +246,15 @@ protected:
 				else
 				{
 					const std::shared_ptr<NonTerminal>& symnonterm
-						= reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
+					= reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
 
 					// if the rule is left-recursive, ignore calculating the same symbol again
 					if(symnonterm->GetId() != nonterm->GetId())
-						CalcFirst(symnonterm);
+						CalcFirst(symnonterm, _first, _first_perrule);
 
 					// add first set except eps
 					bool bHasEps = false;
-					for(const auto& symprod : m_first[symnonterm->GetId()])
+					for(const auto& symprod : _first[symnonterm->GetId()])
 					{
 						if(symprod->IsEps())
 						{
@@ -275,20 +281,24 @@ protected:
 			}
 		}
 
-		m_first[nonterm->GetId()] = first;
-		m_first_perrule[nonterm->GetId()] = first_perrule;
+		_first[nonterm->GetId()] = first;
+
+		if(_first_perrule)
+			(*_first_perrule)[nonterm->GetId()] = first_perrule;
 	}
 
 
 	/**
 	 * calculate follow set
 	 */
-	void CalcFollow(const std::vector<std::shared_ptr<NonTerminal>>& nonterms,
+	static void CalcFollow(const std::vector<std::shared_ptr<NonTerminal>>& nonterms,
 		const std::shared_ptr<NonTerminal>& start,
-		const std::shared_ptr<NonTerminal>& nonterm)
+		const std::shared_ptr<NonTerminal>& nonterm,
+		std::map<std::string, std::set<std::shared_ptr<Symbol>>>& _first,
+		std::map<std::string, std::set<std::shared_ptr<Symbol>>>& _follow)
 	{
 		// set already calculated?
-		if(m_follow.find(nonterm->GetId()) != m_follow.end())
+		if(_follow.find(nonterm->GetId()) != _follow.end())
 			return;
 
 		std::set<std::shared_ptr<Symbol>> follow;
@@ -325,7 +335,7 @@ protected:
 							}
 							else	// non-terminal
 							{
-								for(const auto& symfirst : m_first[rule[_iSym]->GetId()])
+								for(const auto& symfirst : _first[rule[_iSym]->GetId()])
 									if(!symfirst->IsEps())
 										follow.insert(symfirst);
 
@@ -358,22 +368,52 @@ protected:
 						if(bLastSym || iNextSym==rule.size())
 						{
 							if(_nonterm != nonterm)
-								CalcFollow(nonterms, start, _nonterm);
-							const auto& _follow = m_follow[_nonterm->GetId()];
-							follow.insert(_follow.begin(), _follow.end());
+								CalcFollow(nonterms, start, _nonterm, _first, _follow);
+							const auto& __follow = _follow[_nonterm->GetId()];
+							follow.insert(__follow.begin(), __follow.end());
 						}
 					}
 				}
 			}
 		}
 
-
-		m_follow[nonterm->GetId()] = follow;
+		_follow[nonterm->GetId()] = follow;
 	}
 
 
 	/**
-	 * calculates SLR collection
+	 * TODO: for future extension towards LR(1) collections
+	 */
+	void CalcLRFollow(std::size_t cursor, const std::set<std::shared_ptr<Terminal>>& lhs_follows,
+		const std::vector<std::shared_ptr<Symbol>>& rule)
+	{
+		// get rest of the rule after the cursor
+		std::vector<std::shared_ptr<Symbol>> ruleaftercursor;
+		for(std::size_t ruleidx=cursor+1; ruleidx<rule.size(); ++ruleidx)
+			ruleaftercursor.push_back(rule[ruleidx]);
+
+		for(const auto& lhs_follow : lhs_follows)
+		{
+			std::vector<std::shared_ptr<Symbol>> theruleaftercursor = ruleaftercursor;
+			theruleaftercursor.push_back(lhs_follow);
+
+			auto tmpNT = std::make_shared<NonTerminal>("tmp");
+			tmpNT->AddRule(theruleaftercursor);
+
+			std::map<std::string, std::set<std::shared_ptr<Symbol>>> tmp_first;
+			CalcFirst(tmpNT, tmp_first);
+
+			// has to have exactly 1 item
+			if(tmp_first.size())
+			{
+				// add [NT after cursor, tmp_first] to collection
+			}
+		}
+	}
+
+
+	/**
+	 * calculates SLR/LR(0) collection
 	 */
 	void CalcLRCollection(
 		const std::vector<std::shared_ptr<NonTerminal>>& _lhs,
@@ -410,7 +450,7 @@ protected:
 
 		std::function<void(const std::shared_ptr<NonTerminal>& _nonterm, std::set<std::string>& memo_rules)> addrhsrules;
 
-		addrhsrules = [&collection, &addrhsrules, &gethash, this]
+		addrhsrules = [&collection, &addrhsrules, &gethash]
 		(const std::shared_ptr<NonTerminal>& _nonterm, std::set<std::string>& memo_rules) -> void
 		{
 			for(std::size_t rulerhsidx=0; rulerhsidx<_nonterm->NumRules(); ++rulerhsidx)
@@ -442,7 +482,7 @@ protected:
 			const auto& rule = rules[ruleidx];
 			std::size_t cursor = cursors[ruleidx];
 
-			const auto& sym = rule[cursor];
+			//const auto& sym = rule[cursor];
 			hash += gethash(lhs, rule, cursor);
 		}
 
@@ -675,11 +715,11 @@ public:
 	{
 		// calculate first sets for all known non-terminals
 		for(const auto& nonterm : nonterms)
-			CalcFirst(nonterm);
+			CalcFirst(nonterm, m_first, &m_first_perrule);
 
 		// calculate follow sets for all known non-terminals
 		for(const auto& nonterm : nonterms)
-			CalcFollow(nonterms, start, nonterm);
+			CalcFollow(nonterms, start, nonterm, m_first, m_follow);
 
 		// calculate the LR collection
 		CalcLRCollection({{start}}, {{start->GetRule(0)}}, {0});
