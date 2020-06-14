@@ -8,7 +8,7 @@
  *	- http://www.cs.ecu.edu/karl/5220/spr16/Notes/Bottom-up/slr1table.html
  *	- https://en.wikipedia.org/wiki/LR_parser
  *	- https://www.cs.uaf.edu/~cs331/notes/FirstFollow.pdf
- *  - http://www.cs.ecu.edu/karl/5220/spr16/Notes/Bottom-up/lr1.html
+ *	- http://www.cs.ecu.edu/karl/5220/spr16/Notes/Bottom-up/lr1.html
  *	- https://de.wikipedia.org/wiki/LL(k)-Grammatik
  *	- "Compilerbau Teil 1", ISBN: 3-486-25294-1, 1999, p. 267
  */
@@ -246,7 +246,7 @@ protected:
 				else
 				{
 					const std::shared_ptr<NonTerminal>& symnonterm
-					= reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
+						= reinterpret_cast<const std::shared_ptr<NonTerminal>&>(sym);
 
 					// if the rule is left-recursive, ignore calculating the same symbol again
 					if(symnonterm->GetId() != nonterm->GetId())
@@ -535,9 +535,7 @@ protected:
 		std::cout << "item " << rulenum;
 		if(symTransition)
 		{
-			std::cout << " (transition from item " << rulefrom
-				<< " with symbol " << *symTransition << ")";
-
+			std::cout << " (transition from item " << rulefrom << " with symbol " << *symTransition << ")";
 			m_transitions[rulefrom].push_back(std::make_pair(rulenum, *symTransition));
 		}
 

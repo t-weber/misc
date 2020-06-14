@@ -36,8 +36,9 @@ class Symbol
 {
 public:
 	Symbol(const std::string& id, bool bEps=false, bool bEnd=false)
-		: m_id{id}, m_iseps{bEps}, m_isend{false} {}
+		: m_id{id}, m_iseps{bEps}, m_isend{bEnd} {}
 	Symbol() = delete;
+	virtual ~Symbol() = default;
 
 	virtual SymbolType GetType() const = 0;
 	const std::string& GetId() const { return m_id; }
@@ -77,7 +78,7 @@ std::shared_ptr<Terminal> g_eps, g_end;
 class NonTerminal : public Symbol
 {
 public:
-	NonTerminal(const std::string& id) : Symbol{id} {}
+	NonTerminal(const std::string& id) : Symbol{id}, m_rules{} {}
 	NonTerminal() = delete;
 
 	virtual SymbolType GetType() const override { return SymbolType::NONTERM; }
@@ -138,11 +139,11 @@ public:
 	/**
 	 * does this non-terminal have a rule which produces epsilon?
 	 */
-	bool HasEpsRule(const std::shared_ptr<Symbol>& eps) const
+	bool HasEpsRule() const
 	{
 		for(const auto& rule : m_rules)
 		{
-			if(rule.size() == 1 && rule[0] == eps)
+			if(rule.size() == 1 && rule[0]->IsEps())
 				return true;
 		}
 		return false;
@@ -324,7 +325,7 @@ protected:
 								const std::shared_ptr<NonTerminal>& symnonterm
 									= reinterpret_cast<const std::shared_ptr<NonTerminal>&>(rule[_iSym]);
 
-								if(!symnonterm->HasEpsRule(g_eps))
+								if(!symnonterm->HasEpsRule())
 									break;
 							}
 						}
@@ -343,7 +344,7 @@ protected:
 							const std::shared_ptr<NonTerminal>& symnonterm
 								= reinterpret_cast<const std::shared_ptr<NonTerminal>&>(rule[iNextSym]);
 
-							if(!symnonterm->HasEpsRule(g_eps))
+							if(!symnonterm->HasEpsRule())
 								break;
 						}
 
@@ -367,7 +368,7 @@ protected:
 public:
 	LL1(const std::vector<std::shared_ptr<NonTerminal>>& nonterms,
 		const std::shared_ptr<NonTerminal>& start)
-		: m_nonterminals(nonterms), m_start(start)
+	: m_nonterminals(nonterms), m_start(start), m_first{}, m_follow{}, m_first_perrule{}
 	{
 		// calculate first sets for all known non-terminals
 		for(const auto& nonterm : nonterms)
@@ -418,17 +419,14 @@ std::ostream& operator<<(std::ostream& ostr, const LL1& ll1)
 				ostr << rhs->GetId() << " ";
 
 			// first set
-			auto iter = ll1.GetFirstPerRule().find(nonterm->GetId());
-			if(iter != ll1.GetFirstPerRule().end())
+			auto iterFirst = ll1.GetFirstPerRule().find(nonterm->GetId());
+			if(iterFirst != ll1.GetFirstPerRule().end() && iRule < iterFirst->second.size())
 			{
-				if(iRule < iter->second.size())
-				{
-					ostr << "\n\t\t\tFIRST: { ";
-					const auto& first = iter->second[iRule];
-					for(const auto& sym : first)
-						ostr << sym->GetId() << ", ";
-					ostr << " }";
-				}
+				ostr << "\n\t\t\tFIRST: { ";
+				const auto& first = iterFirst->second[iRule];
+				for(const auto& sym : first)
+					ostr << sym->GetId() << ", ";
+				ostr << " }";
 			}
 
 			if(iRule < nonterm->NumRules()-1)
@@ -436,7 +434,6 @@ std::ostream& operator<<(std::ostream& ostr, const LL1& ll1)
 		}
 		ostr << "\n";
 	}
-
 
 	ostr << "\nFIRST sets:\n";
 	for(const auto& [id, set] : ll1.GetFirst() )
@@ -454,6 +451,45 @@ std::ostream& operator<<(std::ostream& ostr, const LL1& ll1)
 		for(const auto& sym : set)
 			ostr << sym->GetId() << ", ";
 		ostr << " }\n";
+	}
+
+	ostr << "\nLL(1) table:\n";
+	for(const auto& nonterm : ll1.GetProductions())
+	{
+		auto iterFollow = ll1.GetFollow().find(nonterm->GetId());
+		if(iterFollow == ll1.GetFollow().end())
+			continue;
+
+		for(std::size_t iRule=0; iRule<nonterm->NumRules(); ++iRule)
+		{
+			auto iterFirst = ll1.GetFirstPerRule().find(nonterm->GetId());
+			if(iterFirst == ll1.GetFirstPerRule().end() || iRule >= iterFirst->second.size())
+				continue;
+
+			ostr << "\ttable[ " << nonterm->GetId() << ", ";
+
+			bool eps_in_first = false;
+			for(const auto& sym : iterFirst->second[iRule])
+			{
+				if(sym->IsEps())
+					eps_in_first = true;
+				else
+					ostr << sym->GetId() << " ";
+			}
+
+			// also include follow if epsilon is in first
+			if(eps_in_first)
+			{
+				for(const auto& sym : iterFollow->second)
+					ostr << sym->GetId() << " ";
+			}
+
+			const auto& rule = nonterm->GetRule(iRule);
+			ostr << "] = " << nonterm->GetId() << " -> ";
+			for(const auto& sym : rule)
+				ostr << sym->GetId() << " ";
+			ostr << "\n";
+		}
 	}
 
 	return ostr;
