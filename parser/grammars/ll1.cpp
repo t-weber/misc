@@ -365,11 +365,33 @@ protected:
 	}
 
 
+	bool HasLeftRecursions() const
+	{
+		for(const auto& nonterm : m_nonterminals)
+		{
+			for(std::size_t ruleidx=0; ruleidx<nonterm->NumRules(); ++ruleidx)
+			{
+				const auto& rule = nonterm->GetRule(ruleidx);
+				if(rule.size() == 0)
+					continue;
+
+				if(rule[0]->GetId() == nonterm->GetId())
+					return true;
+			}
+		}
+
+		return false;
+	}
+
+
 public:
 	LL1(const std::vector<std::shared_ptr<NonTerminal>>& nonterms,
 		const std::shared_ptr<NonTerminal>& start)
 	: m_nonterminals(nonterms), m_start(start), m_first{}, m_follow{}, m_first_perrule{}
 	{
+		if(HasLeftRecursions())
+			throw std::runtime_error{"The given grammar has left recursions and is thus not of type LL(1)."};
+
 		// calculate first sets for all known non-terminals
 		for(const auto& nonterm : nonterms)
 			CalcFirst(nonterm);
@@ -506,55 +528,61 @@ int main()
 	g_eps = std::make_shared<Terminal>("eps", true, false);
 	g_end = std::make_shared<Terminal>("end", false, true);
 
+	try
+	{
+		// test grammar from: https://de.wikipedia.org/wiki/LL(k)-Grammatik#Beispiel
+		// same grammar as in lr1.cpp, but with eliminated left-recursion
+		auto add_term = std::make_shared<NonTerminal>("add_term");
+		auto add_term_rest = std::make_shared<NonTerminal>("add_term_rest");
+		auto mul_term = std::make_shared<NonTerminal>("mul_term");
+		auto mul_term_rest = std::make_shared<NonTerminal>("mul_term_rest");
+		auto pow_term = std::make_shared<NonTerminal>("pow_term");
+		auto pow_term_rest = std::make_shared<NonTerminal>("pow_term_rest");
+		auto factor = std::make_shared<NonTerminal>("factor");
 
-	// test grammar from: https://de.wikipedia.org/wiki/LL(k)-Grammatik#Beispiel
-	// same grammar as in lr1.cpp, but with eliminated left-recursion
-	auto add_term = std::make_shared<NonTerminal>("add_term");
-	auto add_term_rest = std::make_shared<NonTerminal>("add_term_rest");
-	auto mul_term = std::make_shared<NonTerminal>("mul_term");
-	auto mul_term_rest = std::make_shared<NonTerminal>("mul_term_rest");
-	auto pow_term = std::make_shared<NonTerminal>("pow_term");
-	auto pow_term_rest = std::make_shared<NonTerminal>("pow_term_rest");
-	auto factor = std::make_shared<NonTerminal>("factor");
+		auto plus = std::make_shared<Terminal>("+");
+		auto minus = std::make_shared<Terminal>("-");
+		auto mult = std::make_shared<Terminal>("*");
+		auto div = std::make_shared<Terminal>("/");
+		auto mod = std::make_shared<Terminal>("%");
+		auto pow = std::make_shared<Terminal>("^");
+		auto bracket_open = std::make_shared<Terminal>("(");
+		auto bracket_close = std::make_shared<Terminal>(")");
+		auto comma = std::make_shared<Terminal>(",");
+		auto sym = std::make_shared<Terminal>("symbol");
+		auto ident = std::make_shared<Terminal>("ident");
 
-	auto plus = std::make_shared<Terminal>("+");
-	auto minus = std::make_shared<Terminal>("-");
-	auto mult = std::make_shared<Terminal>("*");
-	auto div = std::make_shared<Terminal>("/");
-	auto mod = std::make_shared<Terminal>("%");
-	auto pow = std::make_shared<Terminal>("^");
-	auto bracket_open = std::make_shared<Terminal>("(");
-	auto bracket_close = std::make_shared<Terminal>(")");
-	auto comma = std::make_shared<Terminal>(",");
-	auto sym = std::make_shared<Terminal>("symbol");
-	auto ident = std::make_shared<Terminal>("ident");
+		add_term->AddRule({ mul_term, add_term_rest });
+		add_term->AddRule({ plus, mul_term, add_term_rest });		// unary +
+		add_term->AddRule({ minus, mul_term, add_term_rest });		// unary -
+		add_term_rest->AddRule({ plus, mul_term, add_term_rest });
+		add_term_rest->AddRule({ minus, mul_term, add_term_rest });
+		add_term_rest->AddRule({ g_eps });
 
-	add_term->AddRule({ mul_term, add_term_rest });
-	add_term->AddRule({ plus, mul_term, add_term_rest });	// unary +
-	add_term->AddRule({ minus, mul_term, add_term_rest });	// unary -
-	add_term_rest->AddRule({ plus, mul_term, add_term_rest });
-	add_term_rest->AddRule({ minus, mul_term, add_term_rest });
-	add_term_rest->AddRule({ g_eps });
+		mul_term->AddRule({ pow_term, mul_term_rest });
+		mul_term_rest->AddRule({ mult, pow_term, mul_term_rest });
+		mul_term_rest->AddRule({ div, pow_term, mul_term_rest });
+		mul_term_rest->AddRule({ mod, pow_term, mul_term_rest });
+		mul_term_rest->AddRule({ g_eps });
 
-	mul_term->AddRule({ pow_term, mul_term_rest });
-	mul_term_rest->AddRule({ mult, pow_term, mul_term_rest });
-	mul_term_rest->AddRule({ div, pow_term, mul_term_rest });
-	mul_term_rest->AddRule({ mod, pow_term, mul_term_rest });
-	mul_term_rest->AddRule({ g_eps });
+		pow_term->AddRule({ factor, pow_term_rest });
+		pow_term_rest->AddRule({ pow, factor, pow_term_rest });
+		pow_term_rest->AddRule({ g_eps });
 
-	pow_term->AddRule({ factor, pow_term_rest });
-	pow_term_rest->AddRule({ pow, factor, pow_term_rest });
-	pow_term_rest->AddRule({ g_eps });
+		factor->AddRule({ bracket_open, add_term, bracket_close });
+		factor->AddRule({ ident, bracket_open, bracket_close });				// function call
+		factor->AddRule({ ident, bracket_open, add_term, bracket_close });			// function call
+		factor->AddRule({ ident, bracket_open, add_term, comma, add_term, bracket_close });	// function call
+		factor->AddRule({ sym });
 
-	factor->AddRule({ bracket_open, add_term, bracket_close });
-	factor->AddRule({ ident, bracket_open, bracket_close });			// function call
-	factor->AddRule({ ident, bracket_open, add_term, bracket_close });			// function call
-	factor->AddRule({ ident, bracket_open, add_term, comma, add_term, bracket_close });	// function call
-	factor->AddRule({ sym });
-
-
-	LL1 ll1({add_term, add_term_rest, mul_term, mul_term_rest, pow_term, pow_term_rest, factor}, add_term);
-	std::cout << ll1 << std::endl;
+		LL1 ll1({add_term, add_term_rest, mul_term, mul_term_rest, pow_term, pow_term_rest, factor}, add_term);
+		std::cout << ll1 << std::endl;
+	}
+	catch(const std::exception& ex)
+	{
+		std::cerr << ex.what() << std::endl;
+		return -1;;
+	}
 
 	return 0;
 }
