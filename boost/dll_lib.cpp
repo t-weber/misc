@@ -4,7 +4,8 @@
  * @date 9-dec-17
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -shared -fPIC -o dll_lib.so dll_lib.cpp -std=c++17
+ * g++ -std=c++17 -shared -fPIC -o dll_lib.so dll_lib.cpp
+ * x86_64-w64-mingw32-g++ -std=c++17 -shared -fPIC -Wl,--export-all-symbols -o dll_lib.so dll_lib.cpp
  *
  * References:
  *  * http://www.boost.org/doc/libs/1_65_1/doc/html/boost_dll.html

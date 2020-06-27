@@ -5,6 +5,7 @@
  * @license: see 'LICENSE.EUPL' file
  *
  * g++ -o dll_prog dll_prog.cpp -std=c++17 -lboost_filesystem -lboost_system -ldl
+ * x86_64-w64-mingw32-g++ -o dll_prog dll_prog.cpp -std=c++17 -lboost_filesystem-x64 -lboost_system-x64
  *
  * References:
  *  * http://www.boost.org/doc/libs/1_65_1/doc/html/boost_dll.html
@@ -80,12 +81,20 @@ int main()
 				//auto* funcPrint2 = lib->get<t_fkt_direct>("lib_print");
 				//funcPrint2();
 			}
+			else
+			{
+				std::cerr << "Error: Function \"lib_print\" was not found." << std::endl;
+			}
 
 			// import function
 			if(lib->has("lib_calc_i"))
 			{
 				auto* funcCalc = lib->get<int(*)(int,int)>("lib_calc_i");
 				std::cout << "calc: " << funcCalc(2,3) << "\n";
+			}
+			else
+			{
+				std::cerr << "Error: Function \"lib_calc_i\" was not found." << std::endl;
 			}
 		}
 		catch(const std::exception& ex)
@@ -106,7 +115,13 @@ int main()
 	{
 		auto func = dll::import<void(*)()>(pathLib, "lib_print", loadmode);
 		if(func)
+		{
 			(*func)();
+		}
+		else
+		{
+			std::cerr << "Error: Function \"lib_print\" could not be imported." << std::endl;
+		}
 	}
 
 	std::cout << "\n";
