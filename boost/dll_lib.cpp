@@ -28,15 +28,24 @@ template<class T> T calc(T t1, T t2)
 
 // ----------------------------------------------------------------------------
 // export
-#include <boost/dll/alias.hpp>
 
-// using default section "boostdll"
-//BOOST_DLL_ALIAS(print, lib_print);
-//BOOST_DLL_ALIAS(add<double>, lib_add_d);
-//BOOST_DLL_ALIAS(add<int>, lib_add_i);
+#ifndef __MINGW32__
+	#include <boost/dll/alias.hpp>
 
-// using an explicit section name
-BOOST_DLL_ALIAS_SECTIONED(print, lib_print, TheSec);
-BOOST_DLL_ALIAS_SECTIONED(calc<double>, lib_calc_d, TheSec);
-BOOST_DLL_ALIAS_SECTIONED(calc<int>, lib_calc_i, TheSec);
+	// using default section "boostdll"
+	//BOOST_DLL_ALIAS(print, lib_print);
+	//BOOST_DLL_ALIAS(calc<double>, lib_calc_d);
+	//BOOST_DLL_ALIAS(calc<int>, lib_calc_i);
+
+	// using an explicit section name
+	BOOST_DLL_ALIAS_SECTIONED(print, lib_print, TheSec);
+	BOOST_DLL_ALIAS_SECTIONED(calc<double>, lib_calc_d, TheSec);
+	BOOST_DLL_ALIAS_SECTIONED(calc<int>, lib_calc_i, TheSec);
+#else
+	// mingw needs explicit exports
+	extern "C" __declspec(dllexport) __cdecl void lib_print() { print(); }
+	extern "C" __declspec(dllexport) __cdecl double lib_calc_d(double d1, double d2) { return calc<double>(d1, d2); }
+	extern "C" __declspec(dllexport) __cdecl int lib_calc_i(int i1, int i2) { return calc<int>(i1, i2); }
+#endif
+
 // ----------------------------------------------------------------------------

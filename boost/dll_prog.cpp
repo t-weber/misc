@@ -74,12 +74,15 @@ int main()
 			if(lib->has("lib_print"))
 			{
 				using t_fkt = void(*)();
-				auto* funcPrint = lib->get<t_fkt>("lib_print");
-				funcPrint();
+				using t_fkt_direct = std::remove_pointer_t<t_fkt>;
 
-				//using t_fkt_direct = std::remove_pointer_t<t_fkt>;
-				//auto* funcPrint2 = lib->get<t_fkt_direct>("lib_print");
-				//funcPrint2();
+#ifndef __MINGW32__
+				t_fkt funcPrint = lib->get<t_fkt>("lib_print");
+#else
+				// mingw needs to have function pointers removed:
+				t_fkt funcPrint = lib->get<t_fkt_direct>("lib_print");
+#endif
+				funcPrint();
 			}
 			else
 			{
@@ -89,7 +92,14 @@ int main()
 			// import function
 			if(lib->has("lib_calc_i"))
 			{
-				auto* funcCalc = lib->get<int(*)(int,int)>("lib_calc_i");
+				using t_fkt = int(*)(int, int);
+				using t_fkt_direct = std::remove_pointer_t<t_fkt>;
+
+#ifndef __MINGW32__
+				t_fkt funcCalc = lib->get<t_fkt>("lib_calc_i");
+#else
+				t_fkt funcCalc = lib->get<t_fkt_direct>("lib_calc_i");
+#endif
 				std::cout << "calc: " << funcCalc(2,3) << "\n";
 			}
 			else
@@ -111,6 +121,7 @@ int main()
 
 
 
+#ifndef __MINGW32__
 	// direct usage of function
 	{
 		auto func = dll::import<void(*)()>(pathLib, "lib_print", loadmode);
@@ -125,7 +136,7 @@ int main()
 	}
 
 	std::cout << "\n";
-
+#endif
 
 
 	// symbol infos
