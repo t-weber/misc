@@ -4,11 +4,12 @@
  * @date 11-nov-17
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -std=c++17 -o cpp17 cpp17.cpp
+ * g++ -std=c++17 -Wall -Wextra -o cpp17 cpp17.cpp
  */
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -28,10 +29,23 @@
 namespace ty = boost::typeindex;
 
 
-void print(const auto&... a)
+template<class t_a, class t_b>
+std::string strconcat(const t_a& a, const t_b& b)
 {
-	(std::cout << "types: " << ... << (ty::type_id_with_cvr<decltype(a)>().pretty_name() + ", "));
-	(std::cout << "values: " << ... << a) << std::endl;
+	std::ostringstream ostr;
+	ostr << a << b;
+	return ostr.str();
+}
+
+
+template<class ...t_args> void print(const t_args&... a)
+//void print(const auto&... a)
+{
+	std::cout << "types: ";
+	(std::cout << ... << (ty::type_id_with_cvr<decltype(a)>().pretty_name() + ", "));
+
+	std::cout << "values: ";
+	(std::cout << ... << strconcat(a, ", ")) << std::endl;
 }
 
 
@@ -122,10 +136,10 @@ int main()
 	// [] = ...
 	{
 		auto [i, j, k] = arr();
-		print(i, " ", j, " ", k);
+		print(i, j, k);
 		auto& [l, m, n] = arr2();
 		l = 10;
-		print(l, " ", m, " ", n);
+		print(l, m, n);
 
 		std::unordered_map<std::string, int> map{{{"Test"}, 123}};
 		if(auto [iter, bOk] = map.insert({"newtest", 456}); bOk)
@@ -157,7 +171,7 @@ int main()
 		long y = 0;
 		modify(x);
 		modify(y);
-		print(x, " ", y);
+		print(x, y);
 	}
 
 
@@ -205,7 +219,7 @@ int main()
 	// --------------------------------------------------------------------
 	// invoke, apply, make_from_tuple
 	{
-		std::invoke(::print<int, char, int>, 123, ' ', 456);
+		std::invoke(::print<int, int>, 123, 456);
 
 
 		auto tup = std::make_tuple(456, 789.);
@@ -218,7 +232,7 @@ int main()
 			A(int i, double d) : i(i), d(d) {}
 		};
 		A a{std::make_from_tuple<A>(tup)};
-		print(a.i, " ", a.d);
+		print(a.i, a.d);
 
 
 		int arr[] = { 1, 2, 3, 4, 5};

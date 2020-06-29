@@ -4,11 +4,22 @@
  * @date 3-mar-20
  * @license: see 'LICENSE.EUPL' file
  *
- * clang++ -o cpp cpp.cpp -std=c++17
+ * clang++ -Wall -Wextra -o cpp cpp.cpp -std=c++17
  */
 
 #include <iostream>
 #include <memory>
+
+
+#include <boost/type_index.hpp>
+namespace ty = boost::typeindex;
+
+template<class T>
+void print_type(const T& t)
+{
+	std::cout << "type: " << (ty::type_id_with_cvr<decltype(t)>().pretty_name());
+	std::cout << std::endl;
+}
 
 
 // ----------------------------------------------------------------------------
@@ -27,6 +38,8 @@ class SubType : public BaseType {};
 class X
 {
 public:
+	virtual ~X() = default;
+
 	virtual BaseType* tstCovRet()
 	{
 		std::cout << __PRETTY_FUNCTION__ << std::endl;
@@ -73,6 +86,8 @@ public:
 class Y : public X
 {
 public:
+	virtual ~Y() = default;
+
 	virtual SubType* tstCovRet() override
 	{
 		std::cout << __PRETTY_FUNCTION__ << std::endl;
@@ -164,14 +179,29 @@ void tstQueue()
 
 
 
+// ----------------------------------------------------------------------------
+// test parameter packs
+// ----------------------------------------------------------------------------
+template<template<class...> class t_vec, class ...t_args>
+t_vec<t_args...> create_vec()
+{
+	return t_vec<t_args...>{{1,2,3}};
+}
+// ----------------------------------------------------------------------------
+
+
+
 int main()
 {
 	tstCov();
-
 	std::cout << std::endl;
 
 	tstQueue<std::priority_queue, std::less>();
 	tstQueue<std::priority_queue, std::greater>();
+	std::cout << std::endl;
+
+	auto vec = create_vec<std::vector, int>();
+	print_type(vec);
 
 	return 0;
 }
