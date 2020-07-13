@@ -1,6 +1,10 @@
 #!/bin/sh
 
-rm -f parser
-rm -f lexer_impl.cpp
-rm -f parser_impl.cpp
-rm -f parser_defs.h
+rm -fv parser
+rm -fv lexer_impl.cpp
+rm -fv parser_impl.cpp
+rm -fv parser_defs.h
+
+rm -fv tst1.tab.c
+rm -fv tst1.dot
+rm -fv tst1.pdf
