@@ -209,6 +209,7 @@ requires is_basic_vec<t_vec>
 	return equals<t_vec>(vec, zero<t_vec>(vec.size()), eps);
 }
 
+
 /**
  * tests for zero matrix
  */
@@ -218,6 +219,41 @@ bool equals_0(const t_mat& mat,
 requires is_mat<t_mat>
 {
 	return equals<t_mat>(mat, zero<t_mat>(mat.size1(), mat.size2()), eps);
+}
+
+
+/**
+ * tests for symmetric or hermitian matrix
+ */
+template<class t_mat>
+bool is_symm_or_herm(const t_mat& mat,
+	typename t_mat::value_type eps = std::numeric_limits<typename t_mat::value_type>::epsilon())
+requires is_mat<t_mat>
+{
+	using t_elem = typename t_mat::value_type;
+	if(mat.size1() != mat.size2())
+		return false;
+
+	for(std::size_t i=0; i<mat.size1(); ++i)
+	{
+		for(std::size_t j=i+1; j<mat.size2(); ++j)
+		{
+			if constexpr(is_complex<t_elem>)
+			{
+				// not hermitian?
+				if(!equals<t_elem>(mat(i,j), std::conj(mat(j,i)), eps))
+					return false;
+			}
+			else
+			{
+				// not symmetric?
+				if(!equals<t_elem>(mat(i,j), mat(j,i), eps))
+					return false;
+			}
+		}
+	}
+
+	return true;
 }
 
 

@@ -166,6 +166,7 @@ void vecmat_tsts()
 	t_mat matCreated = create<t_mat>({{1,2}, {3,4}});
 	std::cout << matCreated(0,0) << " " << matCreated(0,1) << "\n";
 	std::cout << matCreated(1,0) << " " << matCreated(1,1) << "\n";
+	std::cout << "symmetric: " << is_symm_or_herm<t_mat>(matCreated);
 
 
 	std::cout << "\nequals\n";
