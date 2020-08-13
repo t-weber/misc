@@ -4,7 +4,7 @@
  * @date 28-mar-19
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -std=c++11 -o producer producer.cpp -lpthread
+ * g++ -std=c++17 -o producer producerprio.cpp -lpthread
  */
 
 #include <iostream>
@@ -46,17 +46,17 @@ class Sema
 		{
 			++m_ctr;
 
-			// lock mutex in case of spurious release of wait() in pass()
+			// lock mutex in case of spurious release of wait() in acquire()
 			std::scoped_lock _sl{m_mtxcond};
 			m_cond.notify_all();
 		}
 
 	private:
 		std::atomic<int> m_ctr{0};
-		std::condition_variable m_cond;
-		std::mutex m_mtxcond;
+		std::condition_variable m_cond{};
+		std::mutex m_mtxcond{};
 
-		std::priority_queue<int> m_prio;
+		std::priority_queue<int> m_prio{};
 };
 
 
@@ -127,7 +127,7 @@ void consume()
 
 
 
-int main(int argc, char **argv)
+int main()
 {
 	std::thread prod{&produce};
 	std::thread cons{&consume};

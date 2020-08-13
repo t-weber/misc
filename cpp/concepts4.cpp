@@ -58,6 +58,30 @@ void print_range(const t_range& range)
 
 
 template<class t_range>
+void print_heap(const t_range& range)
+{
+	int i = 0;
+	int curpow2 = 0;
+
+	for(const auto& elem : range)
+	{
+		std::cout << elem << ", ";
+		++i;
+
+		// next level of heap with lower numbers than their parent
+		if(i == (1<<curpow2))
+		{
+			std::cout << "    ";
+			i = 0;
+			++curpow2;
+		}
+	}
+
+	std::cout << std::endl;
+}
+
+
+template<class t_range>
 void rangetst(t_range range)
 {
 	if constexpr(std::sortable<typename t_range::iterator>)
@@ -72,22 +96,22 @@ void heaptst(t_range range)
 {
 	std::cout << "make_heap: ";
 	std::ranges::make_heap(range);
-	print_range(range);
+	print_heap(range);
 
 	// popped element is moved to last position
 	std::cout << "pop_heap: ";
 	std::ranges::pop_heap(range);
-	print_range(range);
+	print_heap(range);
 	std::cout << *range.rbegin() << std::endl;
 
 	// reinsert last element in range
 	std::cout << "push_heap: ";
 	std::ranges::push_heap(range);
-	print_range(range);
+	print_heap(range);
 
 	std::cout << "sort_heap: ";
 	std::ranges::sort_heap(range);
-	print_range(range);
+	print_heap(range);
 }
 
 
@@ -122,16 +146,17 @@ int main()
 		<< std::is_base_of_v<B,A> << std::endl;
 	std::cout << "A base of B: " << std::boolalpha
 		<< std::is_base_of_v<A,B> << std::endl;
-
-
-	rangetst(std::vector<int>{{5, 3, 8, 6}});
-	std::cout << std::endl;
-	rangetst(std::deque<int>{{5, 3, 8, 6}});
 	std::cout << std::endl;
 
-	heaptst(std::vector<int>{{5, 3, 8, 6}});
+
+	rangetst(std::vector<int>{{5, 105, 3, 13, 8, 6, 10, 1, 17, 20, 35, 100}});
 	std::cout << std::endl;
-	heaptst(std::deque<int>{{5, 3, 8, 6}});
+	rangetst(std::deque<int>{{5, 105, 3, 13, 8, 6, 10, 1, 17, 20, 35, 100}});
+	std::cout << std::endl;
+
+	heaptst(std::vector<int>{{5, 105, 3, 13, 8, 6, 10, 1, 17, 20, 35, 100}});
+	std::cout << std::endl;
+	heaptst(std::deque<int>{{5, 105, 3, 13, 8, 6, 10, 1, 17, 20, 35, 100}});
 	std::cout << std::endl;
 
 	return 0;
