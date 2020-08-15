@@ -8,6 +8,7 @@
 #include "hull.h"
 
 #include <QApplication>
+#include <QMenuBar>
 #include <QMouseEvent>
 
 #include <locale>
@@ -38,13 +39,13 @@ Vertex::~Vertex()
 
 QRectF Vertex::boundingRect() const
 {
-	return QRectF{-10, -10, 10, 10};
+	return QRectF{-5, -5, 10, 10};
 }
 
 
 void Vertex::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 {
-	painter->drawEllipse(-10, -10, 10, 10);
+	painter->drawEllipse(-5, -5, 10, 10);
 }
 
 // ----------------------------------------------------------------------------
@@ -60,6 +61,7 @@ HullView::HullView(QGraphicsScene *scene, QWidget *parent) : QGraphicsView(scene
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 
+	setInteractive(true);
 	setMouseTracking(true);
 }
 
@@ -69,13 +71,40 @@ HullView::~HullView()
 }
 
 
+void HullView::resizeEvent(QResizeEvent *evt)
+{
+	QPointF pt1{mapToScene(QPoint{0,0})};
+	QPointF pt2{mapToScene(QPoint{evt->size().width(), evt->size().height()})};
+
+	const double padding = 16;
+
+	// include bounds given by vertices
+	for(const Vertex* vertex : m_vertices)
+	{
+		QPointF vertexpos = vertex->scenePos();
+
+		if(vertexpos.x() < pt1.x())
+			pt1.setX(vertexpos.x() -  padding);
+		if(vertexpos.x() > pt2.x())
+			pt2.setX(vertexpos.x() +  padding);
+		if(vertexpos.y() < pt1.y())
+			pt1.setY(vertexpos.y() -  padding);
+		if(vertexpos.y() > pt2.y())
+			pt2.setY(vertexpos.y() +  padding);
+	}
+
+	setSceneRect(QRectF{pt1, pt2});
+}
+
+
+
 void HullView::mousePressEvent(QMouseEvent *evt)
 {
 	QPoint posVP = evt->pos();
 	QPointF posScene = mapToScene(posVP);
 
 	QGraphicsItem* item = itemAt(posVP);
-	bool item_is_vertex = m_vertices.find(static_cast<const Vertex*>(item)) != m_vertices.end();
+	bool item_is_vertex = m_vertices.find(static_cast<Vertex*>(item)) != m_vertices.end();
 
 	if(evt->button() == Qt::LeftButton)
 	{
@@ -103,7 +132,7 @@ void HullView::mousePressEvent(QMouseEvent *evt)
 		if(item && item_is_vertex)
 		{
 			m_scene->removeItem(item);
-			m_vertices.erase(static_cast<const Vertex*>(item));
+			m_vertices.erase(static_cast<Vertex*>(item));
 			delete item;
 		}
 	}
@@ -127,7 +156,11 @@ void HullView::mouseMoveEvent(QMouseEvent *evt)
 	QGraphicsView::mouseMoveEvent(evt);
 
 	if(m_dragging)
+	{
+		QResizeEvent evt{size(), size()};
+		resizeEvent(&evt);
 		UpdateHull();
+	}
 }
 
 
@@ -175,6 +208,26 @@ static bool all_points_on_same_side(const QLineF& line, const std::vector<QPoint
 }
 
 
+void HullView::SetCalculateHull(bool b)
+{
+	m_calchull = b;
+	UpdateHull();
+}
+
+
+void HullView::ClearVertices()
+{
+	for(Vertex* vertex : m_vertices)
+	{
+		m_scene->removeItem(vertex);
+		delete vertex;
+	}
+	m_vertices.clear();
+
+	UpdateHull();
+}
+
+
 void HullView::UpdateHull()
 {
 	// remove previous hull
@@ -185,8 +238,7 @@ void HullView::UpdateHull()
 	}
 	m_hull.clear();
 
-
-	if(m_vertices.size() < 3)
+	if(!m_calchull || m_vertices.size() < 3)
 		return;
 
 	std::vector<t_real> vertices;
@@ -260,6 +312,31 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 {
 	setWindowTitle("Hull");
 	setCentralWidget(m_view.get());
+
+
+	// menu
+	QMenu *menuFile = new QMenu{"File", this};
+	QMenu *menuCalc = new QMenu{"Calculate", this};
+
+	QAction *actionNew = new QAction{"New", this};
+	connect(actionNew, &QAction::triggered, [this](){ m_view->ClearVertices(); });
+	menuFile->addAction(actionNew);
+	menuFile->addSeparator();
+
+	QAction *actionQuit = new QAction{"Exit", this};
+	connect(actionQuit, &QAction::triggered, [this](){ this->close(); });
+	menuFile->addAction(actionQuit);
+
+	QAction *actionHull = new QAction{"Convex Hull", this};
+	actionHull->setCheckable(true);
+	actionHull->setChecked(true);
+	connect(actionHull, &QAction::toggled, [this](bool b) { m_view->SetCalculateHull(b); });
+	menuCalc->addAction(actionHull);
+
+	QMenuBar *menuBar = new QMenuBar{this};
+	menuBar->addMenu(menuFile);
+	menuBar->addMenu(menuCalc);
+	setMenuBar(menuBar);
 }
 
 
