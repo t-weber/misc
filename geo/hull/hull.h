@@ -23,12 +23,14 @@
 class Vertex : public QGraphicsItem
 {
 public:
-	Vertex();
+	Vertex(const QPointF& pos, double rad = 15.);
 	virtual ~Vertex();
 
 	virtual QRectF boundingRect() const override;
 	virtual void paint(QPainter*, const QStyleOptionGraphicsItem*, QWidget*) override;
 
+private:
+	double m_rad = 15.;
 };
 
 
@@ -43,11 +45,16 @@ public:
 	const HullView& operator=(const HullView&) const = delete;
 
 	void SetCalculateHull(bool b);
+	void SetCalculateVoronoi(bool b);
+
 	void ClearVertices();
 
 protected:
 	template<class t_real=double>
 	static std::vector<t_real> CalcHull(int dim, const std::vector<t_real>& vec);
+
+	template<class t_real=double>
+	static std::vector<t_real> CalcVoronoi(int dim, const std::vector<t_real>& vec);
 
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
@@ -55,16 +62,21 @@ protected:
 	virtual void mouseMoveEvent(QMouseEvent *evt) override;
 
 	virtual void resizeEvent(QResizeEvent *evt) override;
+
 	void UpdateHull();
+	void UpdateVoronoi();
+	void UpdateAll();
 
 private:
 	QGraphicsScene *m_scene = nullptr;
 
 	std::unordered_set<Vertex*> m_vertices{};
 	std::unordered_set<QGraphicsItem*> m_hull{};
+	std::unordered_set<QGraphicsItem*> m_voronoi{};
 
 	bool m_dragging = false;
 	bool m_calchull = true;
+	bool m_calcvoronoi = true;
 };
 
 

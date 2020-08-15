@@ -13,6 +13,7 @@
 
 #include <locale>
 #include <memory>
+#include <array>
 #include <iostream>
 
 #include <libqhullcpp/Qhull.h>
@@ -26,8 +27,9 @@ using t_real = coordT;
 
 // ----------------------------------------------------------------------------
 
-Vertex::Vertex()
+Vertex::Vertex(const QPointF& pos, double rad) : m_rad{rad}
 {
+	setPos(pos);
 	setFlags(flags() | QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
 }
 
@@ -39,13 +41,29 @@ Vertex::~Vertex()
 
 QRectF Vertex::boundingRect() const
 {
-	return QRectF{-5, -5, 10, 10};
+	return QRectF{-m_rad/2., -m_rad/2., m_rad, m_rad};
 }
 
 
 void Vertex::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*)
 {
-	painter->drawEllipse(-5, -5, 10, 10);
+	std::array<QColor, 2> colours =
+	{
+		QColor::fromRgbF(0.,0.,1.),
+		QColor::fromRgbF(0.,0.,0.),
+	};
+
+	QRadialGradient grad{};
+	grad.setCenter(0., 0.);
+	grad.setRadius(m_rad);
+
+	for(std::size_t col=0; col<colours.size(); ++col)
+		grad.setColorAt(col/double(colours.size()-1), colours[col]);
+
+	painter->setBrush(grad);
+	painter->setPen(*colours.rbegin());
+
+	painter->drawEllipse(-m_rad/2., -m_rad/2., m_rad, m_rad);
 }
 
 // ----------------------------------------------------------------------------
@@ -111,19 +129,21 @@ void HullView::mousePressEvent(QMouseEvent *evt)
 		// if no vertex is at this position, create a new one
 		if(!item)
 		{
-			Vertex *vertex = new Vertex{};
+			Vertex *vertex = new Vertex{posScene};
 			m_vertices.insert(vertex);
-			vertex->setPos(posScene);
 			m_scene->addItem(vertex);
 
 			m_dragging = true;
+			UpdateAll();
 		}
 
 		else
 		{
 			// vertex is being dragged
-			if(item_is_vertex)
+			//if(item_is_vertex)
+			{
 				m_dragging = true;
+			}
 		}
 	}
 	else if(evt->button() == Qt::RightButton)
@@ -137,7 +157,7 @@ void HullView::mousePressEvent(QMouseEvent *evt)
 		}
 	}
 
-	UpdateHull();
+	UpdateAll();
 	QGraphicsView::mousePressEvent(evt);
 }
 
@@ -147,6 +167,7 @@ void HullView::mouseReleaseEvent(QMouseEvent *evt)
 	if(evt->button() == Qt::LeftButton)
 		m_dragging = false;
 
+	UpdateAll();
 	QGraphicsView::mouseReleaseEvent(evt);
 }
 
@@ -159,7 +180,7 @@ void HullView::mouseMoveEvent(QMouseEvent *evt)
 	{
 		QResizeEvent evt{size(), size()};
 		resizeEvent(&evt);
-		UpdateHull();
+		UpdateAll();
 	}
 }
 
@@ -215,6 +236,13 @@ void HullView::SetCalculateHull(bool b)
 }
 
 
+void HullView::SetCalculateVoronoi(bool b)
+{
+	m_calcvoronoi = b;
+	UpdateVoronoi();
+}
+
+
 void HullView::ClearVertices()
 {
 	for(Vertex* vertex : m_vertices)
@@ -224,7 +252,14 @@ void HullView::ClearVertices()
 	}
 	m_vertices.clear();
 
+	UpdateAll();
+}
+
+
+void HullView::UpdateAll()
+{
 	UpdateHull();
+	UpdateVoronoi();
 }
 
 
@@ -273,7 +308,39 @@ void HullView::UpdateHull()
 }
 
 
-template<class t_real=double>
+void HullView::UpdateVoronoi()
+{
+	// remove previous voronoi vertices
+	for(QGraphicsItem* voronoiItem : m_voronoi)
+	{
+		m_scene->removeItem(voronoiItem);
+		delete voronoiItem;
+	}
+	m_voronoi.clear();
+
+	if(!m_calcvoronoi || m_vertices.size() < 4)
+		return;
+
+	std::vector<t_real> vertices;
+	vertices.reserve(m_vertices.size()*2);
+	for(const Vertex* vertex : m_vertices)
+	{
+		vertices.push_back(vertex->x());
+		vertices.push_back(vertex->y());
+	}
+
+
+	std::vector<t_real> voronoi = CalcVoronoi<t_real>(2, vertices);
+
+	for(std::size_t i=0; i<voronoi.size(); i+=2)
+	{
+		QGraphicsItem *voronoiItem = m_scene->addEllipse(voronoi[i], voronoi[i+1], 7, 7);
+		m_voronoi.insert(voronoiItem);
+	}
+}
+
+
+template<class t_real>
 std::vector<t_real> HullView::CalcHull(int dim, const std::vector<t_real>& vec)
 {
 	std::vector<t_real> hull;
@@ -296,6 +363,27 @@ std::vector<t_real> HullView::CalcHull(int dim, const std::vector<t_real>& vec)
 	}
 
 	return hull;
+}
+
+
+template<class t_real>
+std::vector<t_real> HullView::CalcVoronoi(int dim, const std::vector<t_real>& vec)
+{
+	std::vector<t_real> voronoi;
+
+	qh::Qhull qh{"voronoi", dim, int(vec.size()/dim), vec.data(), "v" };
+	qh::QhullVertexList vertices{qh.vertexList()};
+
+	qh::QhullFacetList facets{qh.facetList()};
+	for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+	{
+		qh::QhullPoint pt = iterFacet->voronoiVertex();
+
+		for(int i=0; i<dim; ++i)
+			voronoi.push_back(pt[i]);
+	}
+
+	return voronoi;
 }
 
 
@@ -332,6 +420,12 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	actionHull->setChecked(true);
 	connect(actionHull, &QAction::toggled, [this](bool b) { m_view->SetCalculateHull(b); });
 	menuCalc->addAction(actionHull);
+
+	QAction *actionVoronoi = new QAction{"Voronoi Vertices", this};
+	actionVoronoi->setCheckable(true);
+	actionVoronoi->setChecked(true);
+	connect(actionVoronoi, &QAction::toggled, [this](bool b) { m_view->SetCalculateVoronoi(b); });
+	menuCalc->addAction(actionVoronoi);
 
 	QMenuBar *menuBar = new QMenuBar{this};
 	menuBar->addMenu(menuFile);
