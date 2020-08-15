@@ -1,6 +1,3 @@
-# Prerequisites
-*.d
-
 # Compiled Object files
 *.slo
 *.lo
@@ -8,18 +5,10 @@
 *.obj
 *.class
 
-# Precompiled Headers
-*.gch
-*.pch
-
 # Compiled Dynamic libraries
 *.so
 *.dylib
 *.dll
-
-# Fortran module files
-*.mod
-*.smod
 
 # Compiled Static libraries
 *.lai
@@ -32,7 +21,10 @@
 *.out
 *.app
 
+# Outputs
+*.pdf
+*.svg
+
 # External dependencies
 qcustomplot.cpp
 qcustomplot.h
-
