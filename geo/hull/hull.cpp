@@ -18,6 +18,7 @@
 
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacet.h>
+#include <libqhullcpp/QhullRidge.h>
 #include <libqhullcpp/QhullFacetList.h>
 #include <libqhullcpp/QhullVertexSet.h>
 
@@ -121,8 +122,22 @@ void HullView::mousePressEvent(QMouseEvent *evt)
 	QPoint posVP = evt->pos();
 	QPointF posScene = mapToScene(posVP);
 
-	QGraphicsItem* item = itemAt(posVP);
-	bool item_is_vertex = m_vertices.find(static_cast<Vertex*>(item)) != m_vertices.end();
+	QList<QGraphicsItem*> items = this->items(posVP);
+	QGraphicsItem* item = nullptr;
+	bool item_is_vertex = false;
+
+	for(int itemidx=0; itemidx<items.size(); ++itemidx)
+	{
+		item = items[itemidx];
+		item_is_vertex = m_vertices.find(static_cast<Vertex*>(item)) != m_vertices.end();
+		if(item_is_vertex)
+			break;
+	}
+
+	// only select vertices
+	if(!item_is_vertex)
+		item = nullptr;
+
 
 	if(evt->button() == Qt::LeftButton)
 	{
@@ -140,7 +155,7 @@ void HullView::mousePressEvent(QMouseEvent *evt)
 		else
 		{
 			// vertex is being dragged
-			//if(item_is_vertex)
+			if(item_is_vertex)
 			{
 				m_dragging = true;
 			}
@@ -154,10 +169,10 @@ void HullView::mousePressEvent(QMouseEvent *evt)
 			m_scene->removeItem(item);
 			m_vertices.erase(static_cast<Vertex*>(item));
 			delete item;
+			UpdateAll();
 		}
 	}
 
-	UpdateAll();
 	QGraphicsView::mousePressEvent(evt);
 }
 
@@ -267,9 +282,9 @@ void HullView::ClearVertices()
 
 void HullView::UpdateAll()
 {
-	UpdateHull();
 	UpdateVoronoi();
 	UpdateDelaunay();
+	UpdateHull();
 }
 
 
@@ -309,7 +324,9 @@ void HullView::UpdateHull()
 			//if(!all_points_on_same_side(line, hullvertices))
 			//	continue;
 
-			QGraphicsItem *item = m_scene->addLine(line);
+			QPen pen;
+			pen.setWidthF(2.);
+			QGraphicsItem *item = m_scene->addLine(line, pen);
 			m_hull.insert(item);
 		}
 	}
@@ -338,13 +355,30 @@ void HullView::UpdateVoronoi()
 	}
 
 
-	std::vector<t_real> voronoi = CalcVoronoi<t_real>(2, vertices);
+	auto [voronoi, regions] = CalcVoronoi<t_real>(2, vertices);
 
+	// voronoi vertices
 	for(std::size_t i=0; i<voronoi.size(); i+=2)
 	{
 		QGraphicsItem *voronoiItem = m_scene->addEllipse(voronoi[i], voronoi[i+1], 7, 7);
 		m_voronoi.insert(voronoiItem);
 	}
+
+	// voronoi regions
+	// TODO
+	/*for(const auto& region : regions)
+	{
+		for(std::size_t idx1=0; idx1<region.size(); idx1+=2)
+		{
+			std::size_t idx2 = idx1+2;
+			if(idx2 >= region.size())
+				idx2 = 0;
+
+			QLineF line{QPointF{region[idx1], region[idx1+1]}, QPointF{region[idx2], region[idx2+1]}};
+			QGraphicsItem *item = m_scene->addLine(line);
+			m_voronoi.insert(item);
+		}
+	}*/
 }
 
 
@@ -388,24 +422,51 @@ void HullView::UpdateDelaunay()
 }
 
 
+
 template<class t_real>
-std::vector<t_real> HullView::CalcVoronoi(int dim, const std::vector<t_real>& vec)
+std::tuple<std::vector<t_real>, std::vector<std::vector<t_real>>>
+HullView::CalcVoronoi(int dim, const std::vector<t_real>& vec)
 {
-	std::vector<t_real> voronoi;
+	std::vector<t_real> voronoi;	// vertices
+	std::vector<std::vector<t_real>> regions;
 
-	qh::Qhull qh{"voronoi", dim, int(vec.size()/dim), vec.data(), "v" };
-	qh::QhullVertexList vertices{qh.vertexList()};
-
-	qh::QhullFacetList facets{qh.facetList()};
-	for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+	try
 	{
-		qh::QhullPoint pt = iterFacet->voronoiVertex();
+		qh::Qhull qh{"voronoi", dim, int(vec.size()/dim), vec.data(), "v Qu QJ" };
+		if(qh.hasQhullMessage())
+			std::cout << qh.qhullMessage() << std::endl;
 
-		for(int i=0; i<dim; ++i)
-			voronoi.push_back(pt[i]);
+		qh::QhullFacetList facets{qh.facetList()};
+
+		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+		{
+			qh::QhullPoint pt = iterFacet->voronoiVertex();
+
+			for(int i=0; i<dim; ++i)
+				voronoi.push_back(pt[i]);
+
+
+			std::vector<t_real> region;
+			//qh::QhullRidgeSet ridges = iterFacet->ridges();
+			qh::QhullVertexSet vertices = iterFacet->vertices();
+
+			for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
+			{
+				qh::QhullPoint pt = (*iterVertex).point();
+
+				for(int i=0; i<dim; ++i)
+					region.push_back(pt[i]);
+			}
+
+			regions.emplace_back(std::move(region));
+		}
+	}
+	catch(const std::exception& ex)
+	{
+		std::cerr << ex.what() << std::endl;
 	}
 
-	return voronoi;
+	return std::make_tuple(voronoi, regions);
 }
 
 
@@ -414,24 +475,34 @@ std::vector<std::vector<t_real>> HullView::CalcDelaunay(int dim, const std::vect
 {
 	std::vector<std::vector<t_real>> triags;
 
-	qh::Qhull qh{"triag", dim, int(vec.size()/dim), vec.data(), hull ? "Qt" : "d Qu QJ" };
-	qh::QhullVertexList vertices{qh.vertexList()};
-
-	qh::QhullFacetList facets{qh.facetList()};
-	for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+	try
 	{
-		qh::QhullVertexSet vertices = iterFacet->vertices();
-		std::vector<t_real> thetriag;
+		qh::Qhull qh{"triag", dim, int(vec.size()/dim), vec.data(), hull ? "Qt" : "d Qu QJ" };
+		if(qh.hasQhullMessage())
+			std::cout << qh.qhullMessage() << std::endl;
 
-		for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
+		//qh::QhullVertexList vertices{qh.vertexList()};
+		qh::QhullFacetList facets{qh.facetList()};
+
+		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
 		{
-			qh::QhullPoint pt = (*iterVertex).point();
+			std::vector<t_real> thetriag;
+			qh::QhullVertexSet vertices = iterFacet->vertices();
 
-			for(int i=0; i<dim; ++i)
-				thetriag.push_back(pt[i]);
+			for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
+			{
+				qh::QhullPoint pt = (*iterVertex).point();
+
+				for(int i=0; i<dim; ++i)
+					thetriag.push_back(pt[i]);
+			}
+
+			triags.emplace_back(std::move(thetriag));
 		}
-
-		triags.emplace_back(std::move(thetriag));
+	}
+	catch(const std::exception& ex)
+	{
+		std::cerr << ex.what() << std::endl;
 	}
 
 	return triags;
@@ -449,6 +520,8 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	m_scene{new QGraphicsScene{this}},
 	m_view{new HullView{m_scene.get(), this}}
 {
+	m_view->setRenderHints(QPainter::Antialiasing);
+
 	setWindowTitle("Hull");
 	setCentralWidget(m_view.get());
 
@@ -515,13 +588,22 @@ static inline void set_locales()
 
 int main(int argc, char** argv)
 {
-	auto app = std::make_unique<QApplication>(argc, argv);
-	set_locales();
+	try
+	{
+		auto app = std::make_unique<QApplication>(argc, argv);
+		set_locales();
 
-	auto hullwnd = std::make_unique<HullWnd>();
-	hullwnd->resize(800, 600);
-	hullwnd->show();
+		auto hullwnd = std::make_unique<HullWnd>();
+		hullwnd->resize(800, 600);
+		hullwnd->show();
 
-	return app->exec();
+		return app->exec();
+	}
+	catch(const std::exception& ex)
+	{
+		std::cerr << ex.what() << std::endl;
+	}
+
+	return -1;
 }
 // ----------------------------------------------------------------------------
