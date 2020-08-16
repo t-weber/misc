@@ -53,10 +53,7 @@ public:
 protected:
 	template<class t_real=double>
 	static std::tuple<std::vector<t_real>, std::vector<std::vector<t_real>>>
-	CalcVoronoi(int dim, const std::vector<t_real>& vec);
-
-	template<class t_real=double>
-	static std::vector<std::vector<t_real>> CalcDelaunay(int dim, const std::vector<t_real>& vec, bool hull=0);
+	CalcDelaunay(int dim, const std::vector<t_real>& vec, bool hull=0);
 
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
@@ -66,7 +63,6 @@ protected:
 	virtual void resizeEvent(QResizeEvent *evt) override;
 
 	void UpdateHull();
-	void UpdateVoronoi();
 	void UpdateDelaunay();
 	void UpdateAll();
 

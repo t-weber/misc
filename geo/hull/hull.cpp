@@ -26,6 +26,59 @@ namespace qh = orgQhull;
 using t_real = coordT;
 
 
+
+// ----------------------------------------------------------------------------
+#define HULL_CHECK
+
+#ifdef HULL_CHECK
+static double side_of_line(const QLineF& line, const QPointF& pt)
+{
+	QPointF dir1 = line.p2() - line.p1();
+	QPointF dir2 = pt - line.p1();
+
+	return dir1.x()*dir2.y() - dir1.y()*dir2.x();
+}
+
+
+static bool all_points_on_same_side(const QLineF& line, const std::vector<QPointF>& hullvertices)
+{
+	double eps = 1e-5;
+
+	// find a reference vertex which is sufficiently far from the line
+	std::optional<double> side;
+	for(const QPointF& vert : hullvertices)
+	{
+		if(!side)
+		{
+			double curside = side_of_line(line, vert);
+			if(std::abs(curside) > eps)
+				side = curside;
+		}
+
+		if(side)
+			break;
+	}
+
+	if(!side)
+		return true;
+
+
+	// are all other vertices on the same sine as the reference vertex (or on the line)?
+	for(const QPointF& vert : hullvertices)
+	{
+		double curside = side_of_line(line, vert);
+		if(std::signbit(*side) != std::signbit(curside) && std::abs(curside) > eps)
+			return false;
+	}
+
+	return true;
+}
+#endif
+
+// ----------------------------------------------------------------------------
+
+
+
 // ----------------------------------------------------------------------------
 
 Vertex::Vertex(const QPointF& pos, double rad) : m_rad{rad}
@@ -200,52 +253,6 @@ void HullView::mouseMoveEvent(QMouseEvent *evt)
 }
 
 
-/*
-static double side_of_line(const QLineF& line, const QPointF& pt)
-{
-	QPointF dir1 = line.p2() - line.p1();
-	QPointF dir2 = pt - line.p1();
-
-	return dir1.x()*dir2.y() - dir1.y()*dir2.x();
-}
-
-
-static bool all_points_on_same_side(const QLineF& line, const std::vector<QPointF>& hullvertices)
-{
-	double eps = 1e-5;
-
-	// find a reference vertex which is sufficiently far from the line
-	std::optional<double> side;
-	for(const QPointF& vert : hullvertices)
-	{
-		if(!side)
-		{
-			double curside = side_of_line(line, vert);
-			if(std::abs(curside) > eps)
-				side = curside;
-		}
-
-		if(side)
-			break;
-	}
-
-	if(!side)
-		return true;
-
-
-	// are all other vertices on the same sine as the reference vertex (or on the line)?
-	for(const QPointF& vert : hullvertices)
-	{
-		double curside = side_of_line(line, vert);
-		if(std::signbit(*side) != std::signbit(curside) && std::abs(curside) > eps)
-			return false;
-	}
-
-	return true;
-}
-*/
-
-
 void HullView::SetCalculateHull(bool b)
 {
 	m_calchull = b;
@@ -256,7 +263,7 @@ void HullView::SetCalculateHull(bool b)
 void HullView::SetCalculateVoronoi(bool b)
 {
 	m_calcvoronoi = b;
-	UpdateVoronoi();
+	UpdateDelaunay();
 }
 
 
@@ -282,7 +289,6 @@ void HullView::ClearVertices()
 
 void HullView::UpdateAll()
 {
-	UpdateVoronoi();
 	UpdateDelaunay();
 	UpdateHull();
 }
@@ -309,8 +315,19 @@ void HullView::UpdateHull()
 		vertices.push_back(vertex->y());
 	}
 
+	std::vector<std::vector<t_real>> hull;
+	std::tie(std::ignore, hull) = CalcDelaunay<t_real>(2, vertices, true);
 
-	std::vector<std::vector<t_real>> hull = CalcDelaunay<t_real>(2, vertices, true);
+#ifdef HULL_CHECK
+	std::vector<QPointF> hullvertices;
+	for(const auto& thetriag : hull)
+		for(std::size_t idx1=0; idx1<thetriag.size(); idx1+=2)
+			hullvertices.emplace_back(QPointF{thetriag[idx1], thetriag[idx1+1]});
+#endif
+
+	// convex hull
+	QPen penHull;
+	penHull.setWidthF(2.);
 
 	for(const auto& thetriag : hull)
 	{
@@ -321,64 +338,15 @@ void HullView::UpdateHull()
 				idx2 = 0;
 
 			QLineF line{QPointF{thetriag[idx1], thetriag[idx1+1]}, QPointF{thetriag[idx2], thetriag[idx2+1]}};
-			//if(!all_points_on_same_side(line, hullvertices))
-			//	continue;
+#ifdef HULL_CHECK
+			if(!all_points_on_same_side(line, hullvertices))
+				continue;
+#endif
 
-			QPen pen;
-			pen.setWidthF(2.);
-			QGraphicsItem *item = m_scene->addLine(line, pen);
+			QGraphicsItem *item = m_scene->addLine(line, penHull);
 			m_hull.insert(item);
 		}
 	}
-}
-
-
-void HullView::UpdateVoronoi()
-{
-	// remove previous voronoi vertices
-	for(QGraphicsItem* voronoiItem : m_voronoi)
-	{
-		m_scene->removeItem(voronoiItem);
-		delete voronoiItem;
-	}
-	m_voronoi.clear();
-
-	if(!m_calcvoronoi || m_vertices.size() < 4)
-		return;
-
-	std::vector<t_real> vertices;
-	vertices.reserve(m_vertices.size()*2);
-	for(const Vertex* vertex : m_vertices)
-	{
-		vertices.push_back(vertex->x());
-		vertices.push_back(vertex->y());
-	}
-
-
-	auto [voronoi, regions] = CalcVoronoi<t_real>(2, vertices);
-
-	// voronoi vertices
-	for(std::size_t i=0; i<voronoi.size(); i+=2)
-	{
-		QGraphicsItem *voronoiItem = m_scene->addEllipse(voronoi[i], voronoi[i+1], 7, 7);
-		m_voronoi.insert(voronoiItem);
-	}
-
-	// voronoi regions
-	// TODO
-	/*for(const auto& region : regions)
-	{
-		for(std::size_t idx1=0; idx1<region.size(); idx1+=2)
-		{
-			std::size_t idx2 = idx1+2;
-			if(idx2 >= region.size())
-				idx2 = 0;
-
-			QLineF line{QPointF{region[idx1], region[idx1+1]}, QPointF{region[idx2], region[idx2+1]}};
-			QGraphicsItem *item = m_scene->addLine(line);
-			m_voronoi.insert(item);
-		}
-	}*/
 }
 
 
@@ -392,7 +360,16 @@ void HullView::UpdateDelaunay()
 	}
 	m_delaunay.clear();
 
-	if(!m_calcdelaunay || m_vertices.size() < 4)
+	// remove previous voronoi vertices
+	for(QGraphicsItem* item : m_voronoi)
+	{
+		m_scene->removeItem(item);
+		delete item;
+	}
+	m_voronoi.clear();
+
+
+	if((!m_calcdelaunay && !m_calcvoronoi) || m_vertices.size() < 4)
 		return;
 
 	std::vector<t_real> vertices;
@@ -404,88 +381,103 @@ void HullView::UpdateDelaunay()
 	}
 
 
-	std::vector<std::vector<t_real>> triags = CalcDelaunay<t_real>(2, vertices, false);
+	auto [voronoi, triags] = CalcDelaunay<t_real>(2, vertices, false);
+	const double itemRad = 7.;
 
-	for(const auto& thetriag : triags)
+
+	if(m_calcvoronoi)
 	{
-		for(std::size_t idx1=0; idx1<thetriag.size(); idx1+=2)
-		{
-			std::size_t idx2 = idx1+2;
-			if(idx2 >= thetriag.size())
-				idx2 = 0;
+		// voronoi vertices
+		QPen penVoronoi;
+		penVoronoi.setStyle(Qt::SolidLine);
+		penVoronoi.setWidthF(1.);
 
-			QLineF line{QPointF{thetriag[idx1], thetriag[idx1+1]}, QPointF{thetriag[idx2], thetriag[idx2+1]}};
-			QGraphicsItem *item = m_scene->addLine(line);
-			m_delaunay.insert(item);
+		QPen penCircle;
+		penCircle.setStyle(Qt::DotLine);
+		penCircle.setWidthF(1.);
+		penCircle.setColor(QColor::fromRgbF(1.,0.,0.));
+
+		QBrush brushVoronoi;
+		brushVoronoi.setStyle(Qt::SolidPattern);
+		brushVoronoi.setColor(QColor::fromRgbF(1.,0.,0.));
+
+		for(std::size_t i=0; i<voronoi.size(); i+=2)
+		{
+			QPointF voronoipt{voronoi[i], voronoi[i+1]};
+			QGraphicsItem *voronoiItem = m_scene->addEllipse(
+				voronoipt.x()-itemRad/2., voronoipt.y()-itemRad/2., itemRad, itemRad, penVoronoi, brushVoronoi);
+			m_voronoi.insert(voronoiItem);
+
+			// circles
+			std::size_t triagidx = i/2;
+			if(triagidx < triags.size())
+			{
+				const auto& triag = triags[triagidx];
+				if(triag.size() >= 3)
+				{
+					QPointF triagpt{triag[0], triag[1]};
+					double rad = std::sqrt(QPointF::dotProduct(voronoipt-triagpt, voronoipt-triagpt));
+
+					QGraphicsItem *voronoiCircle = m_scene->addEllipse(
+						voronoipt.x()-rad, voronoipt.y()-rad, rad*2., rad*2., penCircle);
+					m_voronoi.insert(voronoiCircle);
+				}
+			}
+		}
+	}
+
+
+	if(m_calcdelaunay)
+	{
+		// delaunay triangles
+		for(const auto& thetriag : triags)
+		{
+			for(std::size_t idx1=0; idx1<thetriag.size(); idx1+=2)
+			{
+				std::size_t idx2 = idx1+2;
+				if(idx2 >= thetriag.size())
+					idx2 = 0;
+
+				QLineF line{QPointF{thetriag[idx1], thetriag[idx1+1]}, QPointF{thetriag[idx2], thetriag[idx2+1]}};
+				QGraphicsItem *item = m_scene->addLine(line);
+				m_delaunay.insert(item);
+			}
 		}
 	}
 }
 
 
-
+/**
+ * delaunay triangulation and voronoi vertices
+ */
 template<class t_real>
 std::tuple<std::vector<t_real>, std::vector<std::vector<t_real>>>
-HullView::CalcVoronoi(int dim, const std::vector<t_real>& vec)
+HullView::CalcDelaunay(int dim, const std::vector<t_real>& vec, bool only_hull)
 {
-	std::vector<t_real> voronoi;	// vertices
-	std::vector<std::vector<t_real>> regions;
+	std::vector<t_real> voronoi;	// voronoi vertices
+	std::vector<std::vector<t_real>> triags;	// delaunay triangles
 
 	try
 	{
-		qh::Qhull qh{"voronoi", dim, int(vec.size()/dim), vec.data(), "v Qu QJ" };
+		qh::Qhull qh{"triag", dim, int(vec.size()/dim), vec.data(), only_hull ? "Qt" : "v Qu QJ" };
 		if(qh.hasQhullMessage())
 			std::cout << qh.qhullMessage() << std::endl;
 
-		qh::QhullFacetList facets{qh.facetList()};
-
-		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
-		{
-			qh::QhullPoint pt = iterFacet->voronoiVertex();
-
-			for(int i=0; i<dim; ++i)
-				voronoi.push_back(pt[i]);
-
-
-			std::vector<t_real> region;
-			//qh::QhullRidgeSet ridges = iterFacet->ridges();
-			qh::QhullVertexSet vertices = iterFacet->vertices();
-
-			for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
-			{
-				qh::QhullPoint pt = (*iterVertex).point();
-
-				for(int i=0; i<dim; ++i)
-					region.push_back(pt[i]);
-			}
-
-			regions.emplace_back(std::move(region));
-		}
-	}
-	catch(const std::exception& ex)
-	{
-		std::cerr << ex.what() << std::endl;
-	}
-
-	return std::make_tuple(voronoi, regions);
-}
-
-
-template<class t_real>
-std::vector<std::vector<t_real>> HullView::CalcDelaunay(int dim, const std::vector<t_real>& vec, bool hull)
-{
-	std::vector<std::vector<t_real>> triags;
-
-	try
-	{
-		qh::Qhull qh{"triag", dim, int(vec.size()/dim), vec.data(), hull ? "Qt" : "d Qu QJ" };
-		if(qh.hasQhullMessage())
-			std::cout << qh.qhullMessage() << std::endl;
 
 		//qh::QhullVertexList vertices{qh.vertexList()};
 		qh::QhullFacetList facets{qh.facetList()};
 
 		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
 		{
+			if(!only_hull)
+			{
+				qh::QhullPoint pt = iterFacet->voronoiVertex();
+
+				for(int i=0; i<dim; ++i)
+					voronoi.push_back(pt[i]);
+			}
+
+
 			std::vector<t_real> thetriag;
 			qh::QhullVertexSet vertices = iterFacet->vertices();
 
@@ -505,7 +497,7 @@ std::vector<std::vector<t_real>> HullView::CalcDelaunay(int dim, const std::vect
 		std::cerr << ex.what() << std::endl;
 	}
 
-	return triags;
+	return std::make_tuple(voronoi, triags);
 }
 
 
