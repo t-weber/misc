@@ -185,6 +185,7 @@ void HullView::mouseMoveEvent(QMouseEvent *evt)
 }
 
 
+/*
 static double side_of_line(const QLineF& line, const QPointF& pt)
 {
 	QPointF dir1 = line.p2() - line.p1();
@@ -223,10 +224,11 @@ static bool all_points_on_same_side(const QLineF& line, const std::vector<QPoint
 		double curside = side_of_line(line, vert);
 		if(std::signbit(*side) != std::signbit(curside) && std::abs(curside) > eps)
 			return false;
-}
+	}
 
 	return true;
 }
+*/
 
 
 void HullView::SetCalculateHull(bool b)
@@ -240,6 +242,13 @@ void HullView::SetCalculateVoronoi(bool b)
 {
 	m_calcvoronoi = b;
 	UpdateVoronoi();
+}
+
+
+void HullView::SetCalculateDelaunay(bool b)
+{
+	m_calcdelaunay = b;
+	UpdateDelaunay();
 }
 
 
@@ -260,6 +269,7 @@ void HullView::UpdateAll()
 {
 	UpdateHull();
 	UpdateVoronoi();
+	UpdateDelaunay();
 }
 
 
@@ -285,25 +295,23 @@ void HullView::UpdateHull()
 	}
 
 
-	std::vector<t_real> hull = CalcHull<t_real>(2, vertices);
+	std::vector<std::vector<t_real>> hull = CalcDelaunay<t_real>(2, vertices, true);
 
-	std::vector<QPointF> hullvertices;
-	for(std::size_t i=0; i<hull.size(); i+=2)
-		hullvertices.emplace_back(QPointF{hull[i], hull[i+1]});
-
-
-	for(std::size_t idx1=0; idx1<hullvertices.size(); ++idx1)
+	for(const auto& thetriag : hull)
 	{
-		std::size_t idx2 = idx1+1;
-		if(idx2 >= hullvertices.size())
-			idx2 = 0;
+		for(std::size_t idx1=0; idx1<thetriag.size(); idx1+=2)
+		{
+			std::size_t idx2 = idx1+2;
+			if(idx2 >= thetriag.size())
+				idx2 = 0;
 
-		QLineF line{hullvertices[idx1], hullvertices[idx2]};
-		if(!all_points_on_same_side(line, hullvertices))
-			continue;
+			QLineF line{QPointF{thetriag[idx1], thetriag[idx1+1]}, QPointF{thetriag[idx2], thetriag[idx2+1]}};
+			//if(!all_points_on_same_side(line, hullvertices))
+			//	continue;
 
-		QGraphicsItem *hullItem = m_scene->addLine(line);
-		m_hull.insert(hullItem);
+			QGraphicsItem *item = m_scene->addLine(line);
+			m_hull.insert(item);
+		}
 	}
 }
 
@@ -340,29 +348,43 @@ void HullView::UpdateVoronoi()
 }
 
 
-template<class t_real>
-std::vector<t_real> HullView::CalcHull(int dim, const std::vector<t_real>& vec)
+void HullView::UpdateDelaunay()
 {
-	std::vector<t_real> hull;
-
-	qh::Qhull qh{"hull", dim, int(vec.size()/dim), vec.data(), "QJ" };
-	qh::QhullVertexList vertices{qh.vertexList()};
-
-	qh::QhullFacetList facets{qh.facetList()};
-	for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+	// remove previous triangulation
+	for(QGraphicsItem* item : m_delaunay)
 	{
-		qh::QhullVertexSet vertices = iterFacet->vertices();
+		m_scene->removeItem(item);
+		delete item;
+	}
+	m_delaunay.clear();
 
-		for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
-		{
-			qh::QhullPoint pt = (*iterVertex).point();
+	if(!m_calcdelaunay || m_vertices.size() < 4)
+		return;
 
-			for(int i=0; i<dim; ++i)
-				hull.push_back(pt[i]);
-		}
+	std::vector<t_real> vertices;
+	vertices.reserve(m_vertices.size()*2);
+	for(const Vertex* vertex : m_vertices)
+	{
+		vertices.push_back(vertex->x());
+		vertices.push_back(vertex->y());
 	}
 
-	return hull;
+
+	std::vector<std::vector<t_real>> triags = CalcDelaunay<t_real>(2, vertices, false);
+
+	for(const auto& thetriag : triags)
+	{
+		for(std::size_t idx1=0; idx1<thetriag.size(); idx1+=2)
+		{
+			std::size_t idx2 = idx1+2;
+			if(idx2 >= thetriag.size())
+				idx2 = 0;
+
+			QLineF line{QPointF{thetriag[idx1], thetriag[idx1+1]}, QPointF{thetriag[idx2], thetriag[idx2+1]}};
+			QGraphicsItem *item = m_scene->addLine(line);
+			m_delaunay.insert(item);
+		}
+	}
 }
 
 
@@ -384,6 +406,35 @@ std::vector<t_real> HullView::CalcVoronoi(int dim, const std::vector<t_real>& ve
 	}
 
 	return voronoi;
+}
+
+
+template<class t_real>
+std::vector<std::vector<t_real>> HullView::CalcDelaunay(int dim, const std::vector<t_real>& vec, bool hull)
+{
+	std::vector<std::vector<t_real>> triags;
+
+	qh::Qhull qh{"triag", dim, int(vec.size()/dim), vec.data(), hull ? "Qt" : "d Qu QJ" };
+	qh::QhullVertexList vertices{qh.vertexList()};
+
+	qh::QhullFacetList facets{qh.facetList()};
+	for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
+	{
+		qh::QhullVertexSet vertices = iterFacet->vertices();
+		std::vector<t_real> thetriag;
+
+		for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
+		{
+			qh::QhullPoint pt = (*iterVertex).point();
+
+			for(int i=0; i<dim; ++i)
+				thetriag.push_back(pt[i]);
+		}
+
+		triags.emplace_back(std::move(thetriag));
+	}
+
+	return triags;
 }
 
 
@@ -426,6 +477,12 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	actionVoronoi->setChecked(true);
 	connect(actionVoronoi, &QAction::toggled, [this](bool b) { m_view->SetCalculateVoronoi(b); });
 	menuCalc->addAction(actionVoronoi);
+
+	QAction *actionDelaunay = new QAction{"Delaunay Triangulation", this};
+	actionDelaunay->setCheckable(true);
+	actionDelaunay->setChecked(true);
+	connect(actionDelaunay, &QAction::toggled, [this](bool b) { m_view->SetCalculateDelaunay(b); });
+	menuCalc->addAction(actionDelaunay);
 
 	QMenuBar *menuBar = new QMenuBar{this};
 	menuBar->addMenu(menuFile);

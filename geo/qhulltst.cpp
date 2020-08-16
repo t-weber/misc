@@ -7,7 +7,7 @@
  * References:
  *	- http://www.qhull.org/html/qh-code.htm#cpp
  *	- https://github.com/qhull/qhull/tree/master/src/libqhullcpp
-*	- https://github.com/qhull/qhull/blob/master/src/qhulltest/Qhull_test.cpp
+ *	- https://github.com/qhull/qhull/blob/master/src/qhulltest/Qhull_test.cpp
  *
  * g++ -o qhulltst qhulltst.cpp -lqhull_r -lqhullcpp
  */

@@ -46,15 +46,16 @@ public:
 
 	void SetCalculateHull(bool b);
 	void SetCalculateVoronoi(bool b);
+	void SetCalculateDelaunay(bool b);
 
 	void ClearVertices();
 
 protected:
 	template<class t_real=double>
-	static std::vector<t_real> CalcHull(int dim, const std::vector<t_real>& vec);
+	static std::vector<t_real> CalcVoronoi(int dim, const std::vector<t_real>& vec);
 
 	template<class t_real=double>
-	static std::vector<t_real> CalcVoronoi(int dim, const std::vector<t_real>& vec);
+	static std::vector<std::vector<t_real>> CalcDelaunay(int dim, const std::vector<t_real>& vec, bool hull=0);
 
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
@@ -65,6 +66,7 @@ protected:
 
 	void UpdateHull();
 	void UpdateVoronoi();
+	void UpdateDelaunay();
 	void UpdateAll();
 
 private:
@@ -73,10 +75,12 @@ private:
 	std::unordered_set<Vertex*> m_vertices{};
 	std::unordered_set<QGraphicsItem*> m_hull{};
 	std::unordered_set<QGraphicsItem*> m_voronoi{};
+	std::unordered_set<QGraphicsItem*> m_delaunay{};
 
 	bool m_dragging = false;
 	bool m_calchull = true;
 	bool m_calcvoronoi = true;
+	bool m_calcdelaunay = true;
 };
 
 
