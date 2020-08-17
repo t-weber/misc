@@ -469,6 +469,9 @@ HullView::CalcDelaunay(int dim, const std::vector<t_real>& vec, bool only_hull)
 
 		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
 		{
+			if(iterFacet->isUpperDelaunay())
+				continue;
+			
 			if(!only_hull)
 			{
 				qh::QhullPoint pt = iterFacet->voronoiVertex();
