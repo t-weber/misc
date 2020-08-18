@@ -338,6 +338,8 @@ void HullView::UpdateHull()
 			std::size_t idx2 = idx1+2;
 			if(idx2 >= thetriag.size())
 				idx2 = 0;
+			if(idx1 == idx2)
+				continue;
 
 			QLineF line{QPointF{thetriag[idx1], thetriag[idx1+1]}, QPointF{thetriag[idx2], thetriag[idx2+1]}};
 #ifdef HULL_CHECK
