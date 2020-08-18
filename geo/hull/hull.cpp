@@ -135,6 +135,8 @@ HullView::HullView(QGraphicsScene *scene, QWidget *parent) : QGraphicsView(scene
 
 	setInteractive(true);
 	setMouseTracking(true);
+
+	setBackgroundBrush(QBrush{QColor::fromRgbF(0.95, 0.95, 0.95, 1.)});
 }
 
 
@@ -471,7 +473,7 @@ HullView::CalcDelaunay(int dim, const std::vector<t_real>& vec, bool only_hull)
 		{
 			if(iterFacet->isUpperDelaunay())
 				continue;
-			
+
 			if(!only_hull)
 			{
 				qh::QhullPoint pt = iterFacet->voronoiVertex();
