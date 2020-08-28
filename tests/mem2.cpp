@@ -36,6 +36,9 @@ struct MemNode
 	std::size_t level_size = 0;
 	std::size_t used_size = 0;
 
+	// linear position in memory
+	std::size_t lin_pos = 0;
+
 	std::unique_ptr<MemNode> children[2];
 };
 
@@ -50,10 +53,20 @@ public:
 	}
 
 
-	bool allocate(std::size_t size)
+	std::tuple<bool, std::size_t> allocate(std::size_t size)
 	{
 		std::size_t allocsize = nextpow2(size);
 		return alloc_node(m_node.get(), allocsize, size);
+	}
+
+
+	void deallocate(std::size_t linpos)
+	{
+		// if there's only the root node, deallocate it by setting the used size to 0
+		if(m_node->lin_pos == linpos && m_node->used_size != 0)
+			m_node->used_size = 0;
+		else
+			dealloc_node(m_node.get(), linpos);
 	}
 
 
@@ -68,19 +81,20 @@ public:
 
 
 protected:
-	static bool alloc_node(MemNode* node, std::size_t allocsize, std::size_t actualsize)
+	static std::tuple<bool, std::size_t>
+	alloc_node(MemNode* node, std::size_t allocsize, std::size_t actualsize)
 	{
 		if(node->level_size < allocsize)
 		{
 			// not enough space on this level
-			return false;
+			return std::make_tuple(false, 0);
 		}
 		else if(node->level_size == allocsize && node->used_size == 0
 			&& !node->children[0] && !node->children[1])
 		{
 			// found fitting node
 			node->used_size = actualsize;
-			return true;
+			return std::make_tuple(true, node->lin_pos);
 		}
 		else if(node->level_size > allocsize && node->used_size == 0)
 		{
@@ -91,14 +105,37 @@ protected:
 				{
 					node->children[child] = std::make_unique<MemNode>();
 					node->children[child]->level_size = node->level_size>>1;
+					node->children[child]->lin_pos = node->lin_pos + child*node->children[child]->level_size;
 				}
 
-				if(alloc_node(node->children[child].get(), allocsize, actualsize))
-					return true;
+				if(auto tup = alloc_node(node->children[child].get(), allocsize, actualsize);
+					std::get<0>(tup))
+					return tup;
 			}
 		}
 
-		return false;
+		return std::make_tuple(false, 0);
+	}
+
+
+	static void dealloc_node(MemNode* node, std::size_t linpos)
+	{
+		for(int child=0; child<2; ++child)
+		{
+			if(node->children[child]->lin_pos == linpos)
+			{
+				if(node->children[child]->used_size == 0)
+				{
+					// not yet at leaf node
+					dealloc_node(node->children[child].get(), linpos);
+				}
+				else
+				{
+					// at leaf node
+					node->children[child].reset();
+				}
+			}
+		}
 	}
 
 
@@ -137,13 +174,51 @@ private:
 int main()
 {
 	Segment seg(1024);
-	std::cout << std::boolalpha << seg.allocate(500) << std::endl;
-	std::cout << std::boolalpha << seg.allocate(200) << std::endl;
-	std::cout << std::boolalpha << seg.allocate(200) << std::endl;
-	std::cout << std::boolalpha << seg.allocate(200) << std::endl;
 
-	auto [free, frag] = seg.get_free_and_frag();
-	std::cout << "free: " << free << ", int frag: " << frag << std::endl;
+	std::size_t seg2 = 0;
+
+	{
+		auto tup = seg.allocate(500);
+		std::cout << std::boolalpha << std::get<0>(tup) << ", lin pos: " << std::get<1>(tup) << ", ";
+		auto [free, frag] = seg.get_free_and_frag();
+		std::cout << "free: " << free << ", int frag: " << frag << std::endl;
+	}
+	{
+		auto tup = seg.allocate(200);
+		std::cout << std::boolalpha << std::get<0>(tup) << ", lin pos: " << std::get<1>(tup) << ", ";
+		seg2 = std::get<1>(tup);
+		auto [free, frag] = seg.get_free_and_frag();
+		std::cout << "free: " << free << ", int frag: " << frag << std::endl;
+	}
+	{
+		auto tup = seg.allocate(200);
+		std::cout << std::boolalpha << std::get<0>(tup) << ", lin pos: " << std::get<1>(tup) << ", ";
+		auto [free, frag] = seg.get_free_and_frag();
+		std::cout << "free: " << free << ", int frag: " << frag << std::endl;
+	}
+	{
+		auto tup = seg.allocate(200);
+		std::cout << std::boolalpha << std::get<0>(tup) << ", lin pos: " << std::get<1>(tup) << ", ";
+		auto [free, frag] = seg.get_free_and_frag();
+		std::cout << "free: " << free << ", int frag: " << frag << std::endl;
+	}
+	{
+		seg.deallocate(seg2);
+		auto [free, frag] = seg.get_free_and_frag();
+		std::cout << "free: " << free << ", int frag: " << frag << std::endl;
+	}
+	{
+		auto tup = seg.allocate(200);
+		std::cout << std::boolalpha << std::get<0>(tup) << ", lin pos: " << std::get<1>(tup) << ", ";
+		auto [free, frag] = seg.get_free_and_frag();
+		std::cout << "free: " << free << ", int frag: " << frag << std::endl;
+	}
+	{
+		auto tup = seg.allocate(200);
+		std::cout << std::boolalpha << std::get<0>(tup) << ", lin pos: " << std::get<1>(tup) << ", ";
+		auto [free, frag] = seg.get_free_and_frag();
+		std::cout << "free: " << free << ", int frag: " << frag << std::endl;
+	}
 
 	return 0;
 }
