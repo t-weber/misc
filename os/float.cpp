@@ -112,7 +112,7 @@ void float_info(t_float f)
 	const t_int mant_mask = float_traits<t_float>::mant_mask;
 	std::cout << "mantissa mask: " << std::hex << mant_mask << std::dec << std::endl;
 
-	bool sign = (bits & sign_mask) >> float_traits<t_float>::total_len-1;
+	bool sign = (bits & sign_mask) >> (float_traits<t_float>::total_len-1);
 	t_int exp = (bits & exp_mask) >> float_traits<t_float>::mant_len;
 	t_int mant = (bits & mant_mask);
 
@@ -134,7 +134,7 @@ void float_info(t_float f)
 }
 
 
-int main(int argc, char **argv)
+int main()
 {
 	float_info(123.456f);
 	std::cout << "\n" << std::endl;
