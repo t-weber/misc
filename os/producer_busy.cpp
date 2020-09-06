@@ -34,13 +34,17 @@ void produce()
 
 		// busy wait
 		while(producer_active && consumer_wants_to_run)
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
 		{
 			lst.push_back(i++);
 
 			std::cout << "Inserted " << (i-1) << ", number of elements now: " << lst.size() << std::endl;
 		}
+
+		producer_wants_to_run = false;
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(40));
 	}
 }
 
@@ -54,7 +58,7 @@ void consume()
 
 		// busy wait
 		while(!producer_active && producer_wants_to_run)
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
 		{
 			if(lst.size())
@@ -65,6 +69,10 @@ void consume()
 				std::cout << "Removed " << i << ", number of elements now: " << lst.size() << std::endl;
 			}
 		}
+
+		consumer_wants_to_run = false;
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
 }
 
