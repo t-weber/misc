@@ -19,13 +19,13 @@
 
 
 std::list<int> g_lst{};
-std::uint64_t g_mtx = 0;
+std::uint8_t g_mtx = 0;
 
 
-void lock_mtx(volatile std::uint64_t* mtx)
+void lock_mtx(volatile std::uint8_t* mtx)
 {
-	const std::uint64_t locked_state = 1;
-	volatile std::uint64_t is_locked = 1;
+	const std::uint8_t locked_state = 1;
+	volatile std::uint8_t is_locked = 1;
 
 	// busy wait on mtx variable
 	while(is_locked)
@@ -38,18 +38,20 @@ void lock_mtx(volatile std::uint64_t* mtx)
 	 	*		rax = *mtx;		// already locked by other thread, return 1 in rax
 	 	*/
 		asm volatile(
-			"xorq %%rax, %%rax\n"
-			"lock cmpxchg %2, %0\n"
-			"movq %%rax, %1\n"
+			"xorb %%al, %%al\n"
+			"lock cmpxchgb %2, %0\n"
+			"movb %%al, %1\n"
 				: /*%0*/ "+m" (*mtx), /*%1*/ "=r" (is_locked)	// +m: in/out mem, "=r" out via reg
 				: /*%2*/ "r" (locked_state)			// r: in via reg
-				: "%rax", "memory", "cc"			// indicate modified things, "cc" = %flags register
+				: "%al", "memory", "cc"				// indicate modified things, "cc" = %flags register
 		);
+
+		std::this_thread::yield();
 	}
 }
 
 
-void unlock_mtx(std::uint64_t* mtx)
+void unlock_mtx(std::uint8_t* mtx)
 {
 	*mtx = 0;
 }
