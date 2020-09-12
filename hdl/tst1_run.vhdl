@@ -27,10 +27,12 @@ architecture thetester of testbed is
 	signal theclk : std_logic := '0';
 	signal theclk2 : std_logic := '0';
 
+	signal reset : std_logic := '0';
+
 begin
 	theclk <= not theclk after thedelay;
 	theclk2 <= not theclk2 after thedelay*2;
 
-	timer_comp : countdown port map(clk => theclk);
-	timer_comp2 : countdown port map(clk => theclk2);
+	timer_comp : countdown port map(clk => theclk, reset => reset);
+	timer_comp2 : countdown port map(clk => theclk2, reset => reset);
 end architecture;
