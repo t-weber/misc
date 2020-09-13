@@ -1,7 +1,7 @@
 /**
- * producer/consumer test
+ * producer/consumer test with ring buffer
  * @author Tobias Weber
- * @date 28-mar-19
+ * @date 13-sep-2020
  * @license see 'LICENSE.EUPL' file
  *
  * g++ -std=c++17 -o ringbuffer ringbuffer.cpp -lpthread
