@@ -20,7 +20,7 @@
 	#pragma message("Using standard semaphore.")
 	#include <semaphore>
 
-	using t_sema = std::counting_semaphore<10>;
+	using t_sema = std::counting_semaphore<16>;
 #else
 	#pragma message("Using custom semaphore.")
 
