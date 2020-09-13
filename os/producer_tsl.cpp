@@ -17,10 +17,16 @@
 #include <chrono>
 #include <cstdint>
 
+//#define USE_ASM
+#define USE_WAIT
+
 
 std::list<int> g_lst{};
 std::uint8_t g_mtx = 0;
 
+
+#ifdef USE_ASM
+#pragma message("Using asm.")
 
 void lock_mtx(volatile std::uint8_t* mtx)
 {
@@ -50,6 +56,24 @@ void lock_mtx(volatile std::uint8_t* mtx)
 	}
 }
 
+#else
+#pragma message("Using C extension functions.")
+
+void lock_mtx(volatile std::uint8_t* mtx)
+{
+	const std::uint8_t locked_state = 1;
+	std::uint8_t is_locked = 1;
+
+	// busy wait on mtx variable
+	while(is_locked)
+	{
+		is_locked = __atomic_test_and_set(mtx, __ATOMIC_RELAXED);
+		std::this_thread::yield();
+	}
+}
+
+#endif
+
 
 void unlock_mtx(std::uint8_t* mtx)
 {
@@ -71,7 +95,9 @@ void produce()
 		}
 		unlock_mtx(&g_mtx);
 
+#ifdef USE_WAIT
 		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+#endif
 	}
 }
 
@@ -92,7 +118,9 @@ void consume()
 		}
 		unlock_mtx(&g_mtx);
 
+#ifdef USE_WAIT
 		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+#endif
 	}
 }
 
