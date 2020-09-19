@@ -760,7 +760,7 @@ template<class t_mat, class t_vec>
 std::tuple<t_mat, t_mat> qr(const t_mat& mat)
 requires is_mat<t_mat> && is_vec<t_vec>
 {
-	using T = typename t_mat::value_type;
+	//using T = typename t_mat::value_type;
 	const std::size_t rows = mat.size1();
 	const std::size_t cols = mat.size2();
 	const std::size_t N = std::min(cols, rows);
@@ -788,7 +788,7 @@ template<class t_vec>
 t_vec ortho_project(const t_vec& vec, const t_vec& vecNorm, bool bIsNormalised = true)
 requires is_vec<t_vec>
 {
-	const std::size_t iSize = vec.size();
+	//const std::size_t iSize = vec.size();
 	return vec - project<t_vec>(vec, vecNorm, bIsNormalised);
 }
 
@@ -837,7 +837,7 @@ requires is_vec<t_vec>
 {
 	t_cont_out<t_vec> newsys;
 
-	const std::size_t N = sys.size();
+	//const std::size_t N = sys.size();
 	for(const t_vec& vecSys : sys)
 	{
 		t_vec vecOrthoProj = vecSys;
@@ -1300,7 +1300,7 @@ intersect_line_line(
 requires is_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
-	const std::size_t N = line1Dir.size();
+	//const std::size_t N = line1Dir.size();
 
 	const t_vec orgdiff = line1Org - line2Org;
 
@@ -1346,7 +1346,7 @@ std::tuple<t_vec, t_vec, int>
 requires is_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
-	const std::size_t dim = plane1Norm.size();
+	//const std::size_t dim = plane1Norm.size();
 
 	/*
 	// alternate, direct calculation (TODO):
@@ -1445,7 +1445,7 @@ t_vec poly_uv(const t_vec& vert1, const t_vec& vert2, const t_vec& vert3,
 	const t_vec& _pt)
 requires is_mat<t_mat> && is_vec<t_vec>
 {
-	using T = typename t_vec::value_type;
+	//using T = typename t_vec::value_type;
 
 	t_vec vec12 = vert2 - vert1;
 	t_vec vec13 = vert3 - vert1;
@@ -1767,7 +1767,7 @@ std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>
 subdivide_triangles(const std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>& tup)
 requires is_vec<t_vec>
 {
-	using T = typename t_vec::value_type;
+	//using T = typename t_vec::value_type;
 
 	const t_cont<t_vec>& vertices = std::get<0>(tup);
 	const t_cont<t_vec>& normals = std::get<1>(tup);
@@ -1898,7 +1898,7 @@ spherify(const std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>& tup,
 	typename t_vec::value_type rad = 1)
 requires is_vec<t_vec>
 {
-	using T = typename t_vec::value_type;
+	//using T = typename t_vec::value_type;
 
 	const t_cont<t_vec>& vertices = std::get<0>(tup);
 	const t_cont<t_vec>& normals = std::get<1>(tup);
@@ -1954,7 +1954,7 @@ std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_c
 create_plane(const t_vec& norm, typename t_vec::value_type l=1)
 requires is_vec<t_vec>
 {
-	using t_real = typename t_vec::value_type;
+	//using t_real = typename t_vec::value_type;
 	//using t_mat = m::mat<t_real, std::vector>;
 	//using namespace m_ops;
 
