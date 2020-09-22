@@ -15,43 +15,11 @@
 #include <atomic>
 #include <condition_variable>
 #include <chrono>
-//#include <semaphore>
+
+#include "sema.h"
 
 
-/**
- * simple semaphore
- */
-class Sema
-{
-	public:
-		Sema(int ctr) : m_ctr{ctr} {}
-
-		void acquire()
-		{
-			std::unique_lock _ul{m_mtxcond};
-			m_cond.wait(_ul, [this]()->bool { return m_ctr > 0; });
-			//while(!m_cond.wait_for(_ul, std::chrono::nanoseconds{10}, [this]()->bool { return m_ctr > 0; }));
-
-			--m_ctr;
-		}
-
-		void release()
-		{
-			++m_ctr;
-
-			// lock mutex in case of spurious release of wait() in acquire()
-			std::scoped_lock _sl{m_mtxcond};
-			m_cond.notify_one();
-		}
-
-	private:
-		std::atomic<int> m_ctr{0};
-		std::condition_variable m_cond{};
-		std::mutex m_mtxcond{};
-};
-
-
-using t_sema = Sema;
+using t_sema = Sema<unsigned int>;
 //using t_sema = std::counting_semaphore<10>;
 
 std::list<int> lst;

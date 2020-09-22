@@ -10,58 +10,15 @@
 #include <iostream>
 #include <list>
 #include <vector>
-#include <queue>
 #include <random>
 #include <thread>
-#include <mutex>
-#include <atomic>
-#include <condition_variable>
 #include <chrono>
 //#include <semaphore>
+#include "sema.h"
 
-
-/**
- * semaphore with priority queue
- */
-class Sema
-{
-	public:
-		Sema(int ctr) : m_ctr{ctr} {}
-
-		void acquire(int prio=0)
-		{
-			std::unique_lock _ul{m_mtxcond};
-			m_prio.push(prio);
-
-			m_cond.wait(_ul, [this, prio]()->bool
-			{
-				return m_ctr > 0 && (m_prio.top() == prio);
-			});
-
-			m_prio.pop();
-			--m_ctr;
-		}
-
-		void release()
-		{
-			++m_ctr;
-
-			// lock mutex in case of spurious release of wait() in acquire()
-			std::scoped_lock _sl{m_mtxcond};
-			m_cond.notify_all();
-		}
-
-	private:
-		std::atomic<int> m_ctr{0};
-		std::condition_variable m_cond{};
-		std::mutex m_mtxcond{};
-
-		std::priority_queue<int> m_prio{};
-};
-
-
-using t_sema = Sema;
+using t_sema = SemaPrio<unsigned int, int>;
 //using t_sema = std::counting_semaphore<10>;
+
 
 std::list<int> lst;
 const int MAX_ELEMS = 10;
