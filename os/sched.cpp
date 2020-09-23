@@ -6,6 +6,7 @@
  */
 
 #include <iostream>
+#include <algorithm>
 #include <list>
 #include <vector>
 #include <deque>
@@ -15,12 +16,15 @@
 
 // ----------------------------------------------------------------------------
 
+#define DEFAULT_TIMESLICE 4
+
+
 struct Proc
 {
 	int pid;
-	int remaining_time;
+	unsigned int remaining_time;
 
-	int scheduled_time{};
+	unsigned int scheduled_time{};
 };
 
 
@@ -106,6 +110,106 @@ private:
 };
 
 
+/**
+ * preemptive version of FCFS
+ */
+class PreemptRR : public ISched
+{
+public:
+	PreemptRR(unsigned int timeslice=DEFAULT_TIMESLICE) : m_timeslice{timeslice}
+	{}
+
+	virtual void AddProcess(std::shared_ptr<Proc> proc) override
+	{
+		m_procs.push_back(proc);
+	}
+
+	virtual const std::shared_ptr<Proc> Schedule() override
+	{
+		if(!m_procs.size())
+			return nullptr;
+
+		auto proc = m_procs.front();
+
+		proc->scheduled_time = std::min(proc->remaining_time, m_timeslice);
+		proc->remaining_time -= proc->scheduled_time;
+
+		m_procs.pop_front();
+		if(proc->remaining_time > 0)
+			m_procs.push_back(proc);
+
+		return proc;
+	}
+
+	virtual const char* GetSchedName() const override
+	{
+		return "Preempt_RR";
+	}
+
+private:
+	std::list<std::shared_ptr<Proc>> m_procs{};
+	unsigned int m_timeslice{};
+};
+
+
+/**
+ * preemptive version of SFJ
+ */
+class PreemptSRTF : public ISched
+{
+public:
+	PreemptSRTF(unsigned int timeslice=DEFAULT_TIMESLICE) : m_timeslice{timeslice}
+	{}
+
+	virtual void AddProcess(std::shared_ptr<Proc> proc) override
+	{
+		m_procs.push_back(proc);
+		std::stable_sort(m_procs.begin(), m_procs.end(), [](const auto& proc1, const auto& proc2) -> bool
+		{
+			return proc1->remaining_time < proc2->remaining_time;
+		});
+	}
+
+	virtual const std::shared_ptr<Proc> Schedule() override
+	{
+		if(!m_procs.size())
+			return nullptr;
+
+		auto proc = m_procs.front();
+
+		proc->scheduled_time = std::min(proc->remaining_time, m_timeslice);
+		proc->remaining_time -= proc->scheduled_time;
+
+		m_procs.pop_front();
+		if(proc->remaining_time > 0)
+		{
+			m_procs.push_back(proc);
+
+			// re-sort all others, except the one which was just running
+			if(m_procs.size() > 1)
+			{
+				int skip_end = 1;	// skip_end=0 => same as SJF
+				std::stable_sort(m_procs.begin(), std::prev(m_procs.end(),skip_end), [](const auto& proc1, const auto& proc2) -> bool
+				{
+					return proc1->remaining_time < proc2->remaining_time;
+				});
+			}
+		}
+
+		return proc;
+	}
+
+	virtual const char* GetSchedName() const override
+	{
+		return "PreemptSRTF";
+	}
+
+private:
+	std::deque<std::shared_ptr<Proc>> m_procs{};
+	unsigned int m_timeslice{};
+};
+
+
 // ----------------------------------------------------------------------------
 
 
@@ -127,6 +231,7 @@ void tst_sched(const std::index_sequence<idx>&)
 	sched->AddProcess(std::make_shared<Proc>(Proc{.pid=3, .remaining_time=10}));
 	sched->AddProcess(std::make_shared<Proc>(Proc{.pid=4, .remaining_time=1}));
 
+
 	std::cout << "Scheduler: " << sched->GetSchedName() << std::endl;
 	while(1)
 	{
@@ -143,17 +248,17 @@ void tst_sched(const std::index_sequence<idx>&)
 
 // n types
 template<class t_scheds, std::size_t idx, std::size_t ...seq>
-typename std::enable_if<sizeof...(seq), void>::type tst_sched(const std::index_sequence<idx, seq...>&)
+typename std::enable_if<sizeof...(seq)!=0, void>::type tst_sched(const std::index_sequence<idx, seq...>&)
 {
 	tst_sched<t_scheds, idx>(std::index_sequence<idx>());
-	if constexpr(sizeof...(seq))
+	if constexpr(sizeof...(seq) != 0)
 		tst_sched<t_scheds, seq...>(std::index_sequence<seq...>());
 }
 
 
 int main()
 {
-	using t_scheds = std::tuple<CoopFCFS, CoopSJF>;
+	using t_scheds = std::tuple<CoopFCFS, CoopSJF, PreemptRR, PreemptSRTF>;
 	tst_sched<t_scheds>(std::make_index_sequence<std::tuple_size<t_scheds>::value>());
 
 	return 0;
