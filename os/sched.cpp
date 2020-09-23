@@ -213,14 +213,8 @@ private:
 // ----------------------------------------------------------------------------
 
 
-// zero types
-template<class t_scheds>
-void tst_sched(const std::index_sequence<>&)
-{}
-
-// one type
 template<class t_scheds, std::size_t idx>
-void tst_sched(const std::index_sequence<idx>&)
+void tst_sched()
 {
 	using t_sched = typename std::tuple_element<idx, t_scheds>::type;
 	ISched* sched = new t_sched();
@@ -246,13 +240,10 @@ void tst_sched(const std::index_sequence<idx>&)
 	delete sched;
 }
 
-// n types
-template<class t_scheds, std::size_t idx, std::size_t ...seq>
-typename std::enable_if<sizeof...(seq)!=0, void>::type tst_sched(const std::index_sequence<idx, seq...>&)
+template<class t_scheds, std::size_t ...seq>
+typename std::enable_if<sizeof...(seq)!=0, void>::type tst_sched(const std::index_sequence<seq...>&)
 {
-	tst_sched<t_scheds, idx>(std::index_sequence<idx>());
-	if constexpr(sizeof...(seq) != 0)
-		tst_sched<t_scheds, seq...>(std::index_sequence<seq...>());
+	( tst_sched<t_scheds, seq>(), ... );
 }
 
 
