@@ -490,6 +490,7 @@ public:
 	const value_type& operator()(std::size_t i) const { return this->operator[](i); }
 	value_type& operator()(std::size_t i) { return this->operator[](i); }
 
+	using t_cont<T>::operator[];
 
 	friend vec operator+(const vec& vec1, const vec& vec2) { return m_ops::operator+(vec1, vec2); }
 	friend vec operator-(const vec& vec1, const vec& vec2) { return m_ops::operator-(vec1, vec2); }

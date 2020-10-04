@@ -602,7 +602,7 @@ requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
  */
 template<class t_mat, class t_vec>
 typename t_vec::value_type norm(const t_mat& metric_co, const t_vec& vec_contra)
-requires is_basic_vec<t_vec>
+requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 {
 	return std::sqrt(inner<t_mat, t_vec>(metric_co, vec_contra, vec_contra));
 }
