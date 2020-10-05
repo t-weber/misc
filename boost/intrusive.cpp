@@ -13,6 +13,9 @@
 #include <memory>
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/avltree.hpp>
+#include <boost/intrusive/sgtree.hpp>
+#include <boost/intrusive/bstree.hpp>
+#include <boost/intrusive/rbtree.hpp>
 
 namespace intr = boost::intrusive;
 
@@ -20,8 +23,9 @@ namespace intr = boost::intrusive;
 template<class T>
 struct LstElem
 {
-	T val;
+	T val{};
 	intr::list_member_hook<intr::link_mode<intr::normal_link>> _h;
+
 
 	friend std::ostream& operator<<(std::ostream& ostr, const LstElem<T>& e)
 	{
@@ -31,27 +35,35 @@ struct LstElem
 };
 
 
-template<class T>
-struct AVLElem
+template<class HOOK, class T>
+struct TreeLeaf
 {
-	T val;
-	intr::avl_set_member_hook<intr::link_mode<intr::normal_link>> _h;
+	T val{};
+	HOOK _h{};
 
-	friend std::ostream& operator<<(std::ostream& ostr, const AVLElem<T>& e)
+
+	friend std::ostream& operator<<(std::ostream& ostr, const TreeLeaf<HOOK, T>& e)
 	{
 		ostr << e.val;
 		return ostr;
 	}
 
-	friend bool operator<(const AVLElem<T>& e1, const AVLElem<T>& e2)
+	friend bool operator<(const TreeLeaf<HOOK, T>& e1, const TreeLeaf<HOOK, T>& e2)
 	{
 		return e1.val < e2.val;
 	}
 };
 
 
+template<class T>
+using AVLLeaf = TreeLeaf<intr::avl_set_member_hook<intr::link_mode<intr::normal_link>>, T>;
+
+template<class T>
+using BSLeaf = TreeLeaf<intr::bs_set_member_hook<intr::link_mode<intr::normal_link>>, T>;
+
+
 template<class t_elem, class node_traits, class t_node_ptr>
-void print_avl(t_node_ptr node, unsigned depth=0)
+void print_tree(t_node_ptr node, unsigned depth=0)
 {
 	using t_hook = decltype(t_elem::_h);
 
@@ -68,8 +80,67 @@ void print_avl(t_node_ptr node, unsigned depth=0)
 	auto left = node_traits::get_left(node);
 	auto right = node_traits::get_right(node);
 
-	if(left) print_avl<t_elem, node_traits>(left, depth+1);
-	if(right) print_avl<t_elem, node_traits>(right, depth+1);
+	if(left) print_tree<t_elem, node_traits>(left, depth+1);
+	if(right) print_tree<t_elem, node_traits>(right, depth+1);
+}
+
+
+template<class t_tree, template <class...> class t_leaf>
+void test_tree()
+{
+	t_tree tree;
+	using node_traits = typename t_tree::node_traits;
+
+	t_leaf<int> e1{.val = 10};
+	t_leaf<int> e2{.val = 5};
+	t_leaf<int> e3{.val = 15};
+	t_leaf<int> e4{.val = 2};
+	t_leaf<int> e5{.val = 15};
+	t_leaf<int> e6{.val = 30};
+	t_leaf<int> e7{.val = 4};
+
+	//tree.insert_unique(e1);
+	tree.insert_equal(e1);
+	tree.insert_equal(e2);
+	tree.insert_equal(e3);
+	tree.insert_equal(e4);
+	tree.insert_equal(e5);
+	tree.insert_equal(e6);
+	tree.insert_equal(e7);
+
+	//std::cout << "addresses: " << (void*)&e1 << ", " << (void*)&e2 << std::endl;
+	//t_leaf<int> e1b{.val = 10};
+	//std::cout << (void*)&*tree.find(e1b) << std::endl;
+
+
+	for(const auto& elem : tree)
+	{
+		std::cout << "element: "
+			<< (void*)&elem << ", hook: "
+			<< (void*)&elem._h
+			<< ", value: " << elem << std::endl;
+	}
+
+	print_tree<t_leaf<int>, node_traits>(tree.root()->_h.this_ptr());
+
+
+	bool closedrange1 = true;
+	bool closedrange2 = true;
+	auto [iter1, iter2] = tree.bounded_range(t_leaf<int>{.val = 10}, t_leaf<int>{.val = 15}, closedrange1, closedrange2);
+	std::cout << "nodes in range [10, 15]: ";
+	for(auto iter=iter1; iter!=iter2; ++iter)
+		std::cout << *iter << ", ";
+	std::cout << std::endl;
+
+
+	std::cout << "Erasing 15:" << std::endl;
+	tree.erase(t_leaf<int>{.val = 15});
+	print_tree<t_leaf<int>, node_traits>(tree.root()->_h.this_ptr());
+
+	/*auto iterEnd = tree.begin();
+	++iterEnd;
+	tree.erase(tree.begin(), iterEnd);
+	print_tree<t_leaf<int>, node_traits>(tree.root()->_h.this_ptr());*/
 }
 
 
@@ -104,38 +175,39 @@ int main()
 	std::cout << std::endl;
 
 
-	// AVL tree
+	// binary trees
 	{
-		intr::avltree<AVLElem<int>,
-			intr::member_hook<AVLElem<int>, decltype(AVLElem<int>::_h), &AVLElem<int>::_h>> avl;
-		using node_traits = decltype(avl)::node_traits;
+		using t_avl = intr::avltree<AVLLeaf<int>,
+			intr::member_hook<AVLLeaf<int>, decltype(AVLLeaf<int>::_h), &AVLLeaf<int>::_h>>;
+		using t_sg = intr::sgtree<BSLeaf<int>,
+			intr::member_hook<BSLeaf<int>, decltype(BSLeaf<int>::_h), &BSLeaf<int>::_h>>;
+		using t_bs = intr::bstree<BSLeaf<int>,
+			intr::member_hook<BSLeaf<int>, decltype(BSLeaf<int>::_h), &BSLeaf<int>::_h>>;
+		//using t_rb = intr::rbtree<BSLeaf<int>,
+		//	intr::member_hook<BSLeaf<int>, decltype(BSLeaf<int>::_h), &BSLeaf<int>::_h>>;
 
-		AVLElem<int> e1{.val = 10};
-		AVLElem<int> e2{.val = 5};
-		AVLElem<int> e3{.val = 15};
-		AVLElem<int> e4{.val = 2};
-		AVLElem<int> e5{.val = 15};
-		//avl.insert_unique(e1);
-		avl.insert_equal(e1);
-		avl.insert_equal(e2);
-		avl.insert_equal(e3);
-		avl.insert_equal(e4);
-		avl.insert_equal(e5);
+		std::cout << "--------------------------------------------------------------------------------" << std::endl;
+		std::cout << "AVL tree" << std::endl;
+		test_tree<t_avl, AVLLeaf>();
+		std::cout << "--------------------------------------------------------------------------------" << std::endl;
+		std::cout << std::endl;
 
-		//std::cout << "addresses: " << (void*)&e1 << ", " << (void*)&e2 << std::endl;
-		//AVLElem<int> e1b{.val = 10};
-		//std::cout << (void*)&*avl.find(e1b) << std::endl;
+		std::cout << "--------------------------------------------------------------------------------" << std::endl;
+		std::cout << "SG tree" << std::endl;
+		test_tree<t_sg, BSLeaf>();
+		std::cout << "--------------------------------------------------------------------------------" << std::endl;
+		std::cout << std::endl;
 
+		std::cout << "--------------------------------------------------------------------------------" << std::endl;
+		std::cout << "BS tree" << std::endl;
+		test_tree<t_bs, BSLeaf>();
+		std::cout << "--------------------------------------------------------------------------------" << std::endl;
+		//std::cout << std::endl;
 
-		for(const auto& elem : avl)
-		{
-			std::cout << "element: " 
-				<< (void*)&elem << ", hook: " 
-				<< (void*)&elem._h 
-				<< ", value: " << elem << std::endl;
-		}
-
-		print_avl<AVLElem<int>, node_traits>(avl.root()->_h.this_ptr());
+		//std::cout << "--------------------------------------------------------------------------------" << std::endl;
+		//std::cout << "RB tree" << std::endl;
+		//test_tree<t_rb, BSLeaf>();
+		//std::cout << "--------------------------------------------------------------------------------" << std::endl;
 	}
 
 
