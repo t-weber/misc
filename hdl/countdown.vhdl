@@ -65,7 +65,7 @@ architecture countdown_impl of countdown is
 
 begin
 
-	genleds : for ledsegidx in 0 to 3 generate
+	genleds : for ledsegidx in 0 to ctr_bit_len/4-1 generate
 		ledseg : sevenseg port map(digit => curtime(ledsegidx*4+3 downto ledsegidx*4));
 	end generate;
 
