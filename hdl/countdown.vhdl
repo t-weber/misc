@@ -10,7 +10,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 
 
-
 --
 -- package declaration
 --
@@ -34,6 +33,7 @@ end package;
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.leds.sevenseg;
 
 
 --
@@ -42,8 +42,8 @@ use ieee.numeric_std.all;
 entity countdown is
 	generic
 	(
-		ctr_bit_len : natural := 15;
-		start_timer : std_logic_vector(ctr_bit_len downto 0) := x"ffff"
+		ctr_bit_len : natural := 16;
+		start_timer : std_logic_vector(ctr_bit_len-1 downto 0) := x"ffff"
 	);
 
 	port
@@ -61,22 +61,24 @@ end entity;
 --
 architecture countdown_impl of countdown is
 
-	signal curtime : std_logic_vector(ctr_bit_len downto 0) := start_timer;
+	signal curtime : std_logic_vector(ctr_bit_len-1 downto 0) := start_timer;
 
 begin
-	clk_proc : process(clk)
-	begin
-		if rising_edge(clk)
-		then
-			if(reset = '1')
-			then
+	ledseg0 : sevenseg port map(digit => curtime(3 downto 0));
+	ledseg1 : sevenseg port map(digit => curtime(7 downto 4));
+	ledseg2 : sevenseg port map(digit => curtime(11 downto 8));
+	ledseg3 : sevenseg port map(digit => curtime(15 downto 12));
+
+	clk_proc : process(clk) begin
+		if rising_edge(clk) then
+			if(reset = '1') then
 				curtime <= start_timer;
-			elsif(curtime > x"0000")
-			then
-				curtime <= std_logic_vector(unsigned(curtime(ctr_bit_len downto 0)) - 1);
+			elsif(curtime > x"0000") then
+				curtime <= std_logic_vector(unsigned(curtime(ctr_bit_len-1 downto 0)) - 1);
 			end if;
 
 			finished <= '1' when curtime = x"0000" else '0';
 		end if;
 	end process;
 end architecture;
+

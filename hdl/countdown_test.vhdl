@@ -4,9 +4,9 @@
 -- @date dec-2018
 -- @license see 'LICENSE.EUPL' file
 --
--- ghdl -a --std=08 tst1.vhdl  &&  ghdl -a --std=08 tst1_run.vhdl  &&  ghdl -e --std=08 testbed thetester
--- ghdl -r --std=08 testbed thetester --vcd=tst1.vcd
--- gtkwave tst1.vcd
+-- ghdl -a --std=08 sevenseg.vhdl  &&  ghdl -a --std=08 countdown.vhdl  &&  ghdl -a --std=08 countdown_test.vhdl  &&  ghdl -e --std=08 testbed thetester
+-- ghdl -r --std=08 testbed thetester --vcd=countdown_test.vcd
+-- gtkwave countdown_test.vcd
 --
 
 library ieee;
@@ -36,3 +36,4 @@ begin
 	timer_comp : countdown port map(clk => theclk, reset => reset);
 	timer_comp2 : countdown port map(clk => theclk2, reset => reset);
 end architecture;
+
