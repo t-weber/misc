@@ -64,10 +64,10 @@ architecture countdown_impl of countdown is
 	signal curtime : std_logic_vector(ctr_bit_len-1 downto 0) := start_timer;
 
 begin
-	ledseg0 : sevenseg port map(digit => curtime(3 downto 0));
-	ledseg1 : sevenseg port map(digit => curtime(7 downto 4));
-	ledseg2 : sevenseg port map(digit => curtime(11 downto 8));
-	ledseg3 : sevenseg port map(digit => curtime(15 downto 12));
+
+	genleds : for ledsegidx in 0 to 3 generate
+		ledseg : sevenseg port map(digit => curtime(ledsegidx*4+3 downto ledsegidx*4));
+	end generate;
 
 	clk_proc : process(clk) begin
 		if rising_edge(clk) then
