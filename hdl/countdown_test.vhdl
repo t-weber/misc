@@ -33,7 +33,7 @@ begin
 	theclk <= not theclk after thedelay;
 	theclk2 <= not theclk2 after thedelay*2;
 
-	timer_comp : countdown port map(clk => theclk, reset => reset);
-	timer_comp2 : countdown port map(clk => theclk2, reset => reset);
+	timer_comp : countdown generic map(ctr_bit_len => 16) port map(clk => theclk, reset => reset);
+	timer_comp2 : countdown generic map(ctr_bit_len => 16) port map(clk => theclk2, reset => reset);
 end architecture;
 

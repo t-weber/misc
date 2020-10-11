@@ -15,6 +15,11 @@ use ieee.std_logic_1164.all;
 --
 package tst1 is
 	component countdown
+		generic
+		(
+			ctr_bit_len : natural := 16;
+			start_timer : std_logic_vector(ctr_bit_len-1 downto 0) := x"ffff"
+		);
 		port
 		(
 			clk, reset : in std_logic;

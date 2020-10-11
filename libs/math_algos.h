@@ -1284,7 +1284,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * intersection or closest points of lines |org1> + lam1*|dir1> and |org2> + lam2*|dir2>
- * returns [nearest position 1, nearest position 2, dist, valid?, line parameter 1, line parameter 2]
+ * returns [nearest position 1, nearest position 2, valid?, dist, line parameter 1, line parameter 2]
  *
  * |org1> + lam1*|dir1>  =  |org2> + lam2*|dir2>
  * |org1> - |org2>  =  lam2*|dir2> - lam1*|dir1>
