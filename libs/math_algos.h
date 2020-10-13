@@ -112,6 +112,36 @@ requires is_mat<t_mat>
 
 
 /**
+ * create a vector with given size if it is dynamic
+ */
+template<class t_vec>
+t_vec create(std::size_t size=3)
+requires is_basic_vec<t_vec>
+{
+	t_vec vec;
+	if constexpr(is_dyn_vec<t_vec>)
+		vec = t_vec{size};
+
+	return vec;
+}
+
+
+/**
+ * create a matrix with given sizes if it is dynamic
+ */
+template<class t_mat>
+t_mat create(std::size_t size1, std::size_t size2)
+requires is_basic_mat<t_mat>
+{
+	t_mat mat;
+	if constexpr(is_dyn_mat<t_mat>)
+		mat = t_mat{size1, size2};
+
+	return mat;
+}
+
+
+/**
  * set submatrix to unit
  */
 template<class t_mat>
@@ -131,9 +161,7 @@ template<class t_mat>
 t_mat unit(std::size_t N1, std::size_t N2)
 requires is_mat<t_mat>
 {
-	t_mat mat;
-	if constexpr(is_dyn_mat<t_mat>)
-		mat = t_mat(N1, N2);
+	t_mat mat = create<t_mat>(N1, N2);
 
 	unit<t_mat>(mat, 0,0, mat.size1(),mat.size2());
 	return mat;
@@ -158,9 +186,7 @@ template<class t_mat>
 t_mat zero(std::size_t N1, std::size_t N2)
 requires is_mat<t_mat>
 {
-	t_mat mat;
-	if constexpr(is_dyn_mat<t_mat>)
-		mat = t_mat(N1, N2);
+	t_mat mat = create<t_mat>(N1, N2);
 
 	for(std::size_t i=0; i<mat.size1(); ++i)
 		for(std::size_t j=0; j<mat.size2(); ++j)
@@ -265,9 +291,7 @@ template<class t_mat>
 t_mat trans(const t_mat& mat)
 requires is_mat<t_mat>
 {
-	t_mat mat2;
-	if constexpr(is_dyn_mat<t_mat>)
-		mat2 = t_mat(mat.size2(), mat.size1());
+	t_mat mat2 = create<t_mat>(mat.size2(), mat.size1());
 
 	for(std::size_t i=0; i<mat.size1(); ++i)
 		for(std::size_t j=0; j<mat.size2(); ++j)
@@ -284,9 +308,7 @@ template<class t_vec>
 t_vec create(const std::initializer_list<typename t_vec::value_type>& lst)
 requires is_basic_vec<t_vec>
 {
-	t_vec vec;
-	if constexpr(is_dyn_vec<t_vec>)
-		vec = t_vec(lst.size());
+	t_vec vec = create<t_vec>(lst.size());
 
 	auto iterLst = lst.begin();
 	for(std::size_t i=0; i<vec.size(); ++i)
@@ -394,9 +416,7 @@ template<class t_mat, class t_vec>
 t_vec col(const t_mat& mat, std::size_t col)
 requires is_mat<t_mat> && is_basic_vec<t_vec>
 {
-	t_vec vec;
-	if constexpr(is_dyn_vec<t_vec>)
-		vec = t_vec(mat.size1());
+	t_vec vec = create<t_vec>(mat.size1());
 
 	for(std::size_t i=0; i<mat.size1(); ++i)
 		vec[i] = mat(i, col);
@@ -411,9 +431,7 @@ template<class t_mat, class t_vec>
 t_vec row(const t_mat& mat, std::size_t row)
 requires is_mat<t_mat> && is_basic_vec<t_vec>
 {
-	t_vec vec;
-	if constexpr(is_dyn_vec<t_vec>)
-		vec = t_vec(mat.size2());
+	t_vec vec = create<t_vec>(mat.size2());
 
 	for(std::size_t i=0; i<mat.size2(); ++i)
 		vec[i] = mat(row, i);
@@ -495,10 +513,7 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 {
 	const std::size_t N1 = vec1.size();
 	const std::size_t N2 = vec2.size();
-
-	t_mat mat;
-	if constexpr(is_dyn_mat<t_mat>)
-		mat = t_mat{N1, N2};
+	t_mat mat = create<t_mat>(N1, N2);
 
 	for(std::size_t n1=0; n1<N1; ++n1)
 	{
@@ -528,10 +543,7 @@ t_mat metric(const t_cont<t_vec>& basis_co)
 requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 {
 	const std::size_t N = basis_co.size();
-
-	t_mat g_co;
-	if constexpr(is_dyn_mat<t_mat>)
-		g_co = t_mat(N, N);
+	t_mat g_co = create<t_mat>(N, N);
 
 	auto iter_i = basis_co.begin();
 	for(std::size_t i=0; i<N; ++i)
@@ -1020,9 +1032,7 @@ requires is_mat<t_mat>
 		return std::make_tuple(t_mat(), false);
 	}
 
-	t_mat matInv;
-	if constexpr(is_dyn_mat<t_mat>)
-		matInv = t_mat(N, N);
+	t_mat matInv = create<t_mat>(N, N);
 
 	for(std::size_t i=0; i<N; ++i)
 	{
@@ -1508,9 +1518,7 @@ template<class t_mat, class t_vec>
 t_mat skewsymmetric(const t_vec& vec)
 requires is_basic_vec<t_vec> && is_mat<t_mat>
 {
-	t_mat mat;
-	if constexpr(is_dyn_mat<t_mat>)
-		mat = t_mat(3,3);
+	t_mat mat = create<t_mat>(3, 3);
 
 	// if static matrix is larger than 3x3 (e.g. for homogeneous coordinates), initialise as identity
 	if(mat.size1() > 3 || mat.size2() > 3)
@@ -2793,10 +2801,7 @@ requires is_mat<t_mat>
 {
 	t_vec va = create<t_vec>({a, 0, 0});
 	t_vec vb = rotation<t_mat, t_vec>(create<t_vec>({0,0,1}), _cc, 1)*va * b/a;
-
-	t_vec vc;
-	if constexpr(is_dyn_vec<t_vec>)
-		vc = t_vec(va.size());
+	t_vec vc = create<t_vec>(va.size());
 
 	// derived using dot products <va|vc>=cos(_bb), and <vb|vc>=cos(_aa)
 	vc[0] = std::cos(_bb)*c;
@@ -2920,9 +2925,7 @@ template<class t_mat>
 t_mat herm(const t_mat& mat)
 requires is_basic_mat<t_mat>
 {
-	t_mat mat2;
-	if constexpr(is_dyn_mat<t_mat>)
-		mat2 = t_mat(mat.size2(), mat.size1());
+	t_mat mat2 = create<t_mat>(mat.size2(), mat.size1());
 
 	for(std::size_t i=0; i<mat.size1(); ++i)
 		for(std::size_t j=0; j<mat.size2(); ++j)

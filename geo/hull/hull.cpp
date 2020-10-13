@@ -14,6 +14,7 @@
 #include <locale>
 #include <memory>
 #include <array>
+#include <vector>
 #include <iostream>
 
 #include <libqhullcpp/Qhull.h>
@@ -22,8 +23,17 @@
 #include <libqhullcpp/QhullFacetList.h>
 #include <libqhullcpp/QhullVertexSet.h>
 
+#include "../libs/math_algos.h"
+#include "../libs/math_conts.h"
+using namespace m_ops;
+
+
 namespace qh = orgQhull;
-using t_real = coordT;
+
+using t_real_qhull = coordT;
+using t_real = double;
+using t_vec = m::vec<t_real, std::vector>;
+using t_mat = m::mat<t_real, std::vector>;
 
 
 
@@ -309,22 +319,19 @@ void HullView::UpdateHull()
 	if(!m_calchull || m_vertices.size() < 3)
 		return;
 
-	std::vector<t_real> vertices;
-	vertices.reserve(m_vertices.size()*2);
-	for(const Vertex* vertex : m_vertices)
-	{
-		vertices.push_back(vertex->x());
-		vertices.push_back(vertex->y());
-	}
+	std::vector<t_vec> vertices;
+	vertices.reserve(m_vertices.size());
+	std::transform(m_vertices.begin(), m_vertices.end(), std::back_inserter(vertices),
+		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
 
-	std::vector<std::vector<t_real>> hull;
-	std::tie(std::ignore, hull) = CalcDelaunay<t_real>(2, vertices, true);
+	std::vector<std::vector<t_vec>> hull;
+	std::tie(std::ignore, hull) = CalcDelaunay<t_vec>(2, vertices, true);
 
 #ifdef HULL_CHECK
 	std::vector<QPointF> hullvertices;
 	for(const auto& thetriag : hull)
-		for(std::size_t idx1=0; idx1<thetriag.size(); idx1+=2)
-			hullvertices.emplace_back(QPointF{thetriag[idx1], thetriag[idx1+1]});
+		for(std::size_t idx1=0; idx1<thetriag.size(); ++idx1)
+			hullvertices.emplace_back(QPointF{thetriag[idx1][0], thetriag[idx1][1]});
 #endif
 
 	// convex hull
@@ -333,15 +340,15 @@ void HullView::UpdateHull()
 
 	for(const auto& thetriag : hull)
 	{
-		for(std::size_t idx1=0; idx1<thetriag.size(); idx1+=2)
+		for(std::size_t idx1=0; idx1<thetriag.size(); ++idx1)
 		{
-			std::size_t idx2 = idx1+2;
+			std::size_t idx2 = idx1+1;
 			if(idx2 >= thetriag.size())
 				idx2 = 0;
 			if(idx1 == idx2)
 				continue;
 
-			QLineF line{QPointF{thetriag[idx1], thetriag[idx1+1]}, QPointF{thetriag[idx2], thetriag[idx2+1]}};
+			QLineF line{QPointF{thetriag[idx1][0], thetriag[idx1][1]}, QPointF{thetriag[idx2][0], thetriag[idx2][1]}};
 #ifdef HULL_CHECK
 			if(!all_points_on_same_side(line, hullvertices))
 				continue;
@@ -376,17 +383,13 @@ void HullView::UpdateDelaunay()
 	if((!m_calcdelaunay && !m_calcvoronoi) || m_vertices.size() < 4)
 		return;
 
-	std::vector<t_real> vertices;
-	vertices.reserve(m_vertices.size()*2);
-	for(const Vertex* vertex : m_vertices)
-	{
-		vertices.push_back(vertex->x());
-		vertices.push_back(vertex->y());
-	}
+	std::vector<t_vec> vertices;
+	vertices.reserve(m_vertices.size());
+	std::transform(m_vertices.begin(), m_vertices.end(), std::back_inserter(vertices),
+		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
 
-
-	auto [voronoi, triags] = CalcDelaunay<t_real>(2, vertices, false);
-	const double itemRad = 7.;
+	auto [voronoi, triags] = CalcDelaunay<t_vec>(2, vertices, false);
+	const t_real itemRad = 7.;
 
 
 	if(m_calcvoronoi)
@@ -405,22 +408,22 @@ void HullView::UpdateDelaunay()
 		brushVoronoi.setStyle(Qt::SolidPattern);
 		brushVoronoi.setColor(QColor::fromRgbF(1.,0.,0.));
 
-		for(std::size_t i=0; i<voronoi.size(); i+=2)
+		for(std::size_t idx=0; idx<voronoi.size(); ++idx)
 		{
-			QPointF voronoipt{voronoi[i], voronoi[i+1]};
+			const t_vec& voronoivert = voronoi[idx];
+
+			QPointF voronoipt{voronoivert[0], voronoivert[1]};
 			QGraphicsItem *voronoiItem = m_scene->addEllipse(
 				voronoipt.x()-itemRad/2., voronoipt.y()-itemRad/2., itemRad, itemRad, penVoronoi, brushVoronoi);
 			m_voronoi.insert(voronoiItem);
 
 			// circles
-			std::size_t triagidx = i/2;
-			if(triagidx < triags.size())
+			if(idx < triags.size())
 			{
-				const auto& triag = triags[triagidx];
+				const auto& triag = triags[idx];
 				if(triag.size() >= 3)
 				{
-					QPointF triagpt{triag[0], triag[1]};
-					double rad = std::sqrt(QPointF::dotProduct(voronoipt-triagpt, voronoipt-triagpt));
+					t_real rad = m::norm(voronoivert-triag[0]);
 
 					QGraphicsItem *voronoiCircle = m_scene->addEllipse(
 						voronoipt.x()-rad, voronoipt.y()-rad, rad*2., rad*2., penCircle);
@@ -436,13 +439,13 @@ void HullView::UpdateDelaunay()
 		// delaunay triangles
 		for(const auto& thetriag : triags)
 		{
-			for(std::size_t idx1=0; idx1<thetriag.size(); idx1+=2)
+			for(std::size_t idx1=0; idx1<thetriag.size(); ++idx1)
 			{
-				std::size_t idx2 = idx1+2;
+				std::size_t idx2 = idx1+1;
 				if(idx2 >= thetriag.size())
 					idx2 = 0;
 
-				QLineF line{QPointF{thetriag[idx1], thetriag[idx1+1]}, QPointF{thetriag[idx2], thetriag[idx2+1]}};
+				QLineF line{QPointF{thetriag[idx1][0], thetriag[idx1][1]}, QPointF{thetriag[idx2][0], thetriag[idx2][1]}};
 				QGraphicsItem *item = m_scene->addLine(line);
 				m_delaunay.insert(item);
 			}
@@ -454,16 +457,24 @@ void HullView::UpdateDelaunay()
 /**
  * delaunay triangulation and voronoi vertices
  */
-template<class t_real>
-std::tuple<std::vector<t_real>, std::vector<std::vector<t_real>>>
-HullView::CalcDelaunay(int dim, const std::vector<t_real>& vec, bool only_hull)
+template<class t_vec>
+std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>>
+HullView::CalcDelaunay(int dim, const std::vector<t_vec>& verts, bool only_hull)
 {
-	std::vector<t_real> voronoi;	// voronoi vertices
-	std::vector<std::vector<t_real>> triags;	// delaunay triangles
+	std::vector<t_vec> voronoi;				// voronoi vertices
+	std::vector<std::vector<t_vec>> triags;	// delaunay triangles
 
 	try
 	{
-		qh::Qhull qh{"triag", dim, int(vec.size()/dim), vec.data(), only_hull ? "Qt" : "v Qu QJ" };
+		std::vector<t_real_qhull> _verts;
+		_verts.reserve(verts.size()*2);
+		for(const t_vec& vert : verts)
+		{
+			_verts.push_back(t_real_qhull{vert[0]});
+			_verts.push_back(t_real_qhull{vert[1]});
+		}
+
+		qh::Qhull qh{"triag", dim, int(_verts.size()/dim), _verts.data(), only_hull ? "Qt" : "v Qu QJ" };
 		if(qh.hasQhullMessage())
 			std::cout << qh.qhullMessage() << std::endl;
 
@@ -480,20 +491,26 @@ HullView::CalcDelaunay(int dim, const std::vector<t_real>& vec, bool only_hull)
 			{
 				qh::QhullPoint pt = iterFacet->voronoiVertex();
 
+				t_vec vec = m::create<t_vec>(dim);
 				for(int i=0; i<dim; ++i)
-					voronoi.push_back(pt[i]);
+					vec[i] = t_real{pt[i]};
+
+				voronoi.emplace_back(std::move(vec));
 			}
 
 
-			std::vector<t_real> thetriag;
+			std::vector<t_vec> thetriag;
 			qh::QhullVertexSet vertices = iterFacet->vertices();
 
 			for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
 			{
 				qh::QhullPoint pt = (*iterVertex).point();
 
+				t_vec vec = m::create<t_vec>(dim);
 				for(int i=0; i<dim; ++i)
-					thetriag.push_back(pt[i]);
+					vec[i] = t_real{pt[i]};
+
+				thetriag.emplace_back(std::move(vec));
 			}
 
 			triags.emplace_back(std::move(thetriag));
