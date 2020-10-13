@@ -34,6 +34,12 @@ private:
 };
 
 
+enum class CalculationMethod
+{
+	QHULL,
+	PARABOLIC,
+};
+
 
 class HullView : public QGraphicsView
 {
@@ -48,12 +54,18 @@ public:
 	void SetCalculateVoronoi(bool b);
 	void SetCalculateDelaunay(bool b);
 
+	void SetCalculationMethod(CalculationMethod m);
+
 	void ClearVertices();
 
 protected:
 	template<class t_vec>
 	static std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>>
 	CalcDelaunay(int dim, const std::vector<t_vec>& verts, bool hull=0);
+
+	template<class t_vec>
+	static std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>>
+	CalcDelaunayParabolic(const std::vector<t_vec>& verts);
 
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
@@ -78,6 +90,8 @@ private:
 	bool m_calchull = true;
 	bool m_calcvoronoi = true;
 	bool m_calcdelaunay = true;
+
+	CalculationMethod m_calculationmethod = CalculationMethod::QHULL;
 };
 
 
