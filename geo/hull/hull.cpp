@@ -589,7 +589,7 @@ HullView::CalcDelaunayParabolic(const std::vector<t_vec>& verts)
 	try
 	{
 		std::vector<t_real_qhull> _verts;
-		_verts.reserve(verts.size()*dim);
+		_verts.reserve(verts.size()*(dim+1));
 		for(const t_vec& vert : verts)
 		{
 			_verts.push_back(t_real_qhull{vert[0]});
@@ -601,6 +601,7 @@ HullView::CalcDelaunayParabolic(const std::vector<t_vec>& verts)
 		if(qh.hasQhullMessage())
 			std::cout << qh.qhullMessage() << std::endl;
 
+
 		qh::QhullFacetList facets{qh.facetList()};
 
 		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
@@ -608,18 +609,21 @@ HullView::CalcDelaunayParabolic(const std::vector<t_vec>& verts)
 			if(iterFacet->isUpperDelaunay())
 				continue;
 
-			bool valid_triag = true;
+			// filter out non-visible part of hull
+			qh::QhullHyperplane plane = iterFacet->hyperplane();
+			t_vec normal = m::create<t_vec>(dim+1);
+			for(int i=0; i<dim+1; ++i)
+				normal[i] = t_real{plane[i]};
+			// normal pointing upwards?
+			if(normal[2] > 0.)
+				continue;
+
 			std::vector<t_vec> thetriag;
 			qh::QhullVertexSet vertices = iterFacet->vertices();
 
 			for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
 			{
 				qh::QhullPoint pt = (*iterVertex).point();
-				if(0)	// TODO: filter non-visible part of hull
-				{
-					valid_triag = false;
-					break;
-				}
 
 				t_vec vec = m::create<t_vec>(dim);
 				for(int i=0; i<dim; ++i)
@@ -628,11 +632,8 @@ HullView::CalcDelaunayParabolic(const std::vector<t_vec>& verts)
 				thetriag.emplace_back(std::move(vec));
 			}
 
-			if(valid_triag)
-			{
-				voronoi.emplace_back(calc_circumcentre(thetriag));
-				triags.emplace_back(std::move(thetriag));
-			}
+			voronoi.emplace_back(calc_circumcentre(thetriag));
+			triags.emplace_back(std::move(thetriag));
 		}
 	}
 	catch(const std::exception& ex)
@@ -755,7 +756,7 @@ int main(int argc, char** argv)
 		set_locales();
 
 		auto hullwnd = std::make_unique<HullWnd>();
-		hullwnd->resize(800, 600);
+		hullwnd->resize(1024, 768);
 		hullwnd->show();
 
 		return app->exec();
