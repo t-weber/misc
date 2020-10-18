@@ -18,6 +18,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include "geo.h"
+
 
 
 class Vertex : public QGraphicsItem
@@ -34,7 +36,14 @@ private:
 };
 
 
-enum class CalculationMethod
+enum class HullCalculationMethod
+{
+	QHULL,
+	DIVIDE,
+};
+
+
+enum class DelaunayCalculationMethod
 {
 	QHULL,
 	PARABOLIC,
@@ -54,18 +63,10 @@ public:
 	void SetCalculateVoronoi(bool b);
 	void SetCalculateDelaunay(bool b);
 
-	void SetCalculationMethod(CalculationMethod m);
+	void SetHullCalculationMethod(HullCalculationMethod m);
+	void SetDelaunayCalculationMethod(DelaunayCalculationMethod m);
 
 	void ClearVertices();
-
-protected:
-	template<class t_vec>
-	static std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>>
-	CalcDelaunay(int dim, const std::vector<t_vec>& verts, bool hull=0);
-
-	template<class t_vec>
-	static std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>>
-	CalcDelaunayParabolic(const std::vector<t_vec>& verts);
 
 protected:
 	virtual void mousePressEvent(QMouseEvent *evt) override;
@@ -91,7 +92,8 @@ private:
 	bool m_calcvoronoi = true;
 	bool m_calcdelaunay = true;
 
-	CalculationMethod m_calculationmethod = CalculationMethod::QHULL;
+	HullCalculationMethod m_hullcalculationmethod = HullCalculationMethod::QHULL;
+	DelaunayCalculationMethod m_delaunaycalculationmethod = DelaunayCalculationMethod::QHULL;
 };
 
 

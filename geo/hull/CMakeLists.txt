@@ -20,5 +20,5 @@ add_definitions(-Wall -Wextra)
 
 include_directories("${PROJECT_SOURCE_DIR}")
 
-add_executable(hull hull.cpp hull.h)
+add_executable(hull hull.cpp hull.h geo.h)
 target_link_libraries(hull Qt5::Core Qt5::Widgets -lqhull_r -lqhullcpp)

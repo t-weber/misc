@@ -18,20 +18,7 @@
 #include <vector>
 #include <iostream>
 
-#include <libqhullcpp/Qhull.h>
-#include <libqhullcpp/QhullFacet.h>
-#include <libqhullcpp/QhullRidge.h>
-#include <libqhullcpp/QhullFacetList.h>
-#include <libqhullcpp/QhullVertexSet.h>
 
-#include "../libs/math_algos.h"
-#include "../libs/math_conts.h"
-using namespace m_ops;
-
-
-namespace qh = orgQhull;
-
-using t_real_qhull = coordT;
 using t_real = double;
 using t_vec = m::vec<t_real, std::vector>;
 using t_mat = m::mat<t_real, std::vector>;
@@ -85,35 +72,6 @@ static bool all_points_on_same_side(const QLineF& line, const std::vector<QPoint
 	return true;
 }
 #endif
-
-
-t_vec calc_circumcentre(const std::vector<t_vec>& triag)
-{
-	if(triag.size() < 3)
-		return t_vec{};
-
-	const t_vec& v0 = triag[0];
-	const t_vec& v1 = triag[1];
-	const t_vec& v2 = triag[2];
-
-	// formula, see: https://de.wikipedia.org/wiki/Umkreis
-	const t_real x =
-		(v0[0]*v0[0]+v0[1]*v0[1]) * (v1[1]-v2[1]) +
-		(v1[0]*v1[0]+v1[1]*v1[1]) * (v2[1]-v0[1]) +
-		(v2[0]*v2[0]+v2[1]*v2[1]) * (v0[1]-v1[1]);
-
-	const t_real y =
-		(v0[0]*v0[0]+v0[1]*v0[1]) * (v2[0]-v1[0]) +
-		(v1[0]*v1[0]+v1[1]*v1[1]) * (v0[0]-v2[0]) +
-		(v2[0]*v2[0]+v2[1]*v2[1]) * (v1[0]-v0[0]);
-
-	const t_real n =
-		t_real{2}*v0[0] * (v1[1]-v2[1]) +
-		t_real{2}*v1[0] * (v2[1]-v0[1]) +
-		t_real{2}*v2[0] * (v0[1]-v1[1]);
-
-	return m::create<t_vec>({x/n, y/n});
-}
 // ----------------------------------------------------------------------------
 
 
@@ -315,9 +273,16 @@ void HullView::SetCalculateDelaunay(bool b)
 }
 
 
-void HullView::SetCalculationMethod(CalculationMethod m)
+void HullView::SetHullCalculationMethod(HullCalculationMethod m)
 {
-	m_calculationmethod = m;
+	m_hullcalculationmethod = m;
+	UpdateHull();
+}
+
+
+void HullView::SetDelaunayCalculationMethod(DelaunayCalculationMethod m)
+{
+	m_delaunaycalculationmethod = m;
 	UpdateDelaunay();
 }
 
@@ -360,8 +325,22 @@ void HullView::UpdateHull()
 	std::transform(m_vertices.begin(), m_vertices.end(), std::back_inserter(vertices),
 		[](const Vertex* vert) -> t_vec { return m::create<t_vec>({vert->x(), vert->y()}); } );
 
+
 	std::vector<std::vector<t_vec>> hull;
-	std::tie(std::ignore, hull) = CalcDelaunay<t_vec>(2, vertices, true);
+
+	switch(m_hullcalculationmethod)
+	{
+		case HullCalculationMethod::QHULL:
+			std::tie(std::ignore, hull) = calc_delaunay<t_vec>(2, vertices, true);
+			break;
+		case HullCalculationMethod::DIVIDE:
+			hull = calc_hull_divide<t_vec>(vertices);
+			break;
+		default:
+			QMessageBox::critical(this, "Error", "Unknown hull calculation method.");
+			break;
+	}
+
 
 #ifdef HULL_CHECK
 	std::vector<QPointF> hullvertices;
@@ -428,16 +407,16 @@ void HullView::UpdateDelaunay()
 	std::vector<t_vec> voronoi{};
 	std::vector<std::vector<t_vec>> triags{};
 
-	switch(m_calculationmethod)
+	switch(m_delaunaycalculationmethod)
 	{
-		case CalculationMethod::QHULL:
-			std::tie(voronoi, triags) = CalcDelaunay<t_vec>(2, vertices, false);
+		case DelaunayCalculationMethod::QHULL:
+			std::tie(voronoi, triags) = calc_delaunay<t_vec>(2, vertices, false);
 			break;
-		case CalculationMethod::PARABOLIC:
-			std::tie(voronoi, triags) = CalcDelaunayParabolic<t_vec>(vertices);
+		case DelaunayCalculationMethod::PARABOLIC:
+			std::tie(voronoi, triags) = calc_delaunay_parabolic<t_vec>(vertices);
 			break;
 		default:
-			QMessageBox::critical(this, "Error", "Unknown calculation method.");
+			QMessageBox::critical(this, "Error", "Unknown Delaunay calculation method.");
 			break;
 	}
 
@@ -505,146 +484,6 @@ void HullView::UpdateDelaunay()
 	}
 }
 
-
-/**
- * delaunay triangulation and voronoi vertices
- */
-template<class t_vec>
-std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>>
-HullView::CalcDelaunay(int dim, const std::vector<t_vec>& verts, bool only_hull)
-{
-	std::vector<t_vec> voronoi;				// voronoi vertices
-	std::vector<std::vector<t_vec>> triags;	// delaunay triangles
-
-	try
-	{
-		std::vector<t_real_qhull> _verts;
-		_verts.reserve(verts.size() * dim);
-		for(const t_vec& vert : verts)
-			for(int i=0; i<dim; ++i)
-				_verts.push_back(t_real_qhull{vert[i]});
-
-		qh::Qhull qh{"triag", dim, int(_verts.size()/dim), _verts.data(), only_hull ? "Qt" : "v Qu QJ" };
-		if(qh.hasQhullMessage())
-			std::cout << qh.qhullMessage() << std::endl;
-
-
-		//qh::QhullVertexList vertices{qh.vertexList()};
-		qh::QhullFacetList facets{qh.facetList()};
-
-		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
-		{
-			if(iterFacet->isUpperDelaunay())
-				continue;
-
-			if(!only_hull)
-			{
-				qh::QhullPoint pt = iterFacet->voronoiVertex();
-
-				t_vec vec = m::create<t_vec>(dim);
-				for(int i=0; i<dim; ++i)
-					vec[i] = t_real{pt[i]};
-
-				voronoi.emplace_back(std::move(vec));
-			}
-
-
-			std::vector<t_vec> thetriag;
-			qh::QhullVertexSet vertices = iterFacet->vertices();
-
-			for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
-			{
-				qh::QhullPoint pt = (*iterVertex).point();
-
-				t_vec vec = m::create<t_vec>(dim);
-				for(int i=0; i<dim; ++i)
-					vec[i] = t_real{pt[i]};
-
-				thetriag.emplace_back(std::move(vec));
-			}
-
-			triags.emplace_back(std::move(thetriag));
-		}
-	}
-	catch(const std::exception& ex)
-	{
-		std::cerr << ex.what() << std::endl;
-	}
-
-	return std::make_tuple(voronoi, triags);
-}
-
-
-/**
- * delaunay triangulation using parabolic trafo
- */
-template<class t_vec>
-std::tuple<std::vector<t_vec>, std::vector<std::vector<t_vec>>>
-HullView::CalcDelaunayParabolic(const std::vector<t_vec>& verts)
-{
-	const int dim = 2;
-	std::vector<t_vec> voronoi;				// voronoi vertices
-	std::vector<std::vector<t_vec>> triags;	// delaunay triangles
-
-	try
-	{
-		std::vector<t_real_qhull> _verts;
-		_verts.reserve(verts.size()*(dim+1));
-		for(const t_vec& vert : verts)
-		{
-			_verts.push_back(t_real_qhull{vert[0]});
-			_verts.push_back(t_real_qhull{vert[1]});
-			_verts.push_back(t_real_qhull{vert[0]*vert[0] + vert[1]*vert[1]});
-		}
-
-		qh::Qhull qh{"triag", dim+1, int(_verts.size()/(dim+1)), _verts.data(), "Qt"};
-		if(qh.hasQhullMessage())
-			std::cout << qh.qhullMessage() << std::endl;
-
-
-		qh::QhullFacetList facets{qh.facetList()};
-
-		for(auto iterFacet=facets.begin(); iterFacet!=facets.end(); ++iterFacet)
-		{
-			if(iterFacet->isUpperDelaunay())
-				continue;
-
-			// filter out non-visible part of hull
-			qh::QhullHyperplane plane = iterFacet->hyperplane();
-			t_vec normal = m::create<t_vec>(dim+1);
-			for(int i=0; i<dim+1; ++i)
-				normal[i] = t_real{plane[i]};
-			// normal pointing upwards?
-			if(normal[2] > 0.)
-				continue;
-
-			std::vector<t_vec> thetriag;
-			qh::QhullVertexSet vertices = iterFacet->vertices();
-
-			for(auto iterVertex=vertices.begin(); iterVertex!=vertices.end(); ++iterVertex)
-			{
-				qh::QhullPoint pt = (*iterVertex).point();
-
-				t_vec vec = m::create<t_vec>(dim);
-				for(int i=0; i<dim; ++i)
-					vec[i] = t_real{pt[i]};
-
-				thetriag.emplace_back(std::move(vec));
-			}
-
-			voronoi.emplace_back(calc_circumcentre(thetriag));
-			triags.emplace_back(std::move(thetriag));
-		}
-	}
-	catch(const std::exception& ex)
-	{
-		std::cerr << ex.what() << std::endl;
-	}
-
-	return std::make_tuple(voronoi, triags);
-}
-
-
 // ----------------------------------------------------------------------------
 
 
@@ -664,40 +503,64 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	// menu actions
 	QAction *actionNew = new QAction{"New", this};
-	connect(actionNew, &QAction::triggered, [this](){ m_view->ClearVertices(); });
+	connect(actionNew, &QAction::triggered, [this]()
+		{ m_view->ClearVertices(); });
 
 	QAction *actionQuit = new QAction{"Exit", this};
-	connect(actionQuit, &QAction::triggered, [this](){ this->close(); });
+	connect(actionQuit, &QAction::triggered, [this]()
+		{ this->close(); });
 
 
 	QAction *actionHull = new QAction{"Convex Hull", this};
 	actionHull->setCheckable(true);
 	actionHull->setChecked(true);
-	connect(actionHull, &QAction::toggled, [this](bool b) { m_view->SetCalculateHull(b); });
+	connect(actionHull, &QAction::toggled, [this](bool b)
+		{ m_view->SetCalculateHull(b); });
 
 	QAction *actionVoronoi = new QAction{"Voronoi Vertices", this};
 	actionVoronoi->setCheckable(true);
 	actionVoronoi->setChecked(true);
-	connect(actionVoronoi, &QAction::toggled, [this](bool b) { m_view->SetCalculateVoronoi(b); });
+	connect(actionVoronoi, &QAction::toggled, [this](bool b)
+		{ m_view->SetCalculateVoronoi(b); });
 
 	QAction *actionDelaunay = new QAction{"Delaunay Triangulation", this};
 	actionDelaunay->setCheckable(true);
 	actionDelaunay->setChecked(true);
-	connect(actionDelaunay, &QAction::toggled, [this](bool b) { m_view->SetCalculateDelaunay(b); });
+	connect(actionDelaunay, &QAction::toggled, [this](bool b)
+		{ m_view->SetCalculateDelaunay(b); });
 
 
-	QAction *actionQHull = new QAction{"QHull", this};
-	actionQHull->setCheckable(true);
-	actionQHull->setChecked(true);
-	connect(actionQHull, &QAction::toggled, [this]() { m_view->SetCalculationMethod(CalculationMethod::QHULL); });
+	QAction *actionHullQHull = new QAction{"QHull", this};
+	actionHullQHull->setCheckable(true);
+	actionHullQHull->setChecked(true);
+	connect(actionHullQHull, &QAction::toggled, [this]()
+		{ m_view->SetHullCalculationMethod(HullCalculationMethod::QHULL); });
 
-	QAction *actionPara = new QAction{"Parabolic Trafo", this};
-	actionPara->setCheckable(true);
-	connect(actionPara, &QAction::toggled, [this]() { m_view->SetCalculationMethod(CalculationMethod::PARABOLIC); });
+	QAction *actionHullDivide = new QAction{"Divide && Conquer", this};
+	actionHullDivide->setCheckable(true);
+	connect(actionHullDivide, &QAction::toggled, [this]()
+	{ m_view->SetHullCalculationMethod(HullCalculationMethod::DIVIDE); });
 
-	QActionGroup *groupBack = new QActionGroup{this};
-	groupBack->addAction(actionQHull);
-	groupBack->addAction(actionPara);
+
+	QAction *actionDelaunayQHull = new QAction{"QHull", this};
+	actionDelaunayQHull->setCheckable(true);
+	actionDelaunayQHull->setChecked(true);
+	connect(actionDelaunayQHull, &QAction::toggled, [this]()
+		{ m_view->SetDelaunayCalculationMethod(DelaunayCalculationMethod::QHULL); });
+
+	QAction *actionDelaunayPara = new QAction{"Parabolic Trafo", this};
+	actionDelaunayPara->setCheckable(true);
+	connect(actionDelaunayPara, &QAction::toggled, [this]()
+		{ m_view->SetDelaunayCalculationMethod(DelaunayCalculationMethod::PARABOLIC); });
+
+
+	QActionGroup *groupHullBack = new QActionGroup{this};
+	groupHullBack->addAction(actionHullQHull);
+	groupHullBack->addAction(actionHullDivide);
+
+	QActionGroup *groupDelaunayBack = new QActionGroup{this};
+	groupDelaunayBack->addAction(actionDelaunayQHull);
+	groupDelaunayBack->addAction(actionDelaunayPara);
 
 
 	// menu
@@ -713,8 +576,12 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuCalc->addAction(actionVoronoi);
 	menuCalc->addAction(actionDelaunay);
 
-	menuBack->addAction(actionQHull);
-	menuBack->addAction(actionPara);
+	menuBack->addSeparator()->setText("Convex Hull");
+	menuBack->addAction(actionHullQHull);
+	menuBack->addAction(actionHullDivide);
+	menuBack->addSeparator()->setText("Delaunay");
+	menuBack->addAction(actionDelaunayQHull);
+	menuBack->addAction(actionDelaunayPara);
 
 
 	// menu bar
