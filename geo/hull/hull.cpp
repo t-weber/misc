@@ -26,7 +26,7 @@ using t_mat = m::mat<t_real, std::vector>;
 
 
 // ----------------------------------------------------------------------------
-#define HULL_CHECK
+// #define HULL_CHECK
 
 #ifdef HULL_CHECK
 static double side_of_line(const QLineF& line, const QPointF& pt)
@@ -334,7 +334,7 @@ void HullView::UpdateHull()
 			std::tie(std::ignore, hull) = calc_delaunay<t_vec>(2, vertices, true);
 			break;
 		case HullCalculationMethod::DIVIDE:
-			hull = calc_hull_divide<t_vec>(vertices);
+			hull.emplace_back(calc_hull_divide<t_vec>(vertices));
 			break;
 		default:
 			QMessageBox::critical(this, "Error", "Unknown hull calculation method.");
