@@ -9,6 +9,8 @@
 
 #include <QApplication>
 #include <QMenuBar>
+#include <QLabel>
+#include <QStatusBar>
 #include <QMouseEvent>
 #include <QMessageBox>
 
@@ -249,6 +251,10 @@ void HullView::mouseMoveEvent(QMouseEvent *evt)
 		resizeEvent(&evt);
 		UpdateAll();
 	}
+
+	QPoint posVP = evt->pos();
+	QPointF posScene = mapToScene(posVP);
+	emit SignalMouseCoordinates(posScene.x(), posScene.y());
 }
 
 
@@ -500,6 +506,11 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	setWindowTitle("Hull");
 	setCentralWidget(m_view.get());
 
+	QStatusBar *statusBar = new QStatusBar{this};
+	m_statusLabel = std::make_shared<QLabel>(statusBar);
+	statusBar->addPermanentWidget(m_statusLabel.get(), 1);
+	setStatusBar(statusBar);
+
 
 	// menu actions
 	QAction *actionNew = new QAction{"New", this};
@@ -590,6 +601,22 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 	menuBar->addMenu(menuCalc);
 	menuBar->addMenu(menuBack);
 	setMenuBar(menuBar);
+
+
+	// connections
+	connect(m_view.get(), &HullView::SignalMouseCoordinates, [this](double x, double y) -> void
+	{
+		SetStatusMessage(QString("x=%1, y=%2.").arg(x, 5).arg(y, 5));
+	});
+
+
+	SetStatusMessage("Ready.");
+}
+
+
+void HullWnd::SetStatusMessage(const QString& msg)
+{
+	m_statusLabel->setText(msg);
 }
 
 

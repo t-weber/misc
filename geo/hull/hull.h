@@ -10,6 +10,7 @@
 
 
 #include <QMainWindow>
+#include <QLabel>
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsItem>
@@ -51,7 +52,7 @@ enum class DelaunayCalculationMethod
 
 
 class HullView : public QGraphicsView
-{
+{Q_OBJECT
 public:
 	HullView(QGraphicsScene *scene=nullptr, QWidget *parent=nullptr);
 	virtual ~HullView();
@@ -94,6 +95,9 @@ private:
 
 	HullCalculationMethod m_hullcalculationmethod = HullCalculationMethod::QHULL;
 	DelaunayCalculationMethod m_delaunaycalculationmethod = DelaunayCalculationMethod::QHULL;
+
+signals:
+	void SignalMouseCoordinates(double x, double y);
 };
 
 
@@ -106,9 +110,12 @@ public:
 	HullWnd(QWidget* pParent = nullptr);
 	~HullWnd();
 
+	void SetStatusMessage(const QString& msg);
+
 private:
 	std::shared_ptr<QGraphicsScene> m_scene;
 	std::shared_ptr<HullView> m_view;
+	std::shared_ptr<QLabel> m_statusLabel;
 };
 
 

@@ -59,10 +59,10 @@ requires m::is_vec<t_vec>
 
 
 template<class t_vec, class t_real=typename t_vec::value_type>
-t_real line_angle(const t_vec& vec1, const t_vec& vec2)
+t_real line_angle(const t_vec& pt1, const t_vec& pt2)
 requires m::is_vec<t_vec>
 {
-	t_vec dir = vec2-vec1;
+	t_vec dir = pt2 - pt1;
 	return std::atan2(dir[1], dir[0]);
 }
 
@@ -88,6 +88,7 @@ std::vector<t_vec>
 _calc_hull_divide_sorted(const std::vector<t_vec>& verts)
 requires m::is_vec<t_vec>
 {
+	using namespace m_ops;
 	using t_real = typename t_vec::value_type;
 	t_real eps = 1e-5;
 
@@ -119,11 +120,13 @@ requires m::is_vec<t_vec>
 	// recurse
 	std::vector<t_vec> hullLeft = _calc_hull_divide_sorted(vertsLeft);
 	std::vector<t_vec> hullRight = _calc_hull_divide_sorted(vertsRight);
+	//std::cout << "left size: " << hullLeft.size() << ", right size: " << hullRight.size() << std::endl;
 
 	if(hullLeft.size() == 0) return hullRight;
 	if(hullRight.size() == 0) return hullLeft;
 
 	// merge
+	bool leftStayedOnStart=true, rightStayedOnStart=true;
 	// upper part
 	{
 		auto iterLeftMax = std::max_element(hullLeft.begin(), hullLeft.end(), [](const t_vec& vec1, const t_vec& vec2)->bool
@@ -137,49 +140,88 @@ requires m::is_vec<t_vec>
 		auto iterLeft = hullLeft.begin();
 		auto iterRight = hullRight.rbegin();
 		bool leftFound=false, rightFound=false;
+		bool leftNeedsUpdate=false, rightNeedsUpdate=false;
+
+		std::cout << "step 1: starting points: " << *iterLeft << " and " << *iterRight << "." << std::endl;
+
 		while(true)
 		{
-			if(!leftFound)
+			if(!leftFound || leftNeedsUpdate)
 			{
+				leftNeedsUpdate = false;
+
 				auto iterLeftNext = std::next(iterLeft, 1);
 				if(iterLeftNext == hullLeft.end())
 					leftFound = true;
 				else
 				{
 					if(side_of_line(*iterLeft, *iterRight, *iterLeftNext) < 0.)
+					{
 						leftFound = true;
+					}
 					else
+					{
 						iterLeft = iterLeftNext;
+						rightNeedsUpdate = true;
+					}
 				}
 			}
 
-			if(!rightFound)
+			if(!rightFound || rightNeedsUpdate)
 			{
+				rightNeedsUpdate = false;
+
 				auto iterRightNext = std::next(iterRight, 1);
 				if(iterRightNext == hullRight.rend())
 					rightFound = true;
 				else
 				{
 					if(side_of_line(*iterLeft, *iterRight, *iterRightNext) < 0.)
+					{
 						rightFound = true;
+					}
 					else
+					{
 						iterRight = iterRightNext;
+						leftNeedsUpdate = true;
+					}
 				}
 			}
 
-			if(leftFound && rightFound)
+			if(leftFound && rightFound && !leftNeedsUpdate && !rightNeedsUpdate)
 				break;
 		}
+
+		leftStayedOnStart = (iterLeft == hullLeft.begin());
+		rightStayedOnStart = (iterRight == hullRight.rbegin());
+
+		std::cout << "step 1: final points: " << *iterLeft << " and " << *iterRight << "." << std::endl;
+
+		std::size_t sizeLeftOrg = hullLeft.size();
+		std::size_t sizeRightOrg = hullRight.size();
 
 		auto iterLeftStart = std::next(hullLeft.begin(), 1);
 		auto iterLeftEnd = iterLeft;
 		if(iterLeftStart < iterLeftEnd)
 			hullLeft.erase(iterLeftStart, iterLeftEnd);
 
-		auto iterRightStart = std::next(std::next(iterRight,1).base());
-		auto iterRightEnd = std::prev(hullRight.end(),1);
+		auto iterRightStart = iterRight.base();
+		auto iterRightEnd = std::next(hullRight.rbegin(), 1).base();
 		if(iterRightStart < iterRightEnd)
 			hullRight.erase(iterRightStart, iterRightEnd);
+
+		std::cout << "step 1: erased " << sizeLeftOrg-hullLeft.size() << " and " << sizeRightOrg-hullRight.size() << "." << std::endl;
+		/*
+		std::cout << "left hull: ";
+		for(const t_vec& vec : hullLeft)
+			std::cout << vec << ",  ";
+		std::cout << std::endl;
+
+		std::cout << "right hull: ";
+		for(const t_vec& vec : hullRight)
+			std::cout << vec << ",  ";
+		std::cout << std::endl;
+		*/
 	}
 
 	if(hullLeft.size() == 0) return hullRight;
@@ -200,49 +242,87 @@ requires m::is_vec<t_vec>
 		auto iterLeft = hullLeft.rbegin();
 		auto iterRight = hullRight.begin();
 		bool leftFound=false, rightFound=false;
+		bool leftNeedsUpdate=false, rightNeedsUpdate=false;
+
+		std::cout << "step 2: starting points: " << *iterLeft << " and " << *iterRight << "." << std::endl;
+
 		while(true)
 		{
-			if(!leftFound)
+			if(!leftFound || leftNeedsUpdate)
 			{
+				leftNeedsUpdate = false;
+
 				auto iterLeftNext = std::next(iterLeft, 1);
 				if(iterLeftNext == hullLeft.rend())
 					leftFound = true;
 				else
 				{
 					if(side_of_line(*iterLeft, *iterRight, *iterLeftNext) > 0.)
+					{
 						leftFound = true;
+					}
 					else
+					{
 						iterLeft = iterLeftNext;
+						rightNeedsUpdate = true;
+					}
 				}
 			}
 
-			if(!rightFound)
+			if(!rightFound || rightNeedsUpdate)
 			{
+				rightNeedsUpdate = false;
+
 				auto iterRightNext = std::next(iterRight, 1);
 				if(iterRightNext == hullRight.end())
 					rightFound = true;
 				else
 				{
 					if(side_of_line(*iterLeft, *iterRight, *iterRightNext) > 0.)
+					{
 						rightFound = true;
+					}
 					else
+					{
 						iterRight = iterRightNext;
+						leftNeedsUpdate = true;
+					}
 				}
 			}
 
-			if(leftFound && rightFound)
+			if(leftFound && rightFound && !leftNeedsUpdate && !rightNeedsUpdate)
 				break;
 		}
 
-		auto iterLeftStart = std::next(std::next(iterLeft,1).base(), 1);
-		auto iterLeftEnd = hullLeft.end();
+		std::cout << "step 2: final points: " << *iterLeft << " and " << *iterRight << "." << std::endl;
+
+		std::size_t sizeLeftOrg = hullLeft.size();
+		std::size_t sizeRightOrg = hullRight.size();
+
+		auto iterLeftStart = iterLeft.base();
+		if(leftStayedOnStart) std::advance(iterLeftStart, 1);
+		auto iterLeftEnd = hullLeft.rbegin().base();
 		if(iterLeftStart < iterLeftEnd)
 			hullLeft.erase(iterLeftStart, iterLeftEnd);
 
 		auto iterRightStart = hullRight.begin();
+		if(rightStayedOnStart) std::advance(iterRightStart, 1);
 		auto iterRightEnd = iterRight;
 		if(iterRightStart < iterRightEnd)
 			hullRight.erase(iterRightStart, iterRightEnd);
+
+		std::cout << "step 2: erased " << sizeLeftOrg-hullLeft.size() << " and " << sizeRightOrg-hullRight.size() << "." << std::endl;
+		/*
+		std::cout << "left hull: ";
+		for(const t_vec& vec : hullLeft)
+			std::cout << vec << ",  ";
+		std::cout << std::endl;
+
+		std::cout << "right hull: ";
+		for(const t_vec& vec : hullRight)
+			std::cout << vec << ",  ";
+		std::cout << std::endl;
+		*/
 	}
 
 	hullLeft.insert(hullLeft.end(), hullRight.begin(), hullRight.end());
