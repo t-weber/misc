@@ -567,7 +567,8 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	QActionGroup *groupHullBack = new QActionGroup{this};
 	groupHullBack->addAction(actionHullQHull);
-	groupHullBack->addAction(actionHullDivide);
+	// TODO: unfinished...
+	//groupHullBack->addAction(actionHullDivide);
 
 	QActionGroup *groupDelaunayBack = new QActionGroup{this};
 	groupDelaunayBack->addAction(actionDelaunayQHull);
@@ -589,7 +590,8 @@ HullWnd::HullWnd(QWidget* pParent) : QMainWindow{pParent},
 
 	menuBack->addSeparator()->setText("Convex Hull");
 	menuBack->addAction(actionHullQHull);
-	menuBack->addAction(actionHullDivide);
+	// TODO: unfinished...
+	//menuBack->addAction(actionHullDivide);
 	menuBack->addSeparator()->setText("Delaunay");
 	menuBack->addAction(actionDelaunayQHull);
 	menuBack->addAction(actionDelaunayPara);

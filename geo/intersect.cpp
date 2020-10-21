@@ -17,8 +17,8 @@
 #include <boost/intrusive/avltree.hpp>
 namespace intr = boost::intrusive;
 
-#include "../libs/math_algos.h"
-#include "../libs/math_conts.h"
+#include "libs/math_algos.h"
+#include "libs/math_conts.h"
 using namespace m_ops;
 
 

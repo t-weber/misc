@@ -3,6 +3,9 @@
  * @author Tobias Weber
  * @date 18-Oct-2020
  * @license: see 'LICENSE.GPL' file
+ *
+ * References:
+ *	- http://dx.doi.org/10.1007/3-540-27619-X, esp. ch 4.1, ch. 6
  */
 
 #ifndef __GEO2D_H__
@@ -387,7 +390,7 @@ requires m::is_vec<t_vec>
 	using t_real = typename t_vec::value_type;
 	using t_real_qhull = coordT;
 
-	std::vector<t_vec> voronoi;				// voronoi vertices
+	std::vector<t_vec> voronoi;		// voronoi vertices
 	std::vector<std::vector<t_vec>> triags;	// delaunay triangles
 
 	try
@@ -465,7 +468,7 @@ requires m::is_vec<t_vec>
 	using t_real_qhull = coordT;
 
 	const int dim = 2;
-	std::vector<t_vec> voronoi;				// voronoi vertices
+	std::vector<t_vec> voronoi;		// voronoi vertices
 	std::vector<std::vector<t_vec>> triags;	// delaunay triangles
 
 	try
