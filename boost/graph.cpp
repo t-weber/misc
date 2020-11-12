@@ -8,7 +8,7 @@
  *  * https://github.com/boostorg/graph/tree/develop/example
  *  * http://www.boost.org/doc/libs/1_65_1/libs/graph/doc/table_of_contents.html
  *
- * gcc -o graph graph.cpp -std=c++17 -lstdc++ -lm
+ * g++ -o graph graph.cpp -std=c++17 -lm
  */
 
 #include <iostream>
@@ -18,6 +18,7 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/dijkstra_shortest_paths.hpp>
+#include <boost/graph/kruskal_min_spanning_tree.hpp>
 #include <boost/graph/graphviz.hpp>
 
 
@@ -31,7 +32,7 @@ using t_col = boost::default_color_type;
 
 struct t_vertex
 {
-	std::string name;
+	std::string name{};
 
 	t_vertex() = default;
 	t_vertex(const std::string& strName) : name(strName) {}
@@ -42,7 +43,7 @@ struct t_edge
 	t_edge() = default;
 	t_edge(t_real weight) : weight(weight) {}
 
-	t_real weight = 1.;
+	t_real weight{1};
 };
 
 using t_graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS, t_vertex, t_edge>;
@@ -92,7 +93,6 @@ int main()
 			<< boost::get(name, *vert_iter) << std::endl;
 
 
-
 	// add edges
 	if(auto [edge, bInserted] = boost::add_edge(boost::vertex(0,graph), boost::vertex(1,graph), t_edge(1.), graph); !bInserted)
 		std::cout << "Edge 0 not inserted!" << std::endl;
@@ -106,7 +106,6 @@ int main()
 		std::cout << "Edge 4 not inserted!" << std::endl;
 
 
-
 	// shortest path
 	std::vector<int> vecPred(verts.size());
 	dijkstra_shortest_paths(graph, boost::vertex(0, graph),
@@ -117,6 +116,13 @@ int main()
 	std::copy(vecPred.begin(), vecPred.end(), std::ostream_iterator<int>(std::cout, " "));
 	std::cout << std::endl;
 
+
+	// min. spanning tree
+	std::vector<t_edge_descr> spanning_edges;
+	kruskal_minimum_spanning_tree(graph, std::back_inserter(spanning_edges), weight_map(weight));
+	std::cout << "spanning tree: ";
+	std::copy(spanning_edges.begin(), spanning_edges.end(), std::ostream_iterator<t_edge_descr>(std::cout, " "));
+	std::cout << std::endl;
 
 
 	// write graph to an svg file
