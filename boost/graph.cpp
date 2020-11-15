@@ -108,7 +108,7 @@ int main()
 
 	// shortest path
 	std::vector<int> vecPred(verts.size());
-	dijkstra_shortest_paths(graph, boost::vertex(0, graph),
+	boost::dijkstra_shortest_paths(graph, boost::vertex(0, graph),
 		//boost::predecessor_map(vecPred.data()).
 		boost::predecessor_map(boost::make_iterator_property_map(vecPred.begin(), vert_idx)).
 		weight_map(weight));
@@ -119,7 +119,7 @@ int main()
 
 	// min. spanning tree
 	std::vector<t_edge_descr> spanning_edges;
-	kruskal_minimum_spanning_tree(graph, std::back_inserter(spanning_edges), weight_map(weight));
+	boost::kruskal_minimum_spanning_tree(graph, std::back_inserter(spanning_edges), weight_map(weight));
 	std::cout << "spanning tree: ";
 	std::copy(spanning_edges.begin(), spanning_edges.end(), std::ostream_iterator<t_edge_descr>(std::cout, " "));
 	std::cout << std::endl;
