@@ -119,7 +119,7 @@ int main()
 
 	// min. spanning tree
 	std::vector<t_edge_descr> spanning_edges;
-	boost::kruskal_minimum_spanning_tree(graph, std::back_inserter(spanning_edges), weight_map(weight));
+	boost::kruskal_minimum_spanning_tree(graph, std::back_inserter(spanning_edges), boost::weight_map(weight));
 	std::cout << "spanning tree: ";
 	std::copy(spanning_edges.begin(), spanning_edges.end(), std::ostream_iterator<t_edge_descr>(std::cout, " "));
 	std::cout << std::endl;
