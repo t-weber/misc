@@ -68,10 +68,22 @@ architecture countdown_impl of countdown is
 
 	signal curtime : std_logic_vector(ctr_bit_len-1 downto 0) := start_timer;
 
+	-- output seven segment led displays
+	type t_ledseg is array(0 to ctr_bit_len/4-1) of std_logic_vector(6 downto 0);
+	signal ledsegs : t_ledseg;
+
 begin
 
 	genleds : for ledsegidx in 0 to ctr_bit_len/4-1 generate
-		ledseg : sevenseg port map(digit => curtime(ledsegidx*4+3 downto ledsegidx*4));
+		ledseg : sevenseg 
+			generic map(
+				zero_is_on => '0',
+				inverse_numbering => '0'
+			)
+			port map(
+				in_digit => curtime(ledsegidx*4+3 downto ledsegidx*4),
+				out_leds => ledsegs(ledsegidx)
+			);
 	end generate;
 
 	clk_proc : process(clk) begin

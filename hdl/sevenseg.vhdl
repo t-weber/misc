@@ -15,15 +15,16 @@ use ieee.std_logic_1164.all;
 --
 package leds is
 	component sevenseg
-		port
-		(
-			digit : in std_logic_vector(3 downto 0);
+		generic(
 			zero_is_on : in std_logic := '0';
-			inverse_numbering : in std_logic := '0';
-
-			leds : out std_logic_vector(6 downto 0)
+			inverse_numbering : in std_logic := '0'
 		);
 
+		port
+		(
+			in_digit : in std_logic_vector(3 downto 0);
+			out_leds : out std_logic_vector(6 downto 0)
+		);
 	end component;
 end package;
 
@@ -42,13 +43,15 @@ use ieee.numeric_std.all;
 -- pin declaration
 --
 entity sevenseg is
+	generic(
+		zero_is_on : in std_logic := '0';
+		inverse_numbering : in std_logic := '0'
+	);
+
 	port
 	(
-		digit : in std_logic_vector(3 downto 0);
-		zero_is_on : in std_logic := '0';
-		inverse_numbering : in std_logic := '0';
-
-		leds : out std_logic_vector(6 downto 0)
+		in_digit : in std_logic_vector(3 downto 0);
+		out_leds : out std_logic_vector(6 downto 0)
 	);
 end entity;
 
@@ -77,22 +80,67 @@ architecture sevenseg_impl of sevenseg is
 		x"39", x"5e", x"79", x"71"	-- c-f
 	);
 
-
+	signal leds : std_logic_vector(6 downto 0);
 begin
-	process(digit, zero_is_on, inverse_numbering)
-		variable out_leds : std_logic_vector(6 downto 0);
-	begin
-		if inverse_numbering = '0' then
-			out_leds(6 downto 0) := ledvec(to_integer(unsigned(digit(3 downto 0))))(6 downto 0);
-		else
-			out_leds(6 downto 0) := ledvec_inv(to_integer(unsigned(digit(3 downto 0))))(6 downto 0);
-		end if;
+	gen_leds : if inverse_numbering='0' generate
+		--leds <= 
+		--	ledvec(0)(6 downto 0) when in_digit=x"0" else
+		--	ledvec(1)(6 downto 0) when in_digit=x"1" else
+		--	-- ...
+		--	"0000000";
+	
+		with in_digit select leds <=
+			ledvec( 0)(6 downto 0) when x"0",
+			ledvec( 1)(6 downto 0) when x"1",
+			ledvec( 2)(6 downto 0) when x"2",
+			ledvec( 3)(6 downto 0) when x"3",
+			ledvec( 4)(6 downto 0) when x"4",
+			ledvec( 5)(6 downto 0) when x"5",
+			ledvec( 6)(6 downto 0) when x"6",
+			ledvec( 7)(6 downto 0) when x"7",
+			ledvec( 8)(6 downto 0) when x"8",
+			ledvec( 9)(6 downto 0) when x"9",
+			ledvec(10)(6 downto 0) when x"a",
+			ledvec(11)(6 downto 0) when x"b",
+			ledvec(12)(6 downto 0) when x"c",
+			ledvec(13)(6 downto 0) when x"d",
+			ledvec(14)(6 downto 0) when x"e",
+			ledvec(15)(6 downto 0) when x"f",
+			"0000000" when others;
+	end generate;
 
-		if zero_is_on = '1' then
-			leds <= not out_leds;
-		else
-			leds <= out_leds;
-		end if;
-	end process;
+	gen_leds_inv : if inverse_numbering='1' generate
+		with in_digit select leds <=
+			ledvec_inv( 0)(6 downto 0) when x"0",
+			ledvec_inv( 1)(6 downto 0) when x"1",
+			ledvec_inv( 2)(6 downto 0) when x"2",
+			ledvec_inv( 3)(6 downto 0) when x"3",
+			ledvec_inv( 4)(6 downto 0) when x"4",
+			ledvec_inv( 5)(6 downto 0) when x"5",
+			ledvec_inv( 6)(6 downto 0) when x"6",
+			ledvec_inv( 7)(6 downto 0) when x"7",
+			ledvec_inv( 8)(6 downto 0) when x"8",
+			ledvec_inv( 9)(6 downto 0) when x"9",
+			ledvec_inv(10)(6 downto 0) when x"a",
+			ledvec_inv(11)(6 downto 0) when x"b",
+			ledvec_inv(12)(6 downto 0) when x"c",
+			ledvec_inv(13)(6 downto 0) when x"d",
+			ledvec_inv(14)(6 downto 0) when x"e",
+			ledvec_inv(15)(6 downto 0) when x"f",
+			"0000000" when others;
+	end generate;
+
+
+	--with zero_is_on select out_leds <=
+	--	not leds(6 downto 0) when '1',
+	--	leds(6 downto 0) when others;
+
+	gen_leds_zero_on : if zero_is_on='1' generate
+		out_leds <= not leds;
+	end generate;
+
+	gen_leds_zero_off : if zero_is_on='0' generate
+		out_leds <= leds;
+	end generate;
 end architecture;
 
