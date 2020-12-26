@@ -38,7 +38,7 @@ end package;
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.leds.sevenseg;
+--use work.leds.sevenseg;
 
 
 --
@@ -75,7 +75,7 @@ architecture countdown_impl of countdown is
 begin
 
 	genleds : for ledsegidx in 0 to ctr_bit_len/4-1 generate
-		ledseg : sevenseg 
+		ledseg : entity work.sevenseg 
 			generic map(
 				zero_is_on => '0',
 				inverse_numbering => '0'

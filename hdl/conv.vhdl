@@ -12,6 +12,10 @@ use ieee.numeric_std.all;
 
 
 package conv is
+	-- array types
+	type t_logicarray is array(natural range <>) of std_logic;
+	type t_logicvecarray is array(natural range <>) of std_logic_vector;
+
 	-- std_logic_vector -> integer
 	function to_int(vec : std_logic_vector) return integer;
 end package;
