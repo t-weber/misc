@@ -54,7 +54,11 @@ architecture ram_impl of ram is
 
 	-- the memory is an array of words
 	signal words : t_words :=  (
-		x"01", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+		x"10", x"02", -- push 2
+		x"10", x"05", -- push 5
+		x"10", x"03", -- push 3
+		x"01", -- add
+		x"02", -- sub
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
@@ -85,12 +89,12 @@ architecture ram_impl of ram is
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"02", x"03"
+		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00"
 	);
 
 begin
 	-- generate ports 0 to num_ports-1
-	gen_port : for portidx in 0 to num_ports-1 generate begin
+	gen_ports : for portidx in 0 to num_ports-1 generate begin
 
 	-- in case the for-generate loop is not available, the
 	-- process has to be copied for the individual ports

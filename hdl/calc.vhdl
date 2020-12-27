@@ -23,7 +23,10 @@ entity calc is
 		clk : in std_logic;
 
 		key : in std_logic_vector(3 downto 0);
+		sw : in std_logic_vector(7 downto 0);
+
 		ledg : out std_logic_vector(7 downto 0);
+		ledr : out std_logic_vector(7 downto 0);
 
 		hex0, hex1, hex2, hex3 : out std_logic_vector(6 downto 0)
 	);
@@ -40,7 +43,7 @@ architecture calc_impl of calc is
 	signal ram_write_word0, ram_write_word1  : std_logic_vector(ram_num_wordbits-1 downto 0);
 	signal ram_read_word0, ram_read_word1 : std_logic_vector(ram_num_wordbits-1 downto 0);
 
-	signal reg_ip, reg_sp : std_logic_vector(ram_num_wordbits-1 downto 0);
+	signal reg_ip, reg_sp, reg_cycle : std_logic_vector(ram_num_wordbits-1 downto 0);
 	signal clkdiv : std_logic;
 begin
 	--==============================================================================
@@ -74,7 +77,7 @@ begin
 			in_clk=>clkdiv, in_rst=>key(0), in_ram_ready=>ram_ready0,
 			out_ram_write=>ram_write0, out_ram_addr=>ram_addr0,
 			in_ram=>ram_read_word0, out_ram=>ram_write_word0,
-			out_ip=>reg_ip, out_sp=>reg_sp
+			out_ip=>reg_ip, out_sp=>reg_sp, out_cycle=>reg_cycle
 		);
 	--==============================================================================
 
@@ -100,24 +103,22 @@ begin
 	seg2 : entity work.sevenseg generic map(inverse_numbering=>'1', zero_is_on=>'1') port map(in_digit=>disp(2), out_leds=>hex2);
 	seg3 : entity work.sevenseg generic map(inverse_numbering=>'1', zero_is_on=>'1') port map(in_digit=>disp(3), out_leds=>hex3);
 
-	--disp(0) <= reg_sp(3 downto 0);
-	--disp(1) <= reg_sp(7 downto 4);
-	disp(2) <= reg_ip(3 downto 0);
-	disp(3) <= reg_ip(7 downto 4);
+	dbgout1 : entity work.dbgout
+		generic map(
+			num_addrbits=>ram_num_addrbits, num_wordbits=>ram_num_wordbits
+		)
+		port map(
+			in_clk=>clkdiv, in_ram_ready=>ram_ready1,
+			out_ram_write=>ram_write1, out_ram_addr=>ram_addr1,
+			in_ram=>ram_read_word1,
+			in_ip=>reg_ip, in_sp=>reg_sp, in_cycle=>reg_cycle,
+			in_show_sp=>sw(0), in_show_instr=>sw(1),
+			out_disp0=>disp(0), out_disp1=>disp(1), out_disp2=>disp(2), out_disp3=>disp(3),
+			out_disp4=>ledr(3 downto 0), out_disp5=>ledr(7 downto 4)
+		);
+
 	ledg(0) <= clkdiv;
-	
-	
-	process(clkdiv) begin
-		if rising_edge(clkdiv) then
-			ram_write1 <= '0';
-			ram_addr1 <= x"fe";
-			
-			if ram_ready1='1' then
-				disp(0) <= ram_read_word1(3 downto 0);
-				disp(1) <= ram_read_word1(7 downto 4);
-			end if;
-		end if;
-	end process;
+
 	--==============================================================================
 	
 end architecture;
