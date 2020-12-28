@@ -5,6 +5,7 @@
 *.obj
 *.class
 *.pcm
+*.cf
 
 # Compiled Dynamic libraries
 *.so
