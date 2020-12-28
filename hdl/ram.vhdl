@@ -54,16 +54,22 @@ architecture ram_impl of ram is
 
 	-- the memory is an array of words
 	signal words : t_words :=  (
-		x"10", x"02", -- push 2
-		x"10", x"05", -- push 5
+		x"10", x"20", -- push function address 0x20
+		x"22",	-- call function
+		x"10", x"ff",	-- push 0xff (value will be overwritten)
+		x"00", x"00", x"00",
+		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+		x"10", x"04", -- push 4
+		x"10", x"06", -- push 6
 		x"10", x"03", -- push 3
-		x"01", -- add
 		x"02", -- sub
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+		x"01", -- add
+		x"10", x"04", -- push address 0x04
+		x"11", -- pop result
+		x"20", -- branch (return)
+		x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",

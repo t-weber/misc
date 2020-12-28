@@ -5,6 +5,18 @@
 -- @license see 'LICENSE.EUPL' file
 --
 
+/*
+ * opcodes
+ * -------
+ * 0x00: halt
+ * 0x01: add
+ * 0x02; sub
+ * 0x10: push <val>
+ * 0x11: pop
+ * 0x20: absolute branch
+ * 0x21: conditional, absolute branch
+ * 0x22: call
+ */
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -51,7 +63,7 @@ architecture cpu_impl of cpu is
 	
 	-- cycle for multi-cycle instructions
 	signal cur_cycle, next_cycle : integer range 0 to 15 := 0;
-	
+
 begin
 	-- status output for debugging
 	out_ip <= reg_ip;
@@ -122,9 +134,9 @@ begin
 				end if;
 
 
-			--
+			-- -------------------------------------------------------------------
 			-- execute opcode
-			--
+			-- -------------------------------------------------------------------
 			when Exec_Instr =>		
 				case reg_instr is
 
@@ -177,9 +189,9 @@ begin
 							-- push result
 							when 4 =>
 								out_ram_write <= '1';
-								out_ram <= std_logic_vector(unsigned(reg_op1) + unsigned(reg_op2));
+								out_ram <= std_logic_vector(unsigned(reg_op2) + unsigned(reg_op1));
 								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
-								
+
 								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
 
 								if in_ram_ready='1' then
@@ -238,7 +250,7 @@ begin
 							-- push result
 							when 4 =>
 								out_ram_write <= '1';
-								out_ram <= std_logic_vector(unsigned(reg_op1) - unsigned(reg_op2));
+								out_ram <= std_logic_vector(unsigned(reg_op2) - unsigned(reg_op1));
 								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
 
 								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
@@ -300,10 +312,191 @@ begin
 						end case;
 
 
+					--
+					-- pop value to address
+					--
+					when x"11" =>
+						case cur_cycle is
+							-- pop address
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop address
+							when 1 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- pop value
+							when 2 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- pop value
+							when 3 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_op2 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 4;
+								end if;
+
+							-- write data to address
+							when 4 =>
+								out_ram_write <= '1';
+								out_ram <= reg_op2;
+								out_ram_addr <= reg_op1;
+
+								if in_ram_ready='1' then
+									next_cycle <= 5;
+								end if;
+
+							-- next instruction
+							when 5 =>
+								next_ip <= std_logic_vector(unsigned(reg_ip)+1);
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
+					-- absolute branching
+					--
+					when x"20" =>
+						case cur_cycle is
+							-- pop address
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop address and set new instruction pointer
+							when 1 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_ip <= in_ram;
+									next_mode <= Fetch_Instr;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+								end if;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
+					-- conditional, absolute branching
+					--
+					when x"21" =>
+						case cur_cycle is
+							-- pop address
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop address
+							when 1 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- pop value
+							when 2 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- pop value
+							when 3 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_op2 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 4;
+								end if;
+
+							-- set new instruction pointer
+							when 4 =>
+								if reg_op2=x"00" then
+									-- value is 0 -> no branching
+									next_ip <= std_logic_vector(unsigned(reg_ip)+1);
+								else
+									-- value is not 0 -> branch to address
+									next_ip <= reg_op2;
+								end if;
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
+					-- call
+					--
+					when x"22" =>
+						case cur_cycle is
+							-- pop function address
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop function address
+							when 1 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- push pointer to next instruction
+							when 2 =>
+								out_ram_write <= '1';
+								out_ram <= std_logic_vector(unsigned(reg_ip) + 1);
+								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
+
+								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
+
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- branch to function
+							when 3 =>
+								next_ip <= reg_op1;
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
 					when others =>
 						null;
 				end case;
-
+				-- -------------------------------------------------------------------
 
 			when others =>
 				null;
