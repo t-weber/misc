@@ -11,11 +11,23 @@
  * 0x00: halt
  * 0x01: add
  * 0x02; sub
+ * 0x03: unary minus
+ *
  * 0x10: push <val>
  * 0x11: pop
+ * 0x12: push value at address
+ *
  * 0x20: absolute branch
  * 0x21: conditional, absolute branch
  * 0x22: call
+ *
+ * 0x30: equals
+ * 0x31: less than
+ * 0x32: logical not
+ *
+ * 0x40: binary or
+ * 0x41: binary and
+ * 0x42: binary not
  */
 library ieee;
 use ieee.std_logic_1164.all;
@@ -58,9 +70,9 @@ architecture cpu_impl of cpu is
 	-- current_instruction
 	signal reg_instr, next_instr : std_logic_vector(num_wordbits-1 downto 0);
 
-	-- operand  registers
+	-- operand registers
 	signal reg_op1, reg_op2, next_op1, next_op2 : std_logic_vector(num_wordbits-1 downto 0);
-	
+
 	-- cycle for multi-cycle instructions
 	signal cur_cycle, next_cycle : integer range 0 to 15 := 0;
 
@@ -85,16 +97,16 @@ begin
 
 			reg_ip <= next_ip;
 			reg_sp <= next_sp;
-			
+
 			reg_op1 <= next_op1;
 			reg_op2 <= next_op2;
-			
+
 			reg_instr <= next_instr;
 			cur_cycle <= next_cycle;
 		end if;
 	end process;
 
-	
+
 	opproc : process(cur_mode, reg_ip, reg_sp, reg_instr, reg_op1, reg_op2, cur_cycle, in_ram, in_ram_ready)
 	begin
 		-- default: keep current values
@@ -137,7 +149,7 @@ begin
 			-- -------------------------------------------------------------------
 			-- execute opcode
 			-- -------------------------------------------------------------------
-			when Exec_Instr =>		
+			when Exec_Instr =>
 				case reg_instr is
 
 					--
@@ -270,6 +282,50 @@ begin
 
 
 					--
+					-- unary minus
+					--
+					when x"03" =>
+						case cur_cycle is
+							-- pop operand
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop operand
+							when 1 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- push result
+							when 2 =>
+								out_ram_write <= '1';
+								out_ram <= std_logic_vector(0-unsigned(reg_op1));
+								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
+
+								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
+
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- next instruction
+							when 3 =>
+								next_ip <= std_logic_vector(unsigned(reg_ip)+1);
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
 					-- push value
 					--
 					when x"10" =>
@@ -370,6 +426,63 @@ begin
 
 
 					--
+					-- push value at address
+					--
+					when x"12" =>
+						case cur_cycle is
+							-- pop address
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop address
+							when 1 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- get data from the address
+							when 2 =>
+								out_ram_addr <= reg_op1;
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- get data from the address
+							when 3 =>
+								out_ram_addr <= reg_op1;
+								if in_ram_ready='1' then
+									next_op2 <= in_ram; -- save data to op2 register
+									next_cycle <= 4;
+								end if;
+
+							-- push data on stack
+							when 4 =>
+								out_ram_write <= '1';
+								out_ram <= reg_op2;
+								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
+								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
+
+								if in_ram_ready='1' then
+									next_cycle <= 5;
+								end if;
+
+							-- next instruction
+							when 5 =>
+								next_ip <= std_logic_vector(unsigned(reg_ip)+1);
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
 					-- absolute branching
 					--
 					when x"20" =>
@@ -417,14 +530,14 @@ begin
 									next_cycle <= 2;
 								end if;
 
-							-- pop value
+							-- pop condition value
 							when 2 =>
 								out_ram_addr <= reg_sp;
 								if in_ram_ready='1' then
 									next_cycle <= 3;
 								end if;
 
-							-- pop value
+							-- pop condition value
 							when 3 =>
 								out_ram_addr <= reg_sp;
 								if in_ram_ready='1' then
@@ -440,7 +553,7 @@ begin
 									next_ip <= std_logic_vector(unsigned(reg_ip)+1);
 								else
 									-- value is not 0 -> branch to address
-									next_ip <= reg_op2;
+									next_ip <= reg_op1;
 								end if;
 								next_mode <= Fetch_Instr;
 
@@ -486,6 +599,349 @@ begin
 							-- branch to function
 							when 3 =>
 								next_ip <= reg_op1;
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
+					-- equals
+					--
+					when x"30" =>
+						case cur_cycle is
+							-- pop operand 1
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop operand 1
+							when 1 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- pop operand 2
+							when 2 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- pop operand 2
+							when 3 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op2 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 4;
+								end if;
+
+							-- push result
+							when 4 =>
+								out_ram_write <= '1';
+								if reg_op2 = reg_op1 then
+									out_ram <= x"01";
+								else
+									out_ram <= (others => '0');
+								end if;
+								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
+
+								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
+
+								if in_ram_ready='1' then
+									next_cycle <= 5;
+								end if;
+
+							-- next instruction
+							when 5 =>
+								next_ip <= std_logic_vector(unsigned(reg_ip)+1);
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+					--
+					-- less than
+					--
+					when x"31" =>
+						case cur_cycle is
+							-- pop operand 1
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop operand 1
+							when 1 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- pop operand 2
+							when 2 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- pop operand 2
+							when 3 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op2 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 4;
+								end if;
+
+							-- push result
+							when 4 =>
+								out_ram_write <= '1';
+								if unsigned(reg_op2) < unsigned(reg_op1) then
+									out_ram <= x"01";
+								else
+									out_ram <= (others => '0');
+								end if;
+								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
+
+								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
+
+								if in_ram_ready='1' then
+									next_cycle <= 5;
+								end if;
+
+							-- next instruction
+							when 5 =>
+								next_ip <= std_logic_vector(unsigned(reg_ip)+1);
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
+					-- logical not
+					--
+					when x"32" =>
+						case cur_cycle is
+							-- pop operand
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop operand
+							when 1 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- push result
+							when 2 =>
+								out_ram_write <= '1';
+								if reg_op1 = x"00" then
+									out_ram <= x"01";
+								else
+									out_ram <= (others => '0');
+								end if;
+								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
+
+								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
+
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- next instruction
+							when 3 =>
+								next_ip <= std_logic_vector(unsigned(reg_ip)+1);
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
+					-- binary or
+					--
+					when x"40" =>
+						case cur_cycle is
+							-- pop operand 1
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop operand 1
+							when 1 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- pop operand 2
+							when 2 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- pop operand 2
+							when 3 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op2 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 4;
+								end if;
+
+							-- push result
+							when 4 =>
+								out_ram_write <= '1';
+								out_ram <= reg_op2 or reg_op1;
+								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
+
+								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
+
+								if in_ram_ready='1' then
+									next_cycle <= 5;
+								end if;
+
+							-- next instruction
+							when 5 =>
+								next_ip <= std_logic_vector(unsigned(reg_ip)+1);
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
+					-- binary and
+					--
+					when x"41" =>
+						case cur_cycle is
+							-- pop operand 1
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop operand 1
+							when 1 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- pop operand 2
+							when 2 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- pop operand 2
+							when 3 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op2 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 4;
+								end if;
+
+							-- push result
+							when 4 =>
+								out_ram_write <= '1';
+								out_ram <= reg_op2 and reg_op1;
+								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
+
+								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
+
+								if in_ram_ready='1' then
+									next_cycle <= 5;
+								end if;
+
+							-- next instruction
+							when 5 =>
+								next_ip <= std_logic_vector(unsigned(reg_ip)+1);
+								next_mode <= Fetch_Instr;
+
+							when others =>
+								next_cycle <= 0;
+						end case;
+
+
+					--
+					-- binary not
+					--
+					when x"42" =>
+						case cur_cycle is
+							-- pop operand
+							when 0 =>
+								out_ram_addr <= reg_sp;
+								if in_ram_ready='1' then
+									next_cycle <= 1;
+								end if;
+
+							-- pop operand
+							when 1 =>
+								out_ram_addr <= reg_sp;
+
+								if in_ram_ready='1' then
+									next_op1 <= in_ram;
+									next_sp <= std_logic_vector(unsigned(reg_sp)+1);
+									next_cycle <= 2;
+								end if;
+
+							-- push result
+							when 2 =>
+								out_ram_write <= '1';
+								out_ram <= not reg_op1;
+								out_ram_addr <= std_logic_vector(unsigned(reg_sp)-1);
+
+								next_sp <= std_logic_vector(unsigned(reg_sp)-1);
+
+								if in_ram_ready='1' then
+									next_cycle <= 3;
+								end if;
+
+							-- next instruction
+							when 3 =>
+								next_ip <= std_logic_vector(unsigned(reg_ip)+1);
 								next_mode <= Fetch_Instr;
 
 							when others =>

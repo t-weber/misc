@@ -18,7 +18,7 @@ entity calc is
 		-- number of stored words
 		constant ram_num_words : natural := 2**ram_num_addrbits
 	);
-	
+
 	port(
 		clk : in std_logic;
 
@@ -36,7 +36,7 @@ end entity;
 architecture calc_impl of calc is
 	type t_disp is array (0 to 4) of std_logic_vector(3 downto 0);
 	signal disp : t_disp;
-	
+
 	signal ram_write0, ram_write1 : std_logic;
 	signal ram_ready0, ram_ready1 : std_logic;
 	signal ram_addr0, ram_addr1 : std_logic_vector(ram_num_addrbits-1 downto 0);
@@ -56,7 +56,7 @@ begin
 		)
 		port map(
 			in_clk=>clkdiv,
-			
+
 			in_write(0)=>ram_write0, in_write(1)=>ram_write1,
 			in_addr(0)=>ram_addr0, in_addr(1)=>ram_addr1,
 			in_word(0)=>ram_write_word0, in_word(1)=>ram_write_word1, 
@@ -65,7 +65,7 @@ begin
 		);
 	--==============================================================================
 
-	
+
 	--==============================================================================
 	-- CPU
 	--==============================================================================
@@ -81,13 +81,15 @@ begin
 		);
 	--==============================================================================
 
-	
+
 	--==============================================================================
 	-- clock divider
 	--==============================================================================
 	slowclk : entity work.clkdiv
 		generic map(
-			shift_bits=>24, num_ctrbits=>32
+			shift_bits=>22,	-- slow clock for debugging
+			--shift_bits=>0,	-- normal clock
+			num_ctrbits=>32
 		)
 		port map(
 			in_clk=>clk, out_clk=>clkdiv
@@ -120,5 +122,5 @@ begin
 	ledg(0) <= clkdiv;
 
 	--==============================================================================
-	
+
 end architecture;

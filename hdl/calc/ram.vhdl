@@ -53,28 +53,50 @@ architecture ram_impl of ram is
 	type t_words is array(0 to num_words-1) of t_word;
 
 	-- the memory is an array of words
-	signal words : t_words :=  (
-		x"10", x"20", -- push function address 0x20
-		x"22",	-- call function
+	signal words : t_words := (
+		x"10", x"40", -- push function 2 address, 0x40
+		x"22",	-- call function 2
+		x"10", x"20", -- push function 1 address, 0x20
+		x"22",	-- call function 1
 		x"10", x"ff",	-- push 0xff (value will be overwritten)
-		x"00", x"00", x"00",
+
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"10", x"04", -- push 4
-		x"10", x"06", -- push 6
-		x"10", x"03", -- push 3
-		x"02", -- sub
-		x"01", -- add
-		x"10", x"04", -- push address 0x04
-		x"11", -- pop result
-		x"20", -- branch (return)
+
+		-- function 1, calculation test
+		x"10", x"04",	-- push 4
+		x"10", x"06",	-- push 6
+		x"10", x"03",	-- push 3
+		x"02",	-- sub
+		x"01",	-- add
+		x"10", x"07", -- push address 0x07 for value to overwrite
+		x"11",	-- pop result
+		x"20",	-- branch (return)
+
 		x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+
+		-- function 2, loop test
+		x"10", x"60", -- push address 0x60
+		x"12",	-- push value at address
+		x"10", x"01", -- push 1
+		x"01",	-- add
+		x"10", x"60", -- push address 0x60
+		x"11",	-- pop result
+		x"10", x"60", -- push address 0x60
+		x"12",	-- push value at address
+		x"10", x"0a", -- push 10
+		x"31",	-- less than
+		x"32",	-- not
+		x"10", x"56",	-- push address 0x56
+		x"21",	-- conditional branch
+		x"10", x"40", -- push function 2 start address, 0x40
+		x"20",	-- else: loop 
+		x"20",	-- return branch
+
+		x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
