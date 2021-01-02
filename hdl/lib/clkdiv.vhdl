@@ -19,8 +19,7 @@ entity clkdiv is
 );
 
 	port(
-		in_rst : in std_logic;
-		in_clk : in std_logic;
+		in_clk, in_rst : in std_logic;
 		out_clk : out std_logic
 	);
 end entity;
@@ -38,7 +37,7 @@ begin
 	--out_clk <= slow_clk;
 	out_clk <= in_clk when shift_bits=1 else slow_clk;
 
-	ctrprc : process(in_clk) begin
+	ctrprc : process(in_clk, in_rst) begin
 		if in_rst='1' then
 			ctr <= (others => '0');
 			slow_clk <= '0';
@@ -51,7 +50,8 @@ begin
 	clkproc : process(ctr_fin) begin
 		next_slow_clk <= slow_clk;
 
-		if ctr_fin='1' then
+		--if ctr_fin'event and ctr_fin='1' then
+		if rising_edge(ctr_fin) then
 			next_slow_clk <= not slow_clk;
 		end if;
 	end process;
@@ -76,7 +76,7 @@ architecture clkdiv_impl of clkdiv is
 	signal ctr, next_ctr : std_logic_vector(num_ctrbits-1 downto 0) := (others=>'0');
 begin
 
-	ctrprc : process(in_clk) begin
+	ctrprc : process(in_clk, in_rst) begin
 		if in_rst='1' then
 			ctr <= (others => '0');
 		elsif rising_edge(in_clk) then
