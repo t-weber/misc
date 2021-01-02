@@ -22,6 +22,9 @@ package conv is
 	-- integer/natural -> std_logic_vector
 	function int_to_logvec(val : integer; len : natural) return std_logic_vector;
 	function nat_to_logvec(val : natural; len : natural) return std_logic_vector;
+
+	-- increments a std_logic_vector
+	function inc_logvec(vec : std_logic_vector; inc : natural) return std_logic_vector;
 end package;
 
 
@@ -50,5 +53,14 @@ package body conv is
 	function nat_to_logvec(val : natural; len : natural) return std_logic_vector is
 	begin
 		return std_logic_vector(to_unsigned(val, len));
+	end function;
+
+
+	--
+	-- increments a std_logic_vector by inc
+	--
+	function inc_logvec(vec : std_logic_vector; inc : natural) return std_logic_vector is
+	begin
+		return std_logic_vector(unsigned(vec) + inc);
 	end function;
 end package body;
