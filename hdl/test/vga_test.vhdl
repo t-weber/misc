@@ -16,7 +16,8 @@ use ieee.std_logic_1164.all;
 entity testbed is
 	generic
 	(
-		constant pixaddr_len : natural := 11;
+		constant pixaddr_len : natural := 19;
+		constant rgbword_len : natural := 24; 
 		constant thedelay : time := 100 ns
 	);
 end entity;
@@ -24,16 +25,26 @@ end entity;
 
 architecture thetester of testbed is
 	signal theclk : std_logic := '0';
-	signal hpix, vpix : std_logic_vector(pixaddr_len-1 downto 0);
+
+	--signal hpix, vpix : std_logic_vector(11-1 downto 0);
 	signal hsync, vsync : std_logic;
+
+	signal memaddr : std_logic_vector(pixaddr_len-1 downto 0);
+	signal mem : std_logic_vector(rgbword_len-1 downto 0);
 begin
 	theclk <= not theclk after thedelay;
 
 	vgamod : entity work.vga
-		generic map(pixaddr_len=>pixaddr_len)
+		generic map(
+			num_pixaddrbits=>pixaddr_len,
+			--num_rowcolbits=>11,
+			num_rgbbits=>rgbword_len
+		)
 		port map(
 			in_rst=>'0', in_clk=>theclk,
-			out_hpix=>hpix, out_vpix=>vpix,
-			out_hsync=>hsync, out_vsync=>vsync);
+			--out_hpix=>hpix, out_vpix=>vpix,
+			out_hsync=>hsync, out_vsync=>vsync,
+			in_mem=>mem, out_mem_addr=>memaddr
+		);
 end architecture;
 
