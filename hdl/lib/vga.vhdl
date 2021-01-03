@@ -45,6 +45,9 @@ entity vga is
 		-- 50 MHz clock, reset
 		in_clk, in_rst : in std_logic;
 
+		-- show test pattern
+		in_testpattern : in std_logic;
+
 		-- vga interface
 		--out_hpix, out_vpix : out std_logic_vector(num_rowcolbits-1 downto 0);
 		out_hsync, out_vsync : out std_logic;
@@ -90,12 +93,48 @@ begin
 			out_b <= (others => '0');
 		elsif rising_edge(in_clk) then
 			if output_pixel='1' then
-				out_mem_addr <= 
-					nat_to_logvec(v_ctr*hpix_visible + h_ctr + mem_start_addr,
-						num_pixaddrbits);
-				out_r <= in_mem(num_rgbbits-1 downto num_rgbbits-num_colourbits);
-				out_g <= in_mem(num_rgbbits-num_colourbits-1 downto num_rgbbits-2*num_colourbits);
-				out_b <= in_mem(num_rgbbits-2*num_colourbits-1 downto num_rgbbits-3*num_colourbits);
+				-- output test pattern for debugging
+				if in_testpattern='1' then
+					if v_ctr>=0 and v_ctr<vpix_visible/2 and
+						h_ctr>=0 and h_ctr<hpix_visible/3 then
+						out_r <= (others => '1');
+						out_g <= (others => '0');
+						out_b <= (others => '0');
+					elsif v_ctr>=vpix_visible/2 and v_ctr<vpix_visible and
+						h_ctr>=0 and h_ctr<hpix_visible/3 then
+						out_r <= (others => '0');
+						out_g <= (others => '1');
+						out_b <= (others => '0');
+					elsif v_ctr>=0 and v_ctr<vpix_visible/2 and
+						h_ctr>=hpix_visible/3 and h_ctr<2*hpix_visible/3 then
+						out_r <= (others => '0');
+						out_g <= (others => '0');
+						out_b <= (others => '1');
+					elsif v_ctr>=vpix_visible/2 and v_ctr<vpix_visible and
+						h_ctr>=hpix_visible/3 and h_ctr<2*hpix_visible/3 then
+						out_r <= (others => '1');
+						out_g <= (others => '1');
+						out_b <= (others => '0');
+					elsif v_ctr>=0 and v_ctr<vpix_visible/2 and
+						h_ctr>=2*hpix_visible/3 and h_ctr<hpix_visible then
+						out_r <= (others => '0');
+						out_g <= (others => '1');
+						out_b <= (others => '1');
+					elsif v_ctr>=vpix_visible/2 and v_ctr<vpix_visible and
+						h_ctr>=2*hpix_visible/3 and h_ctr<hpix_visible then
+						out_r <= (others => '1');
+						out_g <= (others => '0');
+						out_b <= (others => '1');
+					end if;
+				-- output video memory
+				else
+					out_mem_addr <= 
+						nat_to_logvec(v_ctr*hpix_visible + h_ctr + mem_start_addr,
+							num_pixaddrbits);
+					out_r <= in_mem(num_rgbbits-1 downto num_rgbbits-num_colourbits);
+					out_g <= in_mem(num_rgbbits-num_colourbits-1 downto num_rgbbits-2*num_colourbits);
+					out_b <= in_mem(num_rgbbits-2*num_colourbits-1 downto num_rgbbits-3*num_colourbits);
+				end if;
 			else
 				out_r <= (others => '0');
 				out_g <= (others => '0');

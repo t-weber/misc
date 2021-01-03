@@ -52,6 +52,7 @@ begin
 		)
 		port map(
 			in_rst=>'0', in_clk=>theclk,
+			in_testpattern=>'0',
 			--out_hpix=>hpix, out_vpix=>vpix,
 			out_hsync=>hsync, out_vsync=>vsync,
 			in_mem=>mem, out_mem_addr=>memaddr,
