@@ -19,7 +19,11 @@ entity vga is
 	generic(
 		constant num_pixaddrbits : natural := 19;
 		--constant num_rowcolbits : natural := 11;
-		constant num_rgbbits : natural := 24;
+
+		-- number of bits in one colour channel
+		constant num_colourbits : natural := 8;
+		-- number of bits in all colour channels
+		constant num_rgbbits : natural := 3*num_colourbits;
 
 		-- rows
 		constant hpix_visible : natural := 800;
@@ -38,13 +42,13 @@ entity vga is
 	);
 
 	port(
-		-- clock, reset
+		-- 50 MHz clock, reset
 		in_clk, in_rst : in std_logic;
 
 		-- vga interface
 		--out_hpix, out_vpix : out std_logic_vector(num_rowcolbits-1 downto 0);
 		out_hsync, out_vsync : out std_logic;
-		out_r, out_g, out_b : out std_logic_vector(7 downto 0);
+		out_r, out_g, out_b : out std_logic_vector(num_colourbits-1 downto 0);
 		
 		-- memory interface
 		out_mem_addr : out std_logic_vector(num_pixaddrbits-1 downto 0);
@@ -79,18 +83,24 @@ begin
 	end process;
 
 	-- pixel output
-	pixel_proc : process(in_clk) begin
-		if rising_edge(in_clk) and output_pixel='1' then
-			out_mem_addr <= 
-				nat_to_logvec(v_ctr*hpix_visible + h_ctr + mem_start_addr,
-					num_pixaddrbits);
-			out_r <= in_mem(num_rgbbits-1 downto num_rgbbits-8);
-			out_g <= in_mem(num_rgbbits-9 downto num_rgbbits-16);
-			out_b <= in_mem(num_rgbbits-17 downto num_rgbbits-24);
-		else
+	pixel_proc : process(in_clk, in_rst) begin
+		if in_rst = '1' then
 			out_r <= (others => '0');
 			out_g <= (others => '0');
 			out_b <= (others => '0');
+		elsif rising_edge(in_clk) then
+			if output_pixel='1' then
+				out_mem_addr <= 
+					nat_to_logvec(v_ctr*hpix_visible + h_ctr + mem_start_addr,
+						num_pixaddrbits);
+				out_r <= in_mem(num_rgbbits-1 downto num_rgbbits-num_colourbits);
+				out_g <= in_mem(num_rgbbits-num_colourbits-1 downto num_rgbbits-2*num_colourbits);
+				out_b <= in_mem(num_rgbbits-2*num_colourbits-1 downto num_rgbbits-3*num_colourbits);
+			else
+				out_r <= (others => '0');
+				out_g <= (others => '0');
+				out_b <= (others => '0');
+			end if;
 		end if;
 	end process;
 

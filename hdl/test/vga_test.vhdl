@@ -17,7 +17,9 @@ entity testbed is
 	generic
 	(
 		constant pixaddr_len : natural := 19;
-		constant rgbword_len : natural := 24; 
+		constant rgbchan_len : natural := 8; 	-- bits per channel
+		constant rgbword_len : natural := 3*rgbchan_len;
+
 		constant thedelay : time := 100 ns
 	);
 end entity;
@@ -31,6 +33,7 @@ architecture thetester of testbed is
 
 	signal memaddr : std_logic_vector(pixaddr_len-1 downto 0);
 	signal mem : std_logic_vector(rgbword_len-1 downto 0);
+	signal r,g,b : std_logic_vector(rgbchan_len-1 downto 0);
 begin
 	theclk <= not theclk after thedelay;
 
@@ -44,13 +47,14 @@ begin
 		generic map(
 			num_pixaddrbits=>pixaddr_len,
 			--num_rowcolbits=>11,
+			num_colourbits=>rgbchan_len,
 			num_rgbbits=>rgbword_len
 		)
 		port map(
 			in_rst=>'0', in_clk=>theclk,
 			--out_hpix=>hpix, out_vpix=>vpix,
 			out_hsync=>hsync, out_vsync=>vsync,
-			in_mem=>mem, out_mem_addr=>memaddr
+			in_mem=>mem, out_mem_addr=>memaddr,
+			out_r=>r, out_g=>g, out_b=>b
 		);
 end architecture;
-

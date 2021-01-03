@@ -1,5 +1,5 @@
 /**
- * writes a vhdl rom image from a jpg file (8 bits per channel)
+ * writes a vhdl rom image from a jpg file (4 bits per channel)
  * @author Tobias Weber
  * @date dec-2020
  * @license: see 'LICENSE.EUPL' file
@@ -7,7 +7,7 @@
  * References:
  *  * https://github.com/boostorg/gil/tree/develop/example
  *
- * g++ -std=c++20 -Wall -Wextra -o jpgrom jpgrom.cpp -ljpeg
+ * g++ -std=c++20 -Wall -Wextra -o jpgrom jpgrom_4bit.cpp -ljpeg
  */
 
 #include <iostream>
@@ -55,14 +55,14 @@ entity rom is
 		ostrRom << neededbits-1;
 
 		ostrRom << R"STR( downto 0);
-		out_data : out std_logic_vector(23 downto 0)
+		out_data : out std_logic_vector(11 downto 0)
 	);
 end entity;
 
 architecture rom_impl of rom is
 )STR";
 
-		ostrRom << "\tsubtype t_rgb is std_logic_vector(23 downto 0);\n"
+		ostrRom << "\tsubtype t_rgb is std_logic_vector(11 downto 0);\n"
 			<< "\ttype t_img is array(0 to " << numwords-1 << ") of t_rgb;\n"
 			<< "\n\tconstant img : t_img := (\n";
 
@@ -79,8 +79,8 @@ architecture rom_impl of rom is
 					std::size_t ch = chan;
 					if(ch >= view.num_channels())
 						ch = 0;
-					ostrRom << std::hex << std::setfill('0') << std::setw(2)
-						<< static_cast<unsigned>((*iterRow)[ch]);
+					ostrRom << std::hex << std::setfill('0') << std::setw(1)
+						<< (static_cast<unsigned>((*iterRow)[ch] & 0b00111100) >> 2);
 				}
 				ostrRom << "\"";
 
