@@ -34,6 +34,12 @@ architecture thetester of testbed is
 begin
 	theclk <= not theclk after thedelay;
 
+--	romimg : entity work.rom
+--		port map(
+--			in_addr=>memaddr,
+--			out_data=>mem
+--		);
+
 	vgamod : entity work.vga
 		generic map(
 			num_pixaddrbits=>pixaddr_len,
