@@ -42,6 +42,10 @@ begin
 
 	-- ram image, 200x75 pixels, 4-bits colour
 	ramimg : entity work.ram
+		generic map(
+			num_ports=>1, num_addrbits=>pixaddr_len,
+			num_wordbits=>rgbword_len, num_words=>200*75
+		)
 		port map(
 			in_addr(0)=>memaddr, out_word(0)=>mem,
 			in_clk=>clk, in_write(0)=>'0', in_word(0)=>(others=>'0')
