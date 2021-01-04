@@ -91,7 +91,7 @@ architecture rom_impl of rom is
 			ostrRom << "\n";
 		}
 
-		ostrRom << ");\n";
+		ostrRom << "\t);\n";
 
 		ostrRom <<
 R"STR(

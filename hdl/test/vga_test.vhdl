@@ -1,5 +1,5 @@
 --
--- vga test
+-- vga test (sim)
 -- @author Tobias Weber <tobias.weber@tum.de>
 -- @date jan-2021
 -- @license see 'LICENSE.EUPL' file

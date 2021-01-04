@@ -20,6 +20,7 @@ entity vga is
 		constant num_pixaddrbits : natural := 19;
 		--constant num_rowcolbits : natural := 11;
 
+		-- colour channels
 		-- number of bits in one colour channel
 		constant num_colourbits : natural := 8;
 		-- number of bits in all colour channels
@@ -45,7 +46,7 @@ entity vga is
 		-- 50 MHz clock, reset
 		in_clk, in_rst : in std_logic;
 
-		-- show test pattern
+		-- show test pattern?
 		in_testpattern : in std_logic;
 
 		-- vga interface
@@ -87,14 +88,19 @@ begin
 
 	-- pixel output
 	pixel_proc : process(in_clk, in_rst) begin
+
 		if in_rst = '1' then
+			-- reset
 			out_r <= (others => '0');
 			out_g <= (others => '0');
 			out_b <= (others => '0');
+	
 		elsif rising_edge(in_clk) then
 			if output_pixel='1' then
-				-- output test pattern for debugging
+				-- inside visible pixel range
+	
 				if in_testpattern='1' then
+					-- output test pattern for debugging
 					if v_ctr>=0 and v_ctr<vpix_visible/2 and
 						h_ctr>=0 and h_ctr<hpix_visible/3 then
 						out_r <= (others => '1');
@@ -126,16 +132,20 @@ begin
 						out_g <= (others => '0');
 						out_b <= (others => '1');
 					end if;
-				-- output video memory
+
 				else
+					-- output video memory (h_ctr+1 because of 1 cycle delay for ram!)
 					out_mem_addr <= 
 						nat_to_logvec(v_ctr*hpix_visible + h_ctr + mem_start_addr,
+						--nat_to_logvec(v_ctr/4/2*hpix_visible/4 + (h_ctr+1)/4 + mem_start_addr,
 							num_pixaddrbits);
 					out_r <= in_mem(num_rgbbits-1 downto num_rgbbits-num_colourbits);
 					out_g <= in_mem(num_rgbbits-num_colourbits-1 downto num_rgbbits-2*num_colourbits);
 					out_b <= in_mem(num_rgbbits-2*num_colourbits-1 downto num_rgbbits-3*num_colourbits);
 				end if;
+
 			else
+				-- outside visible pixel range
 				out_r <= (others => '0');
 				out_g <= (others => '0');
 				out_b <= (others => '0');

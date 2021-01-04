@@ -80,7 +80,8 @@ architecture rom_impl of rom is
 					if(ch >= view.num_channels())
 						ch = 0;
 					ostrRom << std::hex << std::setfill('0') << std::setw(1)
-						<< (static_cast<unsigned>((*iterRow)[ch] & 0b00111100) >> 2);
+						<< (static_cast<unsigned>((*iterRow)[ch] & 0b11110000) >> 4);
+						//<< (static_cast<unsigned>((*iterRow)[ch] & 0b00001111));
 				}
 				ostrRom << "\"";
 
@@ -91,7 +92,7 @@ architecture rom_impl of rom is
 			ostrRom << "\n";
 		}
 
-		ostrRom << ");\n";
+		ostrRom << "\t);\n";
 
 		ostrRom <<
 R"STR(
