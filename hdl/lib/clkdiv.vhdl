@@ -16,7 +16,7 @@ entity clkdiv is
 		-- number of bits for counter
 		constant num_ctrbits : natural := 8;
 		constant shift_bits : natural := 0
-);
+	);
 
 	port(
 		in_clk, in_rst : in std_logic;

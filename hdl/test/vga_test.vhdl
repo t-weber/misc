@@ -17,7 +17,7 @@ entity testbed is
 	generic
 	(
 		constant pixaddr_len : natural := 19;
-		constant rgbchan_len : natural := 8; 	-- bits per channel
+		constant rgbchan_len : natural := 8;	-- bits per channel
 		constant rgbword_len : natural := 3*rgbchan_len;
 
 		constant thedelay : time := 100 ns
