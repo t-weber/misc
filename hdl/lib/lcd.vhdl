@@ -89,17 +89,17 @@ architecture lcd_impl of lcd is
 	signal write_cycle, next_write_cycle : integer range -1 to lcd_size := -1;
 
 	-- busy wait counter
-	signal wait_counter_init : natural range 0 to wait_init := 0;
-	signal wait_counter_init_finished : std_logic := '0';
+	signal wait_counter_init, wait_counter_init_next : natural range 0 to wait_init := 0;
+	signal wait_counter_init_finished, wait_counter_init_finished_next : std_logic := '0';
 
-	signal wait_counter_reseton : natural range 0 to wait_reseton := 0;
-	signal wait_counter_reseton_finished : std_logic := '0';
+	signal wait_counter_reseton, wait_counter_reseton_next : natural range 0 to wait_reseton := 0;
+	signal wait_counter_reseton_finished, wait_counter_reseton_finished_next : std_logic := '0';
 
-	signal wait_counter_resetoff : natural range 0 to wait_resetoff := 0;
-	signal wait_counter_resetoff_finished : std_logic := '0';
+	signal wait_counter_resetoff, wait_counter_resetoff_next : natural range 0 to wait_resetoff := 0;
+	signal wait_counter_resetoff_finished, wait_counter_resetoff_finished_next : std_logic := '0';
 
-	signal wait_counter_preready : natural range 0 to wait_preready := 0;
-	signal wait_counter_preready_finished : std_logic := '0';
+	signal wait_counter_preready, wait_counter_preready_next : natural range 0 to wait_preready := 0;
+	signal wait_counter_preready_finished, wait_counter_preready_finished_next : std_logic := '0';
 
 	-- hack for ghdl, using local static values
 	constant static_init_size : natural := 4; --init_size;
@@ -140,6 +140,16 @@ begin
 			init_cycle <= 0;
 			write_cycle <= -1;
 
+			wait_counter_init <= 0;
+			wait_counter_reseton <= 0;
+			wait_counter_resetoff <= 0;
+			wait_counter_preready <= 0;
+
+			wait_counter_init_finished <= '0';
+			wait_counter_reseton_finished <= '0';
+			wait_counter_resetoff_finished <= '0';
+			wait_counter_preready_finished <= '0';
+
 		-- clock
 		elsif rising_edge(in_clk) then
 			lcd_state <= next_lcd_state;
@@ -155,77 +165,43 @@ begin
 
 			init_cycle <= next_init_cycle;
 			write_cycle <= next_write_cycle;
-		end if;
-	end process;
-		
 
-	-- process for busy wait timers
-	proc_timer : process(in_clk, in_reset) begin
-		-- reset
-		if in_reset = '0' then
-			wait_counter_init <= 0;
-			wait_counter_reseton <= 0;
-			wait_counter_resetoff <= 0;
-			wait_counter_preready <= 0;
+			wait_counter_init <= wait_counter_init_next;
+			wait_counter_reseton <= wait_counter_reseton_next;
+			wait_counter_resetoff <= wait_counter_resetoff_next;
+			wait_counter_preready <= wait_counter_preready_next;
 
-			wait_counter_init_finished <= '0';
-			wait_counter_reseton_finished <= '0';
-			wait_counter_resetoff_finished <= '0';
-			wait_counter_preready_finished <= '0';
-
-		elsif rising_edge(in_clk) then
-			if next_lcd_state = Wait_Reset then
-				if wait_counter_init = wait_init then
-					wait_counter_init <= 0;
-					wait_counter_init_finished <= '1';
-				else
-					wait_counter_init <= wait_counter_init + 1;
-				end if;
-			else
-				wait_counter_init <= 0;
-				wait_counter_init_finished <= '0';
-			end if;
-
-			if next_lcd_state = Reset then
-				if wait_counter_reseton = wait_reseton then
-					wait_counter_reseton <= 0;
-					wait_counter_reseton_finished <= '1';
-				else
-					wait_counter_reseton <= wait_counter_reseton + 1;
-				end if;
-			else
-				wait_counter_reseton <= 0;
-				wait_counter_reseton_finished <= '0';
-			end if;
-			
-			if next_lcd_state = Resetted then
-				if wait_counter_resetoff = wait_resetoff then
-					wait_counter_resetoff <= 0;
-					wait_counter_resetoff_finished <= '1';
-				else
-					wait_counter_resetoff <= wait_counter_resetoff + 1;
-				end if;
-			else
-				wait_counter_resetoff <= 0;
-				wait_counter_resetoff_finished <= '0';
-			end if;
-
-			if next_lcd_state = Wait_ReadROM then
-				if wait_counter_preready = wait_preready then
-					wait_counter_preready <= 0;
-					wait_counter_preready_finished <= '1';
-				else
-					wait_counter_preready <= wait_counter_preready + 1;
-				end if;
-			else
-				wait_counter_preready <= 0;
-				wait_counter_preready_finished <= '0';
-			end if;
+			wait_counter_init_finished <= wait_counter_init_finished_next;
+			wait_counter_reseton_finished <= wait_counter_reseton_finished_next;
+			wait_counter_resetoff_finished <= wait_counter_resetoff_finished_next;
+			wait_counter_preready_finished <= wait_counter_preready_finished_next;
 
 		end if;
 	end process;
 
-	
+
+	-- next timer counters
+	wait_counter_init_next <= wait_counter_init + 1
+		when lcd_state=Wait_Reset and wait_counter_init/=wait_init
+		else 0;
+	wait_counter_init_finished_next <= '1' when wait_counter_init=wait_init else '0';
+
+	wait_counter_reseton_next <= wait_counter_reseton + 1
+		when lcd_state=Reset and wait_counter_reseton/=wait_reseton
+		else 0;
+	wait_counter_reseton_finished_next <= '1' when wait_counter_reseton=wait_reseton else '0';
+
+	wait_counter_resetoff_next <= wait_counter_resetoff + 1
+		when lcd_state=Resetted and wait_counter_resetoff/=wait_resetoff
+		else 0;
+	wait_counter_resetoff_finished_next <= '1' when wait_counter_resetoff=wait_resetoff else '0';
+
+	wait_counter_preready_next <= wait_counter_preready + 1
+		when lcd_state=Wait_ReadROM and wait_counter_preready/=wait_preready
+		else 0;
+	wait_counter_preready_finished_next <= '1' when wait_counter_preready=wait_preready else '0';
+
+
 	proc_transitions : process(
 		lcd_state, i2c_cycle, init_cycle, write_cycle, 
 		lcd_reset, rom_addr, initrom_addr, in_initrom_word, in_rom_word,
