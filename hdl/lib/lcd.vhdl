@@ -80,26 +80,26 @@ architecture lcd_impl of lcd is
 	signal i2c_last_busy, i2c_cycle : std_logic;
 
 	-- delays
-	constant wait_init : natural := main_clk/1000*10;	-- 10 ms
-	constant wait_reseton : natural := main_clk/1000*1;	-- 1 ms
-	constant wait_resetoff : natural := main_clk/1000*1;	-- 1 ms
-	constant wait_preready : natural := main_clk/1000_000*250;	-- 250 us
+	constant const_wait_prereset : natural := main_clk/1000*10;	-- 10 ms
+	constant const_wait_reset : natural := main_clk/1000*1;	-- 1 ms
+	constant const_wait_resetted : natural := main_clk/1000*1;	-- 1 ms
+	constant const_wait_readrom : natural := main_clk/1000_000*250;	-- 250 us
 
 	signal init_cycle, next_init_cycle : natural range 0 to init_size := 0;
 	signal write_cycle, next_write_cycle : integer range -1 to lcd_size := -1;
 
 	-- busy wait counter
-	signal wait_counter_init, wait_counter_init_next : natural range 0 to wait_init := 0;
-	signal wait_counter_init_finished, wait_counter_init_finished_next : std_logic := '0';
+	signal wait_counter_prereset, wait_counter_prereset_next : natural range 0 to const_wait_prereset := 0;
+	signal wait_counter_prereset_finished, wait_counter_prereset_finished_next : std_logic := '0';
 
-	signal wait_counter_reseton, wait_counter_reseton_next : natural range 0 to wait_reseton := 0;
-	signal wait_counter_reseton_finished, wait_counter_reseton_finished_next : std_logic := '0';
+	signal wait_counter_reset, wait_counter_reset_next : natural range 0 to const_wait_reset := 0;
+	signal wait_counter_reset_finished, wait_counter_reset_finished_next : std_logic := '0';
 
-	signal wait_counter_resetoff, wait_counter_resetoff_next : natural range 0 to wait_resetoff := 0;
-	signal wait_counter_resetoff_finished, wait_counter_resetoff_finished_next : std_logic := '0';
+	signal wait_counter_resetted, wait_counter_resetted_next : natural range 0 to const_wait_resetted := 0;
+	signal wait_counter_resetted_finished, wait_counter_resetted_finished_next : std_logic := '0';
 
-	signal wait_counter_preready, wait_counter_preready_next : natural range 0 to wait_preready := 0;
-	signal wait_counter_preready_finished, wait_counter_preready_finished_next : std_logic := '0';
+	signal wait_counter_readrom, wait_counter_readrom_next : natural range 0 to const_wait_readrom := 0;
+	signal wait_counter_readrom_finished, wait_counter_readrom_finished_next : std_logic := '0';
 
 	-- hack for ghdl, using local static values
 	constant static_init_size : natural := 4; --init_size;
@@ -140,15 +140,15 @@ begin
 			init_cycle <= 0;
 			write_cycle <= -1;
 
-			wait_counter_init <= 0;
-			wait_counter_reseton <= 0;
-			wait_counter_resetoff <= 0;
-			wait_counter_preready <= 0;
+			wait_counter_prereset <= 0;
+			wait_counter_reset <= 0;
+			wait_counter_resetted <= 0;
+			wait_counter_readrom <= 0;
 
-			wait_counter_init_finished <= '0';
-			wait_counter_reseton_finished <= '0';
-			wait_counter_resetoff_finished <= '0';
-			wait_counter_preready_finished <= '0';
+			wait_counter_prereset_finished <= '0';
+			wait_counter_reset_finished <= '0';
+			wait_counter_resetted_finished <= '0';
+			wait_counter_readrom_finished <= '0';
 
 		-- clock
 		elsif rising_edge(in_clk) then
@@ -166,47 +166,47 @@ begin
 			init_cycle <= next_init_cycle;
 			write_cycle <= next_write_cycle;
 
-			wait_counter_init <= wait_counter_init_next;
-			wait_counter_reseton <= wait_counter_reseton_next;
-			wait_counter_resetoff <= wait_counter_resetoff_next;
-			wait_counter_preready <= wait_counter_preready_next;
+			wait_counter_prereset <= wait_counter_prereset_next;
+			wait_counter_reset <= wait_counter_reset_next;
+			wait_counter_resetted <= wait_counter_resetted_next;
+			wait_counter_readrom <= wait_counter_readrom_next;
 
-			wait_counter_init_finished <= wait_counter_init_finished_next;
-			wait_counter_reseton_finished <= wait_counter_reseton_finished_next;
-			wait_counter_resetoff_finished <= wait_counter_resetoff_finished_next;
-			wait_counter_preready_finished <= wait_counter_preready_finished_next;
+			wait_counter_prereset_finished <= wait_counter_prereset_finished_next;
+			wait_counter_reset_finished <= wait_counter_reset_finished_next;
+			wait_counter_resetted_finished <= wait_counter_resetted_finished_next;
+			wait_counter_readrom_finished <= wait_counter_readrom_finished_next;
 
 		end if;
 	end process;
 
 
 	-- next timer counters
-	wait_counter_init_next <= wait_counter_init + 1
-		when lcd_state=Wait_Reset and wait_counter_init/=wait_init
+	wait_counter_prereset_next <= wait_counter_prereset + 1
+		when lcd_state=Wait_Reset and wait_counter_prereset/=const_wait_prereset
 		else 0;
-	wait_counter_init_finished_next <= '1' when wait_counter_init=wait_init else '0';
+	wait_counter_prereset_finished_next <= '1' when wait_counter_prereset=const_wait_prereset else '0';
 
-	wait_counter_reseton_next <= wait_counter_reseton + 1
-		when lcd_state=Reset and wait_counter_reseton/=wait_reseton
+	wait_counter_reset_next <= wait_counter_reset + 1
+		when lcd_state=Reset and wait_counter_reset/=const_wait_reset
 		else 0;
-	wait_counter_reseton_finished_next <= '1' when wait_counter_reseton=wait_reseton else '0';
+	wait_counter_reset_finished_next <= '1' when wait_counter_reset=const_wait_reset else '0';
 
-	wait_counter_resetoff_next <= wait_counter_resetoff + 1
-		when lcd_state=Resetted and wait_counter_resetoff/=wait_resetoff
+	wait_counter_resetted_next <= wait_counter_resetted + 1
+		when lcd_state=Resetted and wait_counter_resetted/=const_wait_resetted
 		else 0;
-	wait_counter_resetoff_finished_next <= '1' when wait_counter_resetoff=wait_resetoff else '0';
+	wait_counter_resetted_finished_next <= '1' when wait_counter_resetted=const_wait_resetted else '0';
 
-	wait_counter_preready_next <= wait_counter_preready + 1
-		when lcd_state=Wait_ReadROM and wait_counter_preready/=wait_preready
+	wait_counter_readrom_next <= wait_counter_readrom + 1
+		when lcd_state=Wait_ReadROM and wait_counter_readrom/=const_wait_readrom
 		else 0;
-	wait_counter_preready_finished_next <= '1' when wait_counter_preready=wait_preready else '0';
+	wait_counter_readrom_finished_next <= '1' when wait_counter_readrom=const_wait_readrom else '0';
 
 
 	proc_transitions : process(
 		lcd_state, i2c_cycle, init_cycle, write_cycle, 
 		lcd_reset, rom_addr, initrom_addr, in_initrom_word, in_rom_word,
 		i2c_enable, i2c_addr, i2c_data, in_i2c_busy,
-		wait_counter_init_finished, wait_counter_reseton_finished, wait_counter_resetoff_finished, wait_counter_preready_finished)
+		wait_counter_prereset_finished, wait_counter_reset_finished, wait_counter_resetted_finished, wait_counter_readrom_finished)
 	begin
 		-- defaults
 		next_lcd_state <= lcd_state;
@@ -227,7 +227,7 @@ begin
 		case lcd_state is
 
 			when Wait_Reset =>	
-				if wait_counter_init_finished= '1' then
+				if wait_counter_prereset_finished= '1' then
 					next_lcd_state <= Reset;
 				end if;
 
@@ -236,7 +236,7 @@ begin
 				next_lcd_reset <= '0';
 				
 				-- wait
-				if wait_counter_reseton_finished= '1' then
+				if wait_counter_reset_finished= '1' then
 					next_lcd_state <= Resetted;
 				end if;
 
@@ -245,7 +245,7 @@ begin
 				next_lcd_reset <= '1';
 
 				-- wait
-				if wait_counter_resetoff_finished= '1' then
+				if wait_counter_resetted_finished= '1' then
 					next_lcd_state <= ReadInitROM;
 				end if;
 
@@ -275,7 +275,7 @@ begin
 
 
 			when Wait_ReadROM =>
-				if wait_counter_preready_finished= '1' then
+				if wait_counter_readrom_finished= '1' then
 					next_lcd_state <= ReadROM;
 				end if;
 
