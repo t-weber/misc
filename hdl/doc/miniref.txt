@@ -1,0 +1,48 @@
+Switch
+======
+
+Combinatorial
+-------------
+
+with to_switch select to_assign <=
+	assign_expr_1 when case_1,
+	assign_expr_2 when case_2 | case_3,
+	assign_expr_n when others;
+
+
+Sequential
+----------
+
+case to_switch is
+	when case_1 =>
+		to_assign <= assign_expr_1;
+	when case_2 =>
+		to_assign <= assign_expr_2;
+	when others =>
+		null;
+end case;
+
+
+
+If
+==
+
+Combinatorial
+-------------
+
+to_assign <=
+	expr_1 when bool_expr_1
+	expr_2 when bool_expr_2
+	else expr_else;
+
+
+Sequential
+----------
+
+if bool_expr_1 then
+	to_assign <= expr_1;
+elsif bool_expr_2 then
+	to_assign <= expr_2;
+else
+	to_assign <= expr_else;
+end if;
