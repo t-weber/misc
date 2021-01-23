@@ -25,16 +25,22 @@ entity lfsr is
 		-- initial value
 		in_seed : in std_logic_vector(num_bits-1 downto 0);
 
+		-- enable setting of seed
+		in_setseed : in std_logic;
+
+		-- get next value
+		in_nextval : in std_logic;
+
 		-- final value
-		out_reg : out std_logic_vector(num_bits-1 downto 0)
+		out_val : out std_logic_vector(num_bits-1 downto 0)
 	);
 end entity;
 
 
 architecture lfsr_impl of lfsr is
-	signal reg, next_reg : std_logic_vector(num_bits-1 downto 0) := in_seed;
+	signal val, next_val : std_logic_vector(num_bits-1 downto 0) := in_seed;
 
-	function get_next_reg(vec : std_logic_vector) return std_logic_vector is
+	function get_next_val(vec : std_logic_vector) return std_logic_vector is
 	begin
 		-- normal left shift
 		-- return vec(num_bits-2 downto 0) & vec(num_bits-1);
@@ -49,18 +55,24 @@ architecture lfsr_impl of lfsr is
 
 begin
 	-- output
-	out_reg <= reg;
+	out_val <= val;
 
 	process(in_clk, in_rst) begin
 		-- reset
 		if in_rst='1' then
-			reg <= in_seed;
+			val <= (others=>'0');
 
-		-- next reg
+		-- clock
 		elsif rising_edge(in_clk) then
-			reg <= next_reg;
+			if in_nextval='1' then
+				-- next value
+				val <= next_val;
+			elsif in_setseed='1' then
+				-- set new seed
+				val <= in_seed;
+			end if;
 		end if;
 	end process;
 
-	next_reg <= get_next_reg(reg);
+	next_val <= get_next_val(val);
 end architecture;

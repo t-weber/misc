@@ -24,7 +24,7 @@ end entity;
 
 architecture thetester of testbed is
 	signal theclk : std_logic := '0';
-	signal reg : std_logic_vector(num_bits-1 downto 0);
+	signal val : std_logic_vector(num_bits-1 downto 0);
 
 begin
 	theclk <= not theclk after thedelay;
@@ -35,7 +35,7 @@ begin
 		)
 		port map(
 			in_rst=>'0', in_clk=>theclk,
-			in_seed=>"00000101",
-			out_reg=>reg
+			in_seed=>"00000101", in_setseed=>'0',
+			out_val=>val, in_nextval=>'1'
 		);
 end architecture;
