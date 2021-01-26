@@ -5,9 +5,11 @@
 # @license see 'LICENSE.EUPL' file
 #
 
-dirs=( "." "lib" "test" "calc" )
+#dirs=( "." "lib" "test" "calc" )
+dirs=($(find . -type d))
 
 for dir in "${dirs[@]}"; do
+	echo -e "Dir: ${dir}"
 	pushd "${dir}"
 
 	rm -fv *.o
