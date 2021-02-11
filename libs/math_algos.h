@@ -2959,7 +2959,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
- * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - p. 225)
+ * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - pp. 225-226)
  * returns scattering intensity and final polarisation vector
  */
 template<class t_vec, typename t_cplx = typename t_vec::value_type>
@@ -3011,8 +3011,8 @@ requires is_vec<t_vec>
 
 
 /**
- * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - p. 225)
- * calculate indirectly with density matrix
+ * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - pp. 225-226)
+ * calculated indirectly with density matrix
  *
  * V   = N*1 + <Mperp|sigma>
  * I   = 0.5 * tr( V^H V rho )
