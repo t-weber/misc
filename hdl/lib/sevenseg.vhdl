@@ -107,7 +107,7 @@ begin
 			ledvec(13)(6 downto 0) when x"d",
 			ledvec(14)(6 downto 0) when x"e",
 			ledvec(15)(6 downto 0) when x"f",
-			"0000000" when others;
+			(others=>'0') when others;
 	end generate;
 
 	gen_leds_inv : if inverse_numbering='1' generate
@@ -128,7 +128,7 @@ begin
 			ledvec_inv(13)(6 downto 0) when x"d",
 			ledvec_inv(14)(6 downto 0) when x"e",
 			ledvec_inv(15)(6 downto 0) when x"f",
-			"0000000" when others;
+			(others=>'0') when others;
 	end generate;
 
 

@@ -23,9 +23,12 @@
 *.out
 *.app
 
-# Outputs
+# Documents
 *.pdf
 *.svg
+
+# HDL
+*.vcd
 
 # External dependencies
 qcustomplot.cpp
