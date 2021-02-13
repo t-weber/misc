@@ -38,8 +38,8 @@ entity vga is
 		constant vsync_stoppix : natural := vsync_startpix + 6;
 		constant vpix_total : natural := vsync_stoppix + 23;
 
-        -- start address of the display buffer in memory
-        constant mem_start_addr : natural := 0
+		-- start address of the display buffer in memory
+		constant mem_start_addr : natural := 0
 	);
 
 	port(
