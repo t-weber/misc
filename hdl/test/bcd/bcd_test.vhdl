@@ -31,7 +31,7 @@ begin
 	bcd_mod : entity work.bcd
 		generic map(IN_BITS=>bin_num'length, OUT_BITS=>bcd_num'length,
 			NUM_BCD_DIGITS=>3)
-		port map(in_clk=>theclk, in_rst=>'0',
+		port map(in_clk=>theclk, in_rst=>'0', in_start=>'1',
 			in_num=>bin_num, out_bcd=>bcd_num,
 			out_finished=>finished);
 end architecture;

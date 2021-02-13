@@ -24,20 +24,23 @@ entity bcd is
 		-- clock and reset
 		in_clk, in_rst : in std_logic;
 
+		-- start signal
+		in_start : in std_logic;
+
 		-- input
 		in_num : in std_logic_vector(IN_BITS-1 downto 0);
 
 		-- output
 		out_bcd : out std_logic_vector(OUT_BITS-1 downto 0);
 
-		-- conversion finished?
+		-- conversion finished (or idle)?
 		out_finished : out std_logic
 	);
 end entity;
 
 
 architecture bcd_impl of bcd is
-	type t_state is (Shift, Add, NextIndex, Finished);
+	type t_state is (Idle, Shift, Add, NextIndex);
 	signal state, state_next : t_state := Shift;
 
 	signal bcdnum, bcdnum_next : std_logic_vector(OUT_BITS-1 downto 0) := (others=>'0');
@@ -47,6 +50,7 @@ begin
 
 	-- output
 	out_bcd <= bcdnum;
+	out_finished <= '1' when state=Idle else '0';
 
 
 	-- clock process
@@ -76,11 +80,18 @@ begin
 		bitidx_next <= bitidx;
 		bcdidx_next <= bcdidx;
 
-		-- defaults
-		out_finished <= '0';
-
 
 		case state is
+			-- wait for start signal
+			when Idle =>
+				if in_start='1' then
+					-- reset
+					bcdnum_next <= (others=>'0');
+					bitidx_next <= IN_BITS-1;
+					bcdidx_next <= NUM_BCD_DIGITS-1;
+					state_next <= Shift;
+				end if;
+
 			-- shift left
 			when Shift =>
 				bcdnum_next(OUT_BITS-1 downto 1) <= bcdnum(OUT_BITS-2 downto 0);
@@ -90,9 +101,10 @@ begin
 				if bitidx /= 0 then
 					state_next <= Add;
 				else
-					state_next <= Finished;
+					state_next <= Idle;
 				end if;
 
+			-- add 3 if bcd digit >= 5
 			when Add =>
 				-- check if the bcd digit is >= 5
 				if to_int(bcdnum(bcdidx*4+3 downto bcdidx*4)) >= 5 then
@@ -108,12 +120,10 @@ begin
 					state_next <= NextIndex;
 				end if;
 
+			-- next bit
 			when NextIndex =>
 				bitidx_next <= bitidx-1;
 				state_next <= Shift;
-
-			when Finished =>
-				out_finished <= '1';
 		end case;
 	end process;
 end architecture;
