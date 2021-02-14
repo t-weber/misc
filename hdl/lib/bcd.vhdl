@@ -77,7 +77,7 @@ begin
 
 
 	-- conversion process
-	conv_proc : process(state, bitidx, bcdidx, bcdnum)
+	conv_proc : process(state, bitidx, bcdidx, bcdnum, in_start, in_num)
 	begin
 		-- save registers
 		state_next <= state;
