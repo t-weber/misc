@@ -46,6 +46,11 @@ architecture bcd_impl of bcd is
 	signal bcdnum, bcdnum_next : std_logic_vector(OUT_BITS-1 downto 0) := (others=>'0');
 	signal bitidx, bitidx_next : natural range IN_BITS-1 downto 0 := IN_BITS-1;
 	signal bcdidx, bcdidx_next : natural range NUM_BCD_DIGITS-1 downto 0 := NUM_BCD_DIGITS-1;
+
+	-- for special solution (below): use addition constant: 0x3 << (idx*4)
+	type t_intarr is array (natural range <>) of natural range 0 to 16#30000000#;
+	constant inc_const : t_intarr := (16#3#, 16#30#, 16#300#, 16#3000#, 16#30000#, 16#300000#, 16#3000000#, 16#30000000#);
+
 begin
 
 	-- output
@@ -106,11 +111,15 @@ begin
 
 			-- add 3 if bcd digit >= 5
 			when Add =>
-				-- check if the bcd digit is >= 5
+				-- check if the bcd digit is >= 5, if so, add 3
 				if to_int(bcdnum(bcdidx*4+3 downto bcdidx*4)) >= 5 then
-					-- if so, add 3
-					bcdnum_next(OUT_BITS-1 downto bcdidx*4) <=
-						inc_logvec(bcdnum(OUT_BITS-1 downto bcdidx*4), 3);
+					-- general solution: some compilers seem to have problems
+					-- with the variable vector index range
+					--bcdnum_next(OUT_BITS-1 downto bcdidx*4) <=
+					--	inc_logvec(bcdnum(OUT_BITS-1 downto bcdidx*4), 3);
+
+					-- special solution using the inc_const array
+					bcdnum_next <= inc_logvec(bcdnum, inc_const(bcdidx));
 				end if;
 
 				if bcdidx /= 0 then
