@@ -14,6 +14,7 @@ for dir in "${dirs[@]}"; do
 
 	rm -fv *.o
 	rm -fv testbed-thetester
+	rm -fv timing_test-timing_test_impl
 	rm -fv *.cf
 	rm -fv *.vcd
 
