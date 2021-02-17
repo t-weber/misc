@@ -43,7 +43,8 @@ begin
 	end generate;
 
 
-	get_edge : process(in_clk)
+	-- synchronise to clock
+	sync_proc : process(in_clk)
 	begin
 		if rising_edge(in_clk) then
 			shiftreg(0) <= in_signal;
