@@ -98,7 +98,7 @@ begin
 
 	-- address and data bus
 	out_sram_addr <= addr;
-	inout_sram_data <= data when write_enable='0' else (others=>'Z');
+	inout_sram_data <= data when write_enable='1' else (others=>'Z');
 	---------------------------------------------------------------------------
 
 
