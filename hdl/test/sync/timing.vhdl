@@ -175,6 +175,9 @@ begin
 				out_data <= inout_sram_data;
 				state_next <= FinishedReading;
 
+			--
+			-- third clock cycle
+			--
 			when FinishedReading =>
 				read_enable_next <= '0';
 				state_next <= ReadOrWrite;
