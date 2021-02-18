@@ -59,7 +59,7 @@ end entity;
 
 architecture timing_impl of timing is
 	-- states
-	type t_state is (ReadOrWrite, Reading, Writing);
+	type t_state is (ReadOrWrite, Reading, FinishedReading, Writing);
 	signal state, state_next : t_state := ReadOrWrite;
 
 	-- enable signal registers
@@ -79,21 +79,21 @@ begin
 	gen_enables : if ENABLES_ACTIVE_HIGH = '1'
 	-- active high
 	generate
-		out_sram_readenable <=
-			(read_enable and in_clk_mod) when state=ReadOrWrite --state_next=Reading or state_next=Writing
-			else read_enable;
-		out_sram_writeenable <=
-			(write_enable and in_clk_mod) when state=ReadOrWrite -- state_next=Writing or state_next=Reading
-			else write_enable;
+		with state select out_sram_readenable <=
+			(read_enable and in_clk_mod) when FinishedReading,
+			read_enable when others;
+		with state select out_sram_writeenable <=
+			(write_enable and in_clk_mod) when ReadOrWrite,
+			write_enable when others;
 
 	-- active low
 	else generate
-		out_sram_readenable <=
-			not (read_enable and in_clk_mod) when state=ReadOrWrite
-			else not read_enable;
-		out_sram_writeenable <=
-			not (write_enable and in_clk_mod) when state=ReadOrWrite
-			else not write_enable;
+		with state select out_sram_readenable <=
+			not (read_enable and in_clk_mod) when FinishedReading,
+			not read_enable when others;
+		with state select out_sram_writeenable <=
+			not (write_enable and in_clk_mod) when ReadOrWrite,
+			not write_enable when others;
 	end generate;
 
 	-- address and data bus
@@ -155,11 +155,13 @@ begin
 					if in_writeenable='1' then
 						addr_next <= in_addr;
 						data_next <= in_data;
+						read_enable_next <= '0';
 						write_enable_next <= '1';
 						state_next <= Writing;
 					else
 						addr_next <= in_addr;
 						read_enable_next <= '1';
+						write_enable_next <= '0';
 						state_next <= Reading;
 					end if;
 				end if;
@@ -169,6 +171,10 @@ begin
 			--
 			when Reading =>
 				out_data <= inout_sram_data;
+				state_next <= FinishedReading;
+
+			when FinishedReading =>
+				read_enable_next <= '0';
 				state_next <= ReadOrWrite;
 
 			--

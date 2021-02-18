@@ -88,15 +88,15 @@ begin
 		enable <= '1';
 		write_enable <= '0';
 		addr <= x"12";
-		wait for 10 ns;
+		wait for 15 ns;
 		enable <= '0';
 
 		-- read test 2
-		--wait for 10 ns;
+		--wait for 5 ns;
 		enable <= '1';
 		write_enable <= '0';
 		addr <= x"34";
-		wait for 10 ns;
+		wait for 15 ns;
 		enable <= '0';
 
 		-- write test

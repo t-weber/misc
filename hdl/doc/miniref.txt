@@ -16,7 +16,7 @@ Sequential
 case to_switch is
 	when case_1 =>
 		to_assign <= assign_expr_1;
-	when case_2 =>
+	when case_2 | case_3 =>
 		to_assign <= assign_expr_2;
 	when others =>
 		null;
