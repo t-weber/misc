@@ -107,7 +107,7 @@ begin
 	---------------------------------------------------------------------------
 	-- clock process
 	---------------------------------------------------------------------------
-	proc_clk : process(in_clk, in_reset) is
+	proc_clk : process(in_clk) is
 	begin
 		-- clock
 		if rising_edge(in_clk) then
