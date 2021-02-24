@@ -6,6 +6,8 @@
  *
  * References:
  *  * https://doc.qt.io/qt-5/qvulkanwindow.html
+ *  * https://doc.qt.io/qt-5/qvulkaninstance.html
+ *  * https://doc.qt.io/qt-5/qvulkanwindowrenderer.html
  */
 
 #include "qttst.h"
@@ -20,13 +22,90 @@
 namespace algo = boost::algorithm;
 
 
+
+// ----------------------------------------------------------------------------
+// vk renderer
+// ----------------------------------------------------------------------------
+
+VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd)
+	: m_vkinst{vk}, m_vkwnd{wnd}
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+}
+
+
+VkRenderer::~VkRenderer()
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+}
+
+
+void VkRenderer::preInitResources()
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+}
+
+
+void VkRenderer::initResources()
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+
+	m_vkdev = m_vkwnd->device();
+	m_vkfuncs = m_vkinst->deviceFunctions(m_vkdev);
+}
+
+
+void VkRenderer::releaseResources()
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+
+	m_vkfuncs = nullptr;
+}
+
+
+void VkRenderer::initSwapChainResources()
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+}
+
+
+void VkRenderer::releaseSwapChainResources()
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+}
+
+
+void VkRenderer::logicalDeviceLost()
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+}
+
+
+void VkRenderer::physicalDeviceLost()
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+}
+
+
+void VkRenderer::startNextFrame()
+{
+	std::cout << __PRETTY_FUNCTION__ << std::endl;
+
+	m_vkwnd->frameReady();
+}
+// ----------------------------------------------------------------------------
+
+
+
 // ----------------------------------------------------------------------------
 // vk window
 // ----------------------------------------------------------------------------
 
-VkWnd::VkWnd(QWindow* parent)
-	: QVulkanWindow(parent)
+VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent)
+	: m_vkinst{vk}, QVulkanWindow(parent)
 {
+	setVulkanInstance(m_vkinst.get());
+
 	QMatrix4x4 m = clipCorrectionMatrix();
 	std::cout << "Gl -> Vk: \n"
 		<< m(0,0) << " " << m(0,1) << " " << m(0,2) << " " << m(0,3) << "\n"
@@ -41,6 +120,14 @@ VkWnd::~VkWnd()
 {
 }
 
+
+QVulkanWindowRenderer* VkWnd::createRenderer()
+{
+	if(m_vkrenderer)
+		delete m_vkrenderer;
+
+	return m_vkrenderer = new VkRenderer(m_vkinst, this);
+}
 // ----------------------------------------------------------------------------
 
 
@@ -65,7 +152,7 @@ int main(int argc, char** argv)
 	set_locales();
 
 	// create vk instance
-	auto vk = std::make_unique<QVulkanInstance>();
+	auto vk = std::make_shared<QVulkanInstance>();
 
 	if(!vk->create() || !vk->isValid())
 	{
@@ -98,8 +185,7 @@ int main(int argc, char** argv)
 	}
 
 	// create vk window
-	auto wnd = std::make_unique<VkWnd>();
-	wnd->setVulkanInstance(vk.get());
+	auto wnd = std::make_unique<VkWnd>(vk);
 	wnd->resize(800, 600);
 	wnd->show();
 
