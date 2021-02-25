@@ -1,6 +1,6 @@
 #
 # @author Tobias Weber
-# @date nov-2017
+# @date feb-2021
 # @license: see 'LICENSE.GPL' file
 #
 
@@ -16,7 +16,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 
 set(CMAKE_CXX_STANDARD 17)
-add_compile_options(-std=c++17)
+add_compile_options(-std=c++17 -Wall -Wextra)
 
 add_definitions(${Boost_CXX_FLAGS})
 include_directories("${PROJECT_SOURCE_DIR}" "${Boost_INCLUDE_DIRS}/..")

@@ -1,13 +1,16 @@
 /**
  * minimal qt vk example
  * @author Tobias Weber
- * @date feb-2021
+ * @date Feb-2021
  * @license: see 'LICENSE.GPL' file
  *
  * References:
  *  * https://doc.qt.io/qt-5/qvulkanwindow.html
  *  * https://doc.qt.io/qt-5/qvulkaninstance.html
  *  * https://doc.qt.io/qt-5/qvulkanwindowrenderer.html
+ *  * https://doc.qt.io/qt-5/qtgui-hellovulkanwindow-example.html
+ *  * https://code.qt.io/cgit/qt/qtbase.git/tree/examples/vulkan/shared/trianglerenderer.cpp
+ *  * https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkRenderPassBeginInfo.html
  */
 
 #include "qttst.h"
@@ -16,6 +19,7 @@
 
 #include <locale>
 #include <iostream>
+#include <random>
 
 #include <boost/scope_exit.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -37,6 +41,35 @@ VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd)
 VkRenderer::~VkRenderer()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
+}
+
+
+void VkRenderer::tick(const std::chrono::milliseconds& ms)
+{
+	//std::cout << ms.count() << std::endl;
+
+	// random colour index
+	static std::mt19937 rng{std::random_device{}()};
+	int colidx = std::uniform_int_distribution<int>(0, 2)(rng);
+
+	if(m_coldir[colidx])
+		m_col[colidx] += float(ms.count()) / 1000.f;
+	else
+		m_col[colidx] -= float(ms.count()) / 1000.f;
+
+	if(m_col[colidx] > 1.f)
+	{
+		m_col[colidx] = 1.f;
+		m_coldir[colidx] = 0;
+	}
+	else if(m_col[colidx] < 0.f)
+	{
+		m_col[colidx] = 0.f;
+		m_coldir[colidx] = 1;
+	}
+
+	if(m_vkwnd)
+		m_vkwnd->requestUpdate();
 }
 
 
@@ -89,7 +122,32 @@ void VkRenderer::physicalDeviceLost()
 
 void VkRenderer::startNextFrame()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
+
+	VkClearValue clr /* union between .color and .depthStencil */
+	{
+		.color = VkClearColorValue{.float32 = {m_col[0], m_col[1], m_col[2], 1.f}},
+		//.depthStencil = VkClearDepthStencilValue{.depth = 1.f, .stencil = 0}
+	};
+
+	VkRenderPassBeginInfo beg
+	{
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,	// fixed value
+		.pNext = nullptr,
+		.renderPass = m_vkwnd->defaultRenderPass(),
+		.framebuffer = m_vkwnd->currentFramebuffer(),
+		.renderArea = VkRect2D{
+			.offset = VkOffset2D{.x = 0, .y = 0},
+			.extent = VkExtent2D{
+				.width = (uint32_t)m_vkwnd->swapChainImageSize().width(),
+				.height = (uint32_t)m_vkwnd->swapChainImageSize().height()}},
+		.clearValueCount = 1,
+		.pClearValues = &clr
+	};
+
+	VkSubpassContents cont = VK_SUBPASS_CONTENTS_INLINE /*VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS*/;
+	m_vkfuncs->vkCmdBeginRenderPass(m_vkwnd->currentCommandBuffer(), &beg, cont);
+	m_vkfuncs->vkCmdEndRenderPass(m_vkwnd->currentCommandBuffer());
 
 	m_vkwnd->frameReady();
 }
@@ -102,7 +160,7 @@ void VkRenderer::startNextFrame()
 // ----------------------------------------------------------------------------
 
 VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent)
-	: m_vkinst{vk}, QVulkanWindow(parent)
+	: QVulkanWindow{parent}, m_vkinst{vk}
 {
 	setVulkanInstance(m_vkinst.get());
 
@@ -113,11 +171,20 @@ VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent)
 		<< m(2,0) << " " << m(2,1) << " " << m(2,2) << " " << m(2,3) << "\n"
 		<< m(3,0) << " " << m(3,1) << " " << m(3,2) << " " << m(3,3) << "\n"
 		<< std::endl;
+
+	connect(&m_timer, &QTimer::timeout,
+		[this]() -> void
+		{
+			if(m_vkrenderer)
+				m_vkrenderer->tick(std::chrono::milliseconds(1000 / 60));
+		});
+	m_timer.start(std::chrono::milliseconds(1000 / 60));
 }
 
 
 VkWnd::~VkWnd()
 {
+	m_timer.stop();
 }
 
 
