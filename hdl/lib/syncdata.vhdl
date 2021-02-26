@@ -38,7 +38,7 @@ end entity;
 
 
 --
--- mux synchroniser from fast to slow clock domain
+-- mux synchroniser from slow to fast clock domain
 -- implements the design in Fig.  9 from https://www.edn.com/synchronizer-techniques-for-multi-clock-domain-socs-fpgas/
 --
 architecture syncmux_impl of syncvec is
