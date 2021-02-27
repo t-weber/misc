@@ -157,6 +157,7 @@ public:
 	const T operator[](size_t i) const { return base_type::operator()(i,0); }
 };
 
+
 template<typename size_t, size_t ROWS, size_t COLS, typename T, template<size_t, size_t, class...> class t_mat_base>
 class qmat_adapter : public t_mat_base<COLS, ROWS, T>
 {
@@ -193,6 +194,7 @@ public:
 	T& operator[](size_t i) { return static_cast<base_type&>(*this)[i]; }
 	const T operator[](size_t i) const { return static_cast<const base_type&>(*this)[i]; }
 };
+
 
 template<typename size_t, size_t ROWS, size_t COLS, typename T, class t_mat_base>
 class qmatNN_adapter : public t_mat_base

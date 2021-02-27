@@ -192,19 +192,22 @@ void VkRenderer::releaseResources()
 
 void VkRenderer::initSwapChainResources()
 {
+	using namespace m_ops;
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	m_iScreenDims[0] = m_vkwnd->swapChainImageSize().width();
 	m_iScreenDims[1] = m_vkwnd->swapChainImageSize().height();
-
 	std::cout << "window size: " << m_iScreenDims[0] << " x " << m_iScreenDims[1] << "." << std::endl;
 
 	m_matViewport = m::hom_viewport<t_mat>(m_iScreenDims[0], m_iScreenDims[1], 0., 1.);
 	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat>(m_matViewport);
 
 	m_matPerspective = m::hom_perspective<t_mat>(
-		0.01, 100., m::pi<t_real>*0.5, t_real(m_iScreenDims[1])/t_real(m_iScreenDims[0]));
+		0.01, 100., m::pi<t_real>*0.5,
+		t_real(m_iScreenDims[1])/t_real(m_iScreenDims[0]), false, true, true);
 	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat>(m_matPerspective);
+	std::cout << "perspective matrix: " << m_matPerspective << "." << std::endl;
+	std::cout << "inverted perspective matrix: " << m_matPerspective_inv << "." << std::endl;
 }
 
 
@@ -270,14 +273,6 @@ VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent)
 {
 	setVulkanInstance(m_vkinst.get());
 
-	QMatrix4x4 m = clipCorrectionMatrix();
-	std::cout << "Gl -> Vk: \n"
-		<< m(0,0) << " " << m(0,1) << " " << m(0,2) << " " << m(0,3) << "\n"
-		<< m(1,0) << " " << m(1,1) << " " << m(1,2) << " " << m(1,3) << "\n"
-		<< m(2,0) << " " << m(2,1) << " " << m(2,2) << " " << m(2,3) << "\n"
-		<< m(3,0) << " " << m(3,1) << " " << m(3,2) << " " << m(3,3) << "\n"
-		<< std::endl;
-
 	connect(&m_timer, &QTimer::timeout,
 		[this]() -> void
 		{
@@ -285,7 +280,6 @@ VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent)
 				m_vkrenderer->tick(std::chrono::milliseconds(1000 / 60));
 		});
 
-	//setMouseTracking(true);
 	m_timer.start(std::chrono::milliseconds(1000 / 60));
 }
 

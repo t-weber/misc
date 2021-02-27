@@ -2703,29 +2703,32 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * perspective matrix (homogeneous 4x4)
+ * set bZ01=false for gl (near and far planes at -1 and +1), and bZ01=true for vk (planes at 0 and 1)
  * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluPerspective.xml
  */
 template<class t_mat>
 t_mat hom_perspective(
 	typename t_mat::value_type n = 0.01, typename t_mat::value_type f = 100.,
-	typename t_mat::value_type fov = 0.5*pi<typename t_mat::value_type>, typename t_mat::value_type ratio = 3./4.,
-	bool bRHS = true, bool bZ01 = false)
+	typename t_mat::value_type fov = 0.5*pi<typename t_mat::value_type>,
+	typename t_mat::value_type ratio = 3./4.,
+	bool bInvZ = false, bool bZ01 = false, bool bInvY=false)
 requires is_mat<t_mat>
 {
 	using T = typename t_mat::value_type;
 	const T c = 1./std::tan(0.5 * fov);
 	const T n0 = bZ01 ? T(0) : n;
 	const T sc = bZ01 ? T(1) : T(2);
-	const T zs = bRHS ? T(1) : T(-1);
+	const T ys = bInvY ? T(-1) : T(1);
+	const T zs = bInvZ ? T(-1) : T(1);
 
 	//         ( x*c*r                           )      ( -x*c*r/z                         )
 	//         ( y*c                             )      ( -y*c/z                           )
 	// P * x = ( z*(n0+f)/(n-f) + w*sc*n*f/(n-f) )  =>  ( -(n0+f)/(n-f) - w/z*sc*n*f/(n-f) )
 	//         ( -z                              )      ( 1                                )
 	return create<t_mat>({
-		c*ratio, 	0., 	0., 				0.,
-		0, 			c, 		0., 				0.,
-		0.,			0.,		zs*(n0+f)/(n-f), 	sc*n*f/(n-f),
+		c*ratio, 	0., 	0.,					0.,
+		0, 			ys*c,	0.,					0.,
+		0.,			0.,		zs*(n0+f)/(n-f),	sc*n*f/(n-f),
 		0.,			0.,		-zs,				0.
 	});
 }
