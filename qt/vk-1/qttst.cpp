@@ -28,8 +28,6 @@
 namespace fs = std::filesystem;
 
 #include <boost/scope_exit.hpp>
-#include <boost/algorithm/string/replace.hpp>
-namespace algo = boost::algorithm;
 
 
 static inline std::string get_vk_error(VkResult res)
@@ -41,6 +39,20 @@ static inline std::string get_vk_error(VkResult res)
 		case VK_ERROR_OUT_OF_DEVICE_MEMORY: return "out of device memory";
 		case VK_ERROR_INVALID_SHADER_NV: return "invalid shader";
 		default: return "<unknown error code>";
+	}
+}
+
+
+static inline std::string get_device_type(const VkPhysicalDeviceType& ty)
+{
+	switch(ty)
+	{
+		case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: return "integrated gpu";
+		case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: return "discrete gpu";
+		case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: return "virtual gpu";
+		case VK_PHYSICAL_DEVICE_TYPE_CPU: return "virtual cpu";
+		case VK_PHYSICAL_DEVICE_TYPE_OTHER: return "other";
+		default: return "<unknown>";
 	}
 }
 
@@ -62,6 +74,23 @@ VkRenderer::~VkRenderer()
 }
 
 
+QPointF VkRenderer::VkToScreenCoords(const t_vec& vec4, bool *pVisible)
+{
+	auto [ vecPersp, vec ] =
+	m::hom_to_screen_coords<t_mat, t_vec>(vec4, m_matCam, m_matPerspective, m_matViewport, true);
+
+	// position not visible -> return a point outside the viewport
+	if(vecPersp[2] > 1.)
+	{
+		if(pVisible) *pVisible = false;
+		return QPointF(-1*m_iScreenDims[0], -1*m_iScreenDims[1]);
+	}
+
+	if(pVisible) *pVisible = true;
+	return QPointF(vec[0], vec[1]);
+}
+
+
 void VkRenderer::tick(const std::chrono::milliseconds& ms)
 {
 	//std::cout << ms.count() << std::endl;
@@ -80,6 +109,15 @@ void VkRenderer::preInitResources()
 void VkRenderer::initResources()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	const VkPhysicalDeviceProperties* props = m_vkwnd->physicalDeviceProperties();
+	std::cout << "physical device:"
+		<< "\n\tapi = " << props->apiVersion << ","
+		<< "\n\tdriver = " << props->driverVersion << ","
+		<< "\n\tvendor = " << props->vendorID << ","
+		<< "\n\tdevice = " << props->deviceID << ","
+		<< "\n\tname = " << props->deviceName << ","
+		<< "\n\ttype = " << get_device_type(props->deviceType) << "."
+		<< std::endl;
 
 	m_vkdev = m_vkwnd->device();
 	m_vkfuncs = m_vkinst->deviceFunctions(m_vkdev);
@@ -155,6 +193,18 @@ void VkRenderer::releaseResources()
 void VkRenderer::initSwapChainResources()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
+
+	m_iScreenDims[0] = m_vkwnd->swapChainImageSize().width();
+	m_iScreenDims[1] = m_vkwnd->swapChainImageSize().height();
+
+	std::cout << "window size: " << m_iScreenDims[0] << " x " << m_iScreenDims[1] << "." << std::endl;
+
+	m_matViewport = m::hom_viewport<t_mat>(m_iScreenDims[0], m_iScreenDims[1], 0., 1.);
+	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat>(m_matViewport);
+
+	m_matPerspective = m::hom_perspective<t_mat>(
+		0.01, 100., m::pi<t_real>*0.5, t_real(m_iScreenDims[1])/t_real(m_iScreenDims[0]));
+	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat>(m_matPerspective);
 }
 
 
@@ -234,6 +284,8 @@ VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent)
 			if(m_vkrenderer)
 				m_vkrenderer->tick(std::chrono::milliseconds(1000 / 60));
 		});
+
+	//setMouseTracking(true);
 	m_timer.start(std::chrono::milliseconds(1000 / 60));
 }
 
@@ -250,6 +302,12 @@ QVulkanWindowRenderer* VkWnd::createRenderer()
 		delete m_vkrenderer;
 
 	return m_vkrenderer = new VkRenderer(m_vkinst, this);
+}
+
+
+void VkWnd::mouseMoveEvent(QMouseEvent *pEvt)
+{
+	m_posMouse = pEvt->localPos();
 }
 // ----------------------------------------------------------------------------
 

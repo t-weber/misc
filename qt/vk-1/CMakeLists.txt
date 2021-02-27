@@ -15,8 +15,8 @@ find_package(Qt5Widgets REQUIRED)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 
-set(CMAKE_CXX_STANDARD 17)
-add_compile_options(-std=c++17 -Wall -Wextra)
+set(CMAKE_CXX_STANDARD 20)
+add_compile_options(-std=c++20 -Wall -Wextra)
 
 add_definitions(${Boost_CXX_FLAGS})
 include_directories("${PROJECT_SOURCE_DIR}" "${Boost_INCLUDE_DIRS}/..")

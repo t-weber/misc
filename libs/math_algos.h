@@ -990,10 +990,11 @@ t_cont<typename t_mat::value_type> flatten(const t_mat& mat)
 requires is_mat<t_mat> && is_basic_vec<t_cont<typename t_mat::value_type>>
 {
 	using T = typename t_mat::value_type;
+	using t_idx = decltype(mat.size1());
 	t_cont<T> vec;
 
-	for(std::size_t iRow=0; iRow<mat.size1(); ++iRow)
-		for(std::size_t iCol=0; iCol<mat.size2(); ++iCol)
+	for(t_idx iRow=0; iRow<mat.size1(); ++iRow)
+		for(t_idx iCol=0; iCol<mat.size2(); ++iCol)
 			vec.push_back(mat(iRow, iCol));
 
 	return vec;
@@ -1132,8 +1133,10 @@ std::tuple<t_mat, bool> inv(const t_mat& mat)
 requires is_mat<t_mat>
 {
 	using T = typename t_mat::value_type;
+	using t_idx = decltype(mat.size1());
+
 	using t_vec = std::vector<T>;
-	const std::size_t N = mat.size1();
+	const t_idx N = mat.size1();
 
 	// fail if matrix is not square
 	if(N != mat.size2())
@@ -1151,9 +1154,9 @@ requires is_mat<t_mat>
 
 	t_mat matInv = create<t_mat>(N, N);
 
-	for(std::size_t i=0; i<N; ++i)
+	for(t_idx i=0; i<N; ++i)
 	{
-		for(std::size_t j=0; j<N; ++j)
+		for(t_idx j=0; j<N; ++j)
 		{
 			const T sgn = ((i+j) % 2) == 0 ? T(1) : T(-1);
 			const t_vec subMat = flat_submat<t_vec>(matFlat, N, N, i, j);

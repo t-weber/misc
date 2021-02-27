@@ -11,9 +11,21 @@
 #include <QVulkanWindow>
 #include <QVulkanWindowRenderer>
 #include <QVulkanDeviceFunctions>
+#include <QMatrix4x4>
+#include <QVector4D>
+#include <QVector3D>
 #include <QTimer>
+#include <QMouseEvent>
 
 #include <memory>
+
+#include "../../libs/math_algos.h"
+
+
+using t_real = float;
+using t_vec3 = m::qvecN_adapter<int, 3, t_real, QVector3D>;
+using t_vec = m::qvecN_adapter<int, 4, t_real, QVector4D>;
+using t_mat = m::qmatNN_adapter<int, 4, 4, t_real, QMatrix4x4>;
 
 
 class VkWnd;
@@ -30,7 +42,14 @@ protected:
 	VkShaderModule m_fragShader{VK_NULL_HANDLE};
 	VkShaderModule m_vertexShader{VK_NULL_HANDLE};
 
+	t_mat m_matPerspective, m_matPerspective_inv;
+	t_mat m_matViewport, m_matViewport_inv;
+	t_mat m_matCam, m_matCam_inv;
+
+	int m_iScreenDims[2] = { -1, -1 };
+
 protected:
+	QPointF VkToScreenCoords(const t_vec& vec, bool *pVisible=nullptr);
 
 public:
 	VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd);
@@ -58,15 +77,16 @@ protected:
 	std::shared_ptr<QVulkanInstance> m_vkinst;
 	VkRenderer* m_vkrenderer = nullptr;
 
+	QPointF m_posMouse;
 	QTimer m_timer;
-
-protected:
 
 public:
 	VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent=nullptr);
 	virtual ~VkWnd();
 
 	virtual QVulkanWindowRenderer* createRenderer() override;
+
+	virtual void mouseMoveEvent(QMouseEvent *pEvt) override;
 };
 
 
