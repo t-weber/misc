@@ -19,17 +19,17 @@
 
 #include <QApplication>
 
+#include <cstddef>
 #include <locale>
 #include <iostream>
 #include <random>
+#include <fstream>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 #include <boost/scope_exit.hpp>
 #include <boost/algorithm/string/replace.hpp>
 namespace algo = boost::algorithm;
-
-
-#define _GL_MAJ_VER 4
-#define _GL_MIN_VER 5
 
 
 static inline std::string get_vk_error(VkResult res)
@@ -88,96 +88,46 @@ void VkRenderer::initResources()
 	// --------------------------------------------------------------------
 	// shaders
 	// --------------------------------------------------------------------
-	std::string strFragShader = R"RAW(
-		#version ${GLSL_VERSION}
+	if(!fs::exists("vert.spv") || !fs::exists("frag.spv"))
+	{
+		std::cerr << "Vertex or fragment shader could be found." << std::endl;
+		return;
+	}
 
-		in vec4 fragcolor;
-		out vec4 outcolor;
-
-		uniform sampler2D img;
-		in vec2 fragtexcoords;
-
-		// cursor position
-		uniform vec2 fragCurUV = vec2(0.25, 0.25);
-
-		void main()
-		{
-			outcolor = texture(img, fragtexcoords);
-			outcolor *= fragcolor;
-
-			// paint cursor position
-			if(length(fragtexcoords - fragCurUV) < 0.01)
-				outcolor = vec4(1,1,1,1);
-		}
-	)RAW";
-
-
-	std::string strVertexShader = R"RAW(
-		#version ${GLSL_VERSION}
-
-		in vec4 vertex;
-		in vec4 normal;
-		in vec4 vertexcolor;
-		out vec4 fragcolor;
-
-		in vec2 texcoords;
-		out vec2 fragtexcoords;
-
-		uniform mat4 proj = mat4(1.);
-		uniform mat4 cam = mat4(1.);
-
-		vec3 light_dir = vec3(2, 2, -1);
-
-		float lighting(vec3 lightdir)
-		{
-			float I = dot(vec3(cam*normal), normalize(lightdir));
-			if(I < 0) I = 0;
-			return I;
-		}
-
-		void main()
-		{
-			gl_Position = proj * cam * vertex;
-
-			float I = lighting(light_dir);
-			fragcolor = vertexcolor * I;
-			fragcolor[3] = 1;
-
-			fragtexcoords = texcoords;
-		}
-	)RAW";
-
-
-	// set glsl version
-	std::string strGlsl = std::to_string(_GL_MAJ_VER*100 + _GL_MIN_VER*10);
-	for(std::string* strSrc : { &strFragShader, &strVertexShader })
-		algo::replace_all(*strSrc, std::string("${GLSL_VERSION}"), strGlsl);
-
-
-	// compile shaders
-	using t_shader = std::tuple<const std::string*, VkShaderModule*, std::string>;
+	// load shaders
+	using t_shader = std::tuple<const std::string, VkShaderModule*>;
 
 	for(const t_shader& shader : {
-		std::make_tuple(&strFragShader, &m_fragShader, "fragment"),
-		std::make_tuple(&strVertexShader, &m_vertexShader, "vertex") })
+		std::make_tuple("vert.spv", &m_fragShader),
+		std::make_tuple("frag.spv", &m_vertexShader) })
 	{
-		std::cout << "Compiling " << std::get<2>(shader) << " shader." << std::endl;
+		const std::string& file = std::get<0>(shader);
+
+		std::size_t size = fs::file_size(file);
+		std::cout << "Loading shader " << file << ", size = " << size << "." << std::endl;
+
+		std::vector<std::byte> bin;	// shader binary data
+		bin.resize(size);
+		if(std::ifstream ifstr{file}; !ifstr.read(reinterpret_cast<char*>(bin.data()), size))
+		{
+			std::cerr << "Error loading shader " << file << "." << std::endl;
+			continue;
+		}
 
 		VkShaderModuleCreateInfo shaderInfo
 		{
 			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, // fixed value
 			.pNext = nullptr,
 			.flags = 0, // unused
-			.codeSize = std::get<0>(shader)->length(),
-			.pCode = reinterpret_cast<decltype(VkShaderModuleCreateInfo::pCode)>
-				(std::get<0>(shader)->c_str())
+			.codeSize = size,
+			.pCode = reinterpret_cast<decltype(VkShaderModuleCreateInfo::pCode)>(bin.data())
 		};
 
 		if(VkResult err = m_vkfuncs->vkCreateShaderModule(m_vkdev, &shaderInfo, 0, std::get<1>(shader));
 		   err != VK_SUCCESS)
 		{
-			std::cerr << "Error compiling " << std::get<2>(shader)
-				<<  " shader: " << get_vk_error(err) << std::endl;
+			std::cerr << "Error compiling " << file <<  ": " << get_vk_error(err) << std::endl;
+			continue;
 		}
 	}
 	// --------------------------------------------------------------------

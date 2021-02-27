@@ -26,3 +26,9 @@ add_executable(qttst qttst.cpp qttst.h)
 target_link_libraries(qttst
 	${Boost_LIBRARIES}
 	Qt5::Core Qt5::Widgets Qt5::Gui)
+
+
+execute_process(
+	COMMAND glslc --target-env=vulkan1.0 -o vert.spv ${PROJECT_SOURCE_DIR}/shader.vert
+	COMMAND glslc --target-env=vulkan1.0 -o frag.spv ${PROJECT_SOURCE_DIR}/shader.frag
+)

@@ -549,8 +549,8 @@ public:
 	mat& operator/=(value_type d) { return m_ops::operator/=(*this, d); }
 
 private:
-	container_type m_data;
-	std::size_t m_rowsize, m_colsize;
+	container_type m_data{};
+	std::size_t m_rowsize{}, m_colsize{};
 };
 
 // ----------------------------------------------------------------------------

@@ -3,6 +3,14 @@
  * @author Tobias Weber
  * @date dec-17
  * @license see 'LICENSE.EUPL' file
+ *
+ * @see general references for algorithms:
+ * 	- (Arens15): T. Arens et al., ISBN: 978-3-642-44919-2, DOI: 10.1007/978-3-642-44919-2 (2015).
+ * 	- (Arfken13): G. B. Arfken et al., ISBN: 978-0-12-384654-9, DOI: 10.1016/C2009-0-30629-7 (2013).
+ * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008).
+ * 	- (Merziger06): G. Merziger and T. Wirth, ISBN: 3923923333 (2006).
+ * 	- (Scarpino11): M. Scarpino, ISBN: 978-1-6172-9017-6 (2011).
+ * 	- (Shirane02): G. Shirane et al., ISBN: 978-0-5214-1126-4 (2002).
  */
 
 #ifndef __MATH_ALGOS_H__
@@ -18,13 +26,14 @@
 #include <limits>
 #include <algorithm>
 #include <numeric>
+#include <numbers>
 //#include <iostream>
 
 
 namespace m {
 
-template<typename T> constexpr T pi = T(M_PI);
-template<typename T> T golden = T(0.5) + std::sqrt(T(5))/T(2);
+template<typename T> constexpr T pi = std::numbers::pi_v<T>;
+template<typename T> T golden = std::numbers::phi_v<T>; //T(0.5) + std::sqrt(T(5))/T(2);
 
 
 // ----------------------------------------------------------------------------
@@ -40,6 +49,35 @@ requires is_scalar<T>
 {
 	return std::abs(t1 - t2) <= eps;
 }
+
+
+/**
+ * mod operation, keeping result positive
+ */
+template<class t_real>
+t_real mod_pos(t_real val, t_real tomod=t_real{2}*pi<t_real>)
+requires is_scalar<t_real>
+{
+	val = std::fmod(val, tomod);
+	if(val < t_real(0))
+		val += tomod;
+
+	return val;
+}
+
+/**
+ * are two angles equal within an epsilon range?
+ */
+template<class T>
+bool angle_equals(T t1, T t2, T eps = std::numeric_limits<T>::epsilon(), T tomod=T{2}*pi<T>)
+requires is_scalar<T>
+{
+	t1 = mod_pos<T>(t1, tomod);
+	t2 = mod_pos<T>(t2, tomod);
+
+	return std::abs(t1 - t2) <= eps;
+}
+
 
 /**
  * are two complex numbers equal within an epsilon range?
@@ -505,6 +543,21 @@ requires is_basic_vec<t_vec>
 
 
 /**
+ * n-norm
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+typename t_vec::value_type norm(const t_vec& vec, t_real n)
+requires is_basic_vec<t_vec>
+{
+	t_real d = t_real{0};
+	for(std::size_t i=0; i<vec.size(); ++i)
+		d += std::pow(std::abs(vec[i]), n);
+	n = std::pow(d, t_real(1)/n);
+	return n;
+}
+
+
+/**
  * outer product
  */
 template<class t_mat, class t_vec>
@@ -535,8 +588,8 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 // with metric
 
 /**
- * covariant metric tensor
- * g_{i,j} = e_i * e_j
+ * covariant metric tensor, g_{i,j} = e_i * e_j
+ * @see (Arens15), p. 808
  */
 template<class t_mat, class t_vec, template<class...> class t_cont=std::initializer_list>
 t_mat metric(const t_cont<t_vec>& basis_co)
@@ -563,6 +616,7 @@ requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 
 /**
  * lower index using metric
+ * @see (Arens15), p. 808
  */
 template<class t_mat, class t_vec>
 t_vec lower_index(const t_mat& metric_co, const t_vec& vec_contra)
@@ -581,6 +635,7 @@ requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 
 /**
  * raise index using metric
+ * @see (Arens15), p. 808
  */
 template<class t_mat, class t_vec>
 t_vec raise_index(const t_mat& metric_contra, const t_vec& vec_co)
@@ -599,6 +654,7 @@ requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 
 /**
  * inner product using metric
+ * @see (Arens15), p. 808
  */
 template<class t_mat, class t_vec>
 typename t_vec::value_type inner(const t_mat& metric_co, const t_vec& vec1_contra, const t_vec& vec2_contra)
@@ -611,6 +667,7 @@ requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 
 /**
  * 2-norm using metric
+ * @see (Arens15), p. 808
  */
 template<class t_mat, class t_vec>
 typename t_vec::value_type norm(const t_mat& metric_co, const t_vec& vec_contra)
@@ -625,6 +682,7 @@ requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 /**
  * matrix to project onto vector: P = |v><v|
  * from: |x'> = <v|x> * |v> = |v><v|x> = |v><v| * |x>
+ * @see (Arens15), p. 814
  */
 template<class t_mat, class t_vec>
 t_mat projector(const t_vec& vec, bool bIsNormalised = true)
@@ -645,6 +703,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * project vector vec onto another vector vecProj
+ * @see (Arens15), p. 814
  */
 template<class t_vec>
 t_vec project(const t_vec& vec, const t_vec& vecProj, bool bIsNormalised = true)
@@ -666,6 +725,7 @@ requires is_vec<t_vec>
 /**
  * project vector vec onto another vector vecProj
  * don't multiply with direction vector
+ * @see (Arens15), p. 814
  */
 template<class t_vec>
 typename t_vec::value_type
@@ -688,10 +748,11 @@ requires is_vec<t_vec>
 /**
  * project vector vec onto the line lineOrigin + lam*lineDir
  * shift line to go through origin, calculate projection and shift back
- * returns [closest point, distance]
+ * @returns [closest point, distance]
  */
 template<class t_vec>
-std::tuple<t_vec, typename t_vec::value_type> project_line(const t_vec& vec,
+std::tuple<t_vec, typename t_vec::value_type>
+project_line(const t_vec& vec,
 	const t_vec& lineOrigin, const t_vec& lineDir, bool bIsNormalised = true)
 requires is_vec<t_vec>
 {
@@ -705,8 +766,55 @@ requires is_vec<t_vec>
 
 
 /**
+ * distance between point and line
+ */
+template<class t_vec, class t_real = typename t_vec::value_type>
+t_real dist_pt_line(const t_vec& pt,
+	const t_vec& linePt1, const t_vec& linePt2,
+	bool bLineIsFinite=true)
+requires is_vec<t_vec>
+{
+	const std::size_t dim = linePt1.size();
+
+	const t_vec lineDir = linePt2 - linePt1;
+	const auto [nearestPt, dist] = project_line<t_vec>(pt, linePt1, lineDir, false);
+
+
+	// get point component with max. difference
+	t_real diff = -1.;
+	std::size_t compidx = 0;
+	for(std::size_t i=0; i<dim; ++i)
+	{
+		t_real newdiff = std::abs(linePt2[i] - linePt1[i]);
+		if(newdiff > diff)
+		{
+			diff = newdiff;
+			compidx = i;
+		}
+	}
+
+
+	t_real t = (nearestPt[compidx]-linePt1[compidx]) / (linePt2[compidx]-linePt1[compidx]);
+	if(bLineIsFinite && t>=t_real{0} && t<=t_real{1})
+	{
+		// projection is on line -> use distance between point and projection
+		return dist;
+	}
+	else
+	{
+		// projection is not on line -> use distance between point and closest line end point
+		if(std::abs(t-t_real{0}) < std::abs(t-t_real{1}))
+			return norm<t_vec>(linePt1 - pt);
+		else
+			return norm<t_vec>(linePt2 - pt);
+	}
+}
+
+
+/**
  * matrix to project onto orthogonal complement (plane perpendicular to vector): P = 1-|v><v|
  * from completeness relation: 1 = sum_i |v_i><v_i| = |x><x| + |y><y| + |z><z|
+ * @see (Arens15), p. 814
  */
 template<class t_mat, class t_vec>
 t_mat ortho_projector(const t_vec& vec, bool bIsNormalised = true)
@@ -721,6 +829,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 /**
  * matrix to mirror on plane perpendicular to vector: P = 1 - 2*|v><v|
  * subtracts twice its projection onto the plane normal from the vector
+ * @see (Arens15), p. 710
  */
 template<class t_mat, class t_vec>
 t_mat ortho_mirror_op(const t_vec& vec, bool bIsNormalised = true)
@@ -736,6 +845,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * matrix to mirror [a, b, c, ...] into, e.g.,  [a, b', 0, 0]
+ * @see (Scarpino11), p. 268
  */
 template<class t_mat, class t_vec>
 t_mat ortho_mirror_zero_op(const t_vec& vec, std::size_t row)
@@ -766,7 +876,8 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * QR decomposition of a matrix
- * returns [Q, R]
+ * @returns [Q, R]
+ * @see (Scarpino11), pp. 269-272
  */
 template<class t_mat, class t_vec>
 std::tuple<t_mat, t_mat> qr(const t_mat& mat)
@@ -824,6 +935,7 @@ requires is_vec<t_vec>
 /**
  * mirror a vector on a plane perpendicular to vector vecNorm with distance d
  * vecNorm has to be normalised and plane in Hessian form: x*vecNorm = d
+ * @see (Arens15), p. 710
  */
 template<class t_vec>
 t_vec ortho_mirror_plane(const t_vec& vec,
@@ -840,6 +952,8 @@ requires is_vec<t_vec>
 /**
  * find orthonormal substitute basis for vector space (Gram-Schmidt algo)
  * remove orthogonal projections to all other base vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
+ * @see (Arens15), p. 744
+ * @see https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process
  */
 template<class t_vec,
 	template<class...> class t_cont_in = std::initializer_list,
@@ -916,6 +1030,7 @@ requires is_basic_vec<t_vec>
 
 /**
  * determinant from a square matrix stored in a vector container
+ * @see (Merziger06), p. 185
  */
 template<class t_vec>
 typename t_vec::value_type flat_det(const t_vec& mat, std::size_t iN)
@@ -1009,6 +1124,8 @@ requires is_mat<t_mat>
 
 /**
  * inverted matrix
+ * @see https://en.wikipedia.org/wiki/Invertible_matrix#In_relation_to_its_adjugate
+ * @see https://en.wikipedia.org/wiki/Adjugate_matrix
  */
 template<class t_mat>
 std::tuple<t_mat, bool> inv(const t_mat& mat)
@@ -1088,6 +1205,7 @@ requires is_mat<t_mat> && is_basic_vec<t_vec>
 
 /**
  * general n-dim cross product using determinant definition
+ * @see https://en.wikipedia.org/wiki/Cross_product
  */
 template<class t_vec, template<class...> class t_cont = std::initializer_list>
 t_vec cross(const t_cont<t_vec>& vecs)
@@ -1120,10 +1238,12 @@ requires is_basic_vec<t_vec>
 
 /**
  * intersection of plane <x|n> = d and line |org> + lam*|dir>
- * returns [position of intersection, 0: no intersection, 1: intersection, 2: line on plane, line parameter lambda]
+ * @returns [position of intersection, 0: no intersection, 1: intersection, 2: line on plane, line parameter lambda]
  * insert |x> = |org> + lam*|dir> in plane equation:
  * <org|n> + lam*<dir|n> = d
  * lam = (d - <org|n>) / <dir|n>
+ *
+ * @see http://mathworld.wolfram.com/Line-PlaneIntersection.html
  */
 template<class t_vec>
 std::tuple<t_vec, int, typename t_vec::value_type>
@@ -1156,9 +1276,10 @@ requires is_vec<t_vec>
 
 /**
  * intersection of a sphere  and a line |org> + lam*|dir>
- * returns vector of intersections
+ * @returns vector of intersections
  * insert |x> = |org> + lam*|dir> in sphere equation <x-mid | x-mid> = r^2
- * For solution, see: https://en.wikipedia.org/wiki/Line%E2%80%93sphere_intersection
+ *
+ * @see https://en.wikipedia.org/wiki/Line%E2%80%93sphere_intersection for the solution.
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 t_cont<t_vec>
@@ -1217,7 +1338,7 @@ requires is_vec<ty> || is_mat<ty>
 
 /**
  * intersection of a polygon and a line
- * returns [position of intersection, intersects?, line parameter lambda]
+ * @returns [position of intersection, intersects?, line parameter lambda]
  */
 template<class t_vec, template<class ...> class t_cont = std::vector>
 std::tuple<t_vec, bool, typename t_vec::value_type>
@@ -1272,7 +1393,7 @@ requires is_vec<t_vec>
 
 /**
  * intersection of a polygon (transformed with a matrix) and a line
- * returns [position of intersection, intersects?, line parameter lambda]
+ * @returns [position of intersection, intersects?, line parameter lambda]
  */
 template<class t_vec, class t_mat, template<class ...> class t_cont = std::vector>
 std::tuple<t_vec, bool, typename t_vec::value_type>
@@ -1294,13 +1415,15 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * intersection or closest points of lines |org1> + lam1*|dir1> and |org2> + lam2*|dir2>
- * returns [nearest position 1, nearest position 2, valid?, dist, line parameter 1, line parameter 2]
+ * @returns [nearest position 1, nearest position 2, valid?, dist, line parameter 1, line parameter 2]
  *
  * |org1> + lam1*|dir1>  =  |org2> + lam2*|dir2>
  * |org1> - |org2>  =  lam2*|dir2> - lam1*|dir1>
  * |org1> - |org2>  =  (dir2 | -dir1) * |lam2 lam1>
  * (dir2 | -dir1)^T * (|org1> - |org2>)  =  (dir2 | -dir1)^T * (dir2 | -dir1) * |lam2 lam1>
  * |lam2 lam1> = ((dir2 | -dir1)^T * (dir2 | -dir1))^(-1) * (dir2 | -dir1)^T * (|org1> - |org2>)
+ *
+ * @see https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
  */
 template<class t_vec>
 std::tuple<t_vec, t_vec, bool, typename t_vec::value_type, typename t_vec::value_type, typename t_vec::value_type>
@@ -1346,7 +1469,9 @@ requires is_vec<t_vec>
 
 /**
  * intersection of planes <x|n1> = d1 and <x|n2> = d2
- * returns line [org, dir, 0: no intersection, 1: intersection, 2: planes coincide]
+ * @returns line [org, dir, 0: no intersection, 1: intersection, 2: planes coincide]
+ *
+ * @see http://mathworld.wolfram.com/Plane-PlaneIntersection.html
  */
 template<class t_vec>
 std::tuple<t_vec, t_vec, int>
@@ -1513,6 +1638,7 @@ requires is_basic_vec<t_vec>
 
 /**
  * cross product matrix (3x3)
+ * @see https://en.wikipedia.org/wiki/Skew-symmetric_matrix
  */
 template<class t_mat, class t_vec>
 t_mat skewsymmetric(const t_vec& vec)
@@ -1534,6 +1660,9 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 
 /**
  * SO(3) matrix to rotate around an axis
+ * @see https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+ * @see (Arens15), p. 718 and p. 816
+ * @see (Merziger06), p. 208
  */
 template<class t_mat, class t_vec>
 t_mat rotation(const t_vec& axis, const typename t_vec::value_type angle, bool bIsNormalised=1)
@@ -1618,7 +1747,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * extracts lines from polygon object, takes input from e.g. create_cube()
- * returns [point pairs]
+ * @returns [point pairs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 t_cont<t_vec> create_lines(const t_cont<t_vec>& vertices, const t_cont<t_cont<std::size_t>>& faces)
@@ -1674,7 +1803,7 @@ requires is_vec<t_vec>
 
 /**
  * triangulates polygon object, takes input from e.g. create_cube()
- * returns [triangles, face normals, vertex uvs]
+ * @returns [triangles, face normals, vertex uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>
@@ -1768,7 +1897,7 @@ requires is_vec<t_vec>
 /**
  * subdivides triangles
  * input: [triangle vertices, normals, uvs]
- * returns [triangles, face normals, vertex uvs]
+ * @returns [triangles, face normals, vertex uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>
@@ -1881,7 +2010,7 @@ requires is_vec<t_vec>
 /**
  * subdivides triangles (with specified number of iterations)
  * input: [triangle vertices, normals, uvs]
- * returns [triangles, face normals, vertex uvs]
+ * @returns [triangles, face normals, vertex uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>
@@ -1898,7 +2027,7 @@ requires is_vec<t_vec>
 /**
  * create the faces of a sphere
  * input: [triangle vertices, normals, uvs] (like subdivide_triangles)
- * returns [triangles, face normals, vertex uvs]
+ * @returns [triangles, face normals, vertex uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_vec>, t_cont<t_vec>>
@@ -1951,11 +2080,12 @@ requires is_vec<t_vec>
 
 // ----------------------------------------------------------------------------
 // 3-dim solids
+// @see https://en.wikipedia.org/wiki/Platonic_solid
 // ----------------------------------------------------------------------------
 
 /**
  * create a plane
- * returns [vertices, face vertex indices, face normals, face uvs]
+ * @returns [vertices, face vertex indices, face normals, face uvs]
  */
 template<class t_mat, class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
@@ -1999,7 +2129,7 @@ requires is_vec<t_vec>
 
 /**
  * create a disk
- * returns [vertices, face vertex indices, face normals, face uvs]
+ * @returns [vertices, face vertex indices, face normals, face uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
@@ -2050,7 +2180,7 @@ requires is_vec<t_vec>
 
 /**
  * create a cone
- * returns [vertices, face vertex indices, face normals, face uvs]
+ * @returns [vertices, face vertex indices, face normals, face uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
@@ -2128,7 +2258,7 @@ requires is_vec<t_vec>
 /**
  * create a cylinder
  * cyltype: 0 (no caps), 1 (with caps), 2 (arrow)
- * returns [vertices, face vertex indices, face normals, face uvs]
+ * @returns [vertices, face vertex indices, face normals, face uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
@@ -2260,7 +2390,7 @@ requires is_vec<t_vec>
 
 /**
  * create the faces of a cube
- * returns [vertices, face vertex indices, face normals, face uvs]
+ * @returns [vertices, face vertex indices, face normals, face uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
@@ -2316,7 +2446,7 @@ requires is_vec<t_vec>
 
 /**
  * create the faces of a icosahedron
- * returns [vertices, face vertex indices, face normals, face uvs]
+ * @returns [vertices, face vertex indices, face normals, face uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
@@ -2376,7 +2506,7 @@ requires is_vec<t_vec>
 
 /**
  * create the faces of a octahedron
- * returns [vertices, face vertex indices, face normals, face uvs]
+ * @returns [vertices, face vertex indices, face normals, face uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
@@ -2437,7 +2567,7 @@ requires is_vec<t_vec>
 
 /**
  * create the faces of a tetrahedron
- * returns [vertices, face vertex indices, face normals, face uvs]
+ * @returns [vertices, face vertex indices, face normals, face uvs]
  */
 template<class t_vec, template<class...> class t_cont = std::vector>
 std::tuple<t_cont<t_vec>, t_cont<t_cont<std::size_t>>, t_cont<t_vec>, t_cont<t_cont<t_vec>>>
@@ -2492,7 +2622,8 @@ requires is_vec<t_vec>
 
 /**
  * project a homogeneous vector to screen coordinates
- * returns [vecPersp, vecScreen]
+ * @returns [vecPersp, vecScreen]
+ * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluProject.xml
  */
 template<class t_mat, class t_vec>
 std::tuple<t_vec, t_vec> hom_to_screen_coords(const t_vec& vec4,
@@ -2519,6 +2650,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 /**
  * calculate world coordinates from screen coordinates
  * (vary zPlane to get the points of the z-line at constant (x,y))
+ * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluUnProject.xml
  */
 template<class t_mat, class t_vec>
 t_vec hom_from_screen_coords(
@@ -2543,7 +2675,8 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * calculate line from screen coordinates
- * returns [pos, dir]
+ * @returns [pos, dir]
+ * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluUnProject.xml
  */
 template<class t_mat, class t_vec>
 std::tuple<t_vec, t_vec> hom_line_from_screen_coords(
@@ -2567,7 +2700,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * perspective matrix (homogeneous 4x4)
- * see: https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluPerspective.xml
+ * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluPerspective.xml
  */
 template<class t_mat>
 t_mat hom_perspective(
@@ -2597,7 +2730,7 @@ requires is_mat<t_mat>
 
 /**
  * viewport matrix (homogeneous 4x4)
- * see: https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/glViewport.xml
+ * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/glViewport.xml
  */
 template<class t_mat>
 t_mat hom_viewport(typename t_mat::value_type w, typename t_mat::value_type h,
@@ -2658,6 +2791,7 @@ requires is_mat<t_mat>
 
 /**
  * SU(2) generators, pauli matrices sig_i = 2*S_i
+ * @see (Arfken13), p. 110
  */
 template<class t_mat>
 const t_mat& su2_matrix(std::size_t which)
@@ -2681,6 +2815,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 
 /**
  * get a vector of pauli matrices
+ * @see (Arfken13), p. 110
  */
 template<class t_vec>
 t_vec su2_matrices(bool bIncludeUnit = false)
@@ -2718,6 +2853,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * SU(2) ladders
+ * @see https://en.wikipedia.org/wiki/Ladder_operator
  */
 template<class t_mat>
 const t_mat& su2_ladder(std::size_t which)
@@ -2739,7 +2875,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 
 /**
  * SU(3) generators, gell-mann matrices
- * see: https://de.wikipedia.org/wiki/Gell-Mann-Matrizen
+ * @see https://de.wikipedia.org/wiki/Gell-Mann-Matrizen
  */
 template<class t_mat>
 const t_mat& su3_matrix(std::size_t which)
@@ -2771,7 +2907,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 
 /**
  * crystallographic B matrix, B = 2pi * A^(-T)
- * after: https://en.wikipedia.org/wiki/Fractional_coordinates
+ * @see https://en.wikipedia.org/wiki/Fractional_coordinates
  */
 template<class t_mat, class t_real = typename t_mat::value_type>
 t_mat B_matrix(t_real a, t_real b, t_real c, t_real _aa, t_real _bb, t_real _cc)
@@ -2793,7 +2929,7 @@ requires is_mat<t_mat>
 
 /**
  * crystallographic A matrix, B = 2pi * A^(-T)
- * after: https://en.wikipedia.org/wiki/Fractional_coordinates
+ * @see https://en.wikipedia.org/wiki/Fractional_coordinates
  */
 template<class t_mat, class t_vec, class t_real = typename t_mat::value_type>
 t_mat A_matrix(t_real a, t_real b, t_real c, t_real _aa, t_real _bb, t_real _cc)
@@ -2827,6 +2963,10 @@ requires is_mat<t_mat>
  * Rs: atomic positions
  * Q: scattering vector G for nuclear scattering or G+k for magnetic scattering with propagation vector k
  * fs: optional magnetic form factors
+ *
+ * @see https://doi.org/10.1016/B978-044451050-1/50002-1
+ * @see (Shirane02), p. 25, equ. 2.26 for nuclear structure factor
+ * @see (Shirane02), p. 40, equ. 2.81 for magnetic structure factor
  */
 template<class t_vec, class T = t_vec, template<class...> class t_cont = std::vector,
 	class t_cplx = std::complex<double>>
@@ -2949,6 +3089,9 @@ requires is_basic_mat<t_mat>
  * <A> = tr( A * p_i * |a_i><a_i| )
  * <A> = tr( A * rho )
  * polarisation density matrix: rho = 0.5 * (1 + <P|sigma>)
+ *
+ * @see https://doi.org/10.1016/B978-044451050-1/50006-9
+ * @see (Bronstein08), Ch. 21 (Zusatzkapitel.pdf), pp. 11-12
  */
 template<class t_vec, class t_mat>
 t_mat pol_density_mat(const t_vec& P, typename t_vec::value_type c=0.5)
@@ -2959,8 +3102,9 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
- * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - pp. 225-226)
- * returns scattering intensity and final polarisation vector
+ * Blume-Maleev equation
+ * @returns scattering intensity and final polarisation vector
+ * @see https://doi.org/10.1016/B978-044451050-1/50006-9 - pp. 225-226
  */
 template<class t_vec, typename t_cplx = typename t_vec::value_type>
 std::tuple<t_cplx, t_vec> blume_maleev(const t_vec& P_i, const t_vec& Mperp, const t_cplx& N)
@@ -3011,14 +3155,17 @@ requires is_vec<t_vec>
 
 
 /**
- * Blume-Maleev equation (see: https://doi.org/10.1016/B978-044451050-1/50006-9 - pp. 225-226)
+ * Blume-Maleev equation
  * calculated indirectly with density matrix
  *
  * V   = N*1 + <Mperp|sigma>
  * I   = 0.5 * tr( V^H V rho )
  * P_f = 0.5 * tr( V^H sigma V rho ) / I
  *
- * returns scattering intensity and final polarisation vector
+ * @returns scattering intensity and final polarisation vector
+ *
+ * @see lecture notes by P. J. Brown, 2006
+ * @see https://doi.org/10.1016/B978-044451050-1/50006-9 - pp. 225-226
  */
 template<class t_mat, class t_vec, typename t_cplx = typename t_vec::value_type>
 std::tuple<t_cplx, t_vec> blume_maleev_indir(const t_vec& P_i, const t_vec& Mperp, const t_cplx& N)

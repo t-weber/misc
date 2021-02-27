@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <iterator>
 #include <complex>
+#include <concepts>
 
 
 namespace m {
@@ -115,6 +116,20 @@ concept /*bool*/ is_complex = requires(const T& a)
 	a-a;
 	a*a;
 	a/a;
+};
+
+
+/**
+ * requirements for an iterable container
+ */
+template<class T>
+concept /*bool*/ is_iterable = requires(const T& a)
+{
+	a.begin();
+	a.end();
+
+	{ a.begin() == a.end() } -> std::same_as<bool>;
+	{ a.begin() != a.end() } -> std::same_as<bool>;
 };
 // ----------------------------------------------------------------------------
 
