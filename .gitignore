@@ -23,6 +23,7 @@
 *.exe
 *.out
 *.app
+*.x86
 
 # Documents
 *.pdf
