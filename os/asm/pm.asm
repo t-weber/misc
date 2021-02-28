@@ -5,6 +5,7 @@
 ;
 ; nasm -w+all -o pm.x86 -f bin pm.asm
 ; qemu-system-i386 -drive format=raw,file=pm.x86,index=0
+; debugging: qemu-system-x86_64 -d cpu -drive format=raw,file=pm.x86,index=0 2> /tmp/cpu.txt
 ;
 ; references:
 ;	- https://wiki.osdev.org/Babystep7
