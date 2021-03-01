@@ -15,6 +15,7 @@ find_package(Qt5Widgets REQUIRED)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 
+enable_language(CXX)
 set(CMAKE_CXX_STANDARD 20)
 add_compile_options(-std=c++20 -Wall -Wextra)
 

@@ -18,6 +18,7 @@
 #include "qttst.h"
 
 #include <QApplication>
+#include <QLoggingCategory>
 
 #include <cstddef>
 #include <locale>
@@ -169,6 +170,21 @@ void VkRenderer::initResources()
 		}
 	}
 	// --------------------------------------------------------------------
+
+	VkPipelineCache cache = VK_NULL_HANDLE;
+	VkGraphicsPipelineCreateInfo createInfos
+	{
+	};
+
+	VkPipeline pipeline
+	{
+	};
+
+	/*if(VkResult err = m_vkfuncs->vkCreateGraphicsPipelines(m_vkdev, cache, 1, &createInfos, nullptr, &pipeline);
+		err != VK_SUCCESS)
+	{
+		std::cerr << "Error creating graphics pipeline: " << get_vk_error(err) << std::endl;
+	}*/
 }
 
 
@@ -323,11 +339,53 @@ static inline void set_locales()
 
 int main(int argc, char** argv)
 {
+	//QLoggingCategory::setFilterRules("*.debug=true\n*.warning=true\n*.info=true\n*.critical=true\n*.fatal=true");
+	QLoggingCategory::setFilterRules("*=true");
+	qInstallMessageHandler([](QtMsgType ty, const QMessageLogContext& ctx, const QString& log) -> void
+	{
+		auto get_msg_type = [](const QtMsgType& _ty) -> std::string
+		{
+			switch(_ty)
+			{
+				case QtDebugMsg: return "debug";
+				case QtWarningMsg: return "warning";
+				case QtCriticalMsg: return "critical";
+				case QtFatalMsg: return "fatal";
+				case QtInfoMsg: return "info";
+				default: return "<unknown>";
+			}
+		};
+
+		auto get_str = [](const char* pc) -> std::string
+		{
+			if(!pc) return "<unknown>";
+			return std::string{"\""} + std::string{pc} + std::string{"\""};
+		};
+
+		std::cerr << "qt " << get_msg_type(ty);
+		if(ctx.function)
+		{
+			std::cerr << " in "
+				<< "file " << get_str(ctx.file) << ", "
+				<< "function " << get_str(ctx.function) << ", "
+				<< "line " << ctx.line;
+		}
+		std::cerr << ": " << log.toStdString() << std::endl;
+	});
+
 	auto app = std::make_unique<QApplication>(argc, argv);
 	set_locales();
 
 	// create vk instance
 	auto vk = std::make_shared<QVulkanInstance>();
+
+	QByteArrayList layers{{
+		"VK_LAYER_KHRONOS_validation",
+		"VK_EXT_debug_report",
+		"VK_EXT_debug_utils",
+	}};
+	vk->setLayers(layers);
+	vk->setFlags(vk->flags() & ~QVulkanInstance::NoDebugOutputRedirect);
 
 	if(!vk->create() || !vk->isValid())
 	{

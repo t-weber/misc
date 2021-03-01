@@ -14,10 +14,11 @@
 ;
 
 
-%define WORD_SIZE	4
-%define CHAROUT		000b_8000h	; base address for character output
-%define STACK_START	0000_ffffh	; some (arbitrary) stack base address
-%define MBR_BOOTSIG_ADDR	$$ + 200h-2	; 510 bytes after section start
+%define WORD_SIZE        4
+%define CHAROUT          000b_8000h	; base address for character output
+%define STACK_START      0000_ffffh	; some (arbitrary) stack base address
+%define NUM_GDT_ENTRIES  4
+%define MBR_BOOTSIG_ADDR $$ + 200h-2	; 510 bytes after section start
 
 
 
@@ -46,11 +47,11 @@ start:
 	;sti
 
 	; data segment
-	mov ax, 0000000000000_0_00b	; segment index 0, gdt, ring=0
+	mov ax, 0000000000001_0_00b	; segment index 1, gdt, ring=0
 	mov ds, ax
 
 	; stack segment
-	mov ax, 0000000000001_0_00b	; segment index 1, gdt, ring=0
+	mov ax, 0000000000010_0_00b	; segment index 2, gdt, ring=0
 	mov ss, ax
 	mov esp, dword STACK_START
 
@@ -148,11 +149,13 @@ endstruc
 
 ; see https://wiki.osdev.org/Babystep7
 gdtr: istruc gdtr_struc
-	at size, dw descr_struc_size*3 - 1	; size of 3 entries - 1
+	at size, dw descr_struc_size*NUM_GDT_ENTRIES - 1	; size - 1
 	at offs, dd descr_base_addr
 iend
 
 descr_base_addr:
+	times descr_struc_size db 0	; null descriptor
+
 data_descr: istruc descr_struc
 	at limit0_15, db 0xff, 0xff
 	at base0_23, db 00h, 00h, 00h
