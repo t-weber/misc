@@ -177,7 +177,7 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
  */
 template<class t_vec>
 std::ostream& operator<<(std::ostream& ostr, const t_vec& vec)
-requires m::is_basic_vec<t_vec> //&& m::is_dyn_vec<t_vec>
+requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
 	const std::size_t N = vec.size();
 

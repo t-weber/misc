@@ -171,20 +171,153 @@ void VkRenderer::initResources()
 	}
 	// --------------------------------------------------------------------
 
-	VkPipelineCache cache = VK_NULL_HANDLE;
+
+	// --------------------------------------------------------------------
+	// pipeline stages
+	// --------------------------------------------------------------------
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineShaderStageCreateInfo.html
+	VkPipelineShaderStageCreateInfo shaderstages[2] =
+	{
+		{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.stage = VK_SHADER_STAGE_VERTEX_BIT,
+			.module = m_vertexShader,
+			.pName = "main",
+			.pSpecializationInfo = nullptr,
+		},
+		{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.module = m_fragShader,
+			.pName = "main",
+			.pSpecializationInfo = nullptr,
+		},
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineVertexInputStateCreateInfo.html
+	VkPipelineVertexInputStateCreateInfo vertexinputstate
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.vertexBindingDescriptionCount = 0,
+		.pVertexBindingDescriptions = nullptr,
+		.vertexAttributeDescriptionCount = 0,
+		.pVertexAttributeDescriptions = nullptr,
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineInputAssemblyStateCreateInfo.html
+	VkPipelineInputAssemblyStateCreateInfo inputassemblystate
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		.primitiveRestartEnable = 0,
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineTessellationStateCreateInfo.html
+	VkPipelineTessellationStateCreateInfo tessellationstate
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.patchControlPoints = 0,
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineViewportStateCreateInfo.html
+	VkPipelineViewportStateCreateInfo viewportstate
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.viewportCount = 0,
+		.pViewports = nullptr,
+		.scissorCount = 0,
+		.pScissors = nullptr,
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineRasterizationStateCreateInfo.html
+	VkPipelineRasterizationStateCreateInfo rasterisationstate
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		// ...
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineMultisampleStateCreateInfo.html
+	VkPipelineMultisampleStateCreateInfo multisamplestate
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		// ...
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineDepthStencilStateCreateInfo.html
+	VkPipelineDepthStencilStateCreateInfo depthstencilstate
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		// ...
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineColorBlendStateCreateInfo.html
+	VkPipelineColorBlendStateCreateInfo colorblendstate
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		// ...
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineDynamicStateCreateInfo.html
+	VkPipelineDynamicStateCreateInfo dynamicstate
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.dynamicStateCount = 0,
+		.pDynamicStates = nullptr,
+	};
+
 	VkGraphicsPipelineCreateInfo createInfos
 	{
+		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.stageCount = sizeof(shaderstages)/sizeof(shaderstages[0]),
+		.pStages = shaderstages,
+		.pVertexInputState = &vertexinputstate,
+		.pInputAssemblyState = &inputassemblystate,
+		.pTessellationState = &tessellationstate,
+		.pViewportState = &viewportstate,
+		.pRasterizationState = &rasterisationstate,
+		.pMultisampleState = &multisamplestate,
+		.pDepthStencilState = &depthstencilstate,
+		.pColorBlendState = &colorblendstate,
+		.pDynamicState = &dynamicstate,
+		.layout = VK_NULL_HANDLE,
+		.renderPass = VK_NULL_HANDLE,
+		.subpass = 0,
+		.basePipelineHandle = VK_NULL_HANDLE,
+		.basePipelineIndex = 0,
 	};
 
 	VkPipeline pipeline
 	{
 	};
 
+	VkPipelineCache cache = VK_NULL_HANDLE;
+
 	/*if(VkResult err = m_vkfuncs->vkCreateGraphicsPipelines(m_vkdev, cache, 1, &createInfos, nullptr, &pipeline);
 		err != VK_SUCCESS)
 	{
 		std::cerr << "Error creating graphics pipeline: " << get_vk_error(err) << std::endl;
 	}*/
+	// --------------------------------------------------------------------
 }
 
 
@@ -249,10 +382,10 @@ void VkRenderer::startNextFrame()
 {
 	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
-	VkClearValue clr /* union between .color and .depthStencil */
+	VkClearValue clr[] /* union between .color and .depthStencil */
 	{
-		.color = VkClearColorValue{.float32 = {1.f, 1.f, 1.f, 1.f}},
-		//.depthStencil = VkClearDepthStencilValue{.depth = 1.f, .stencil = 0}
+		{ .color = VkClearColorValue{.float32 = {1.f, 1.f, 1.f, 1.f}} },
+		{ .depthStencil = VkClearDepthStencilValue{.depth = 1.f, .stencil = 0} }
 	};
 
 	VkRenderPassBeginInfo beg
@@ -266,8 +399,8 @@ void VkRenderer::startNextFrame()
 			.extent = VkExtent2D{
 				.width = (uint32_t)m_vkwnd->swapChainImageSize().width(),
 				.height = (uint32_t)m_vkwnd->swapChainImageSize().height()}},
-		.clearValueCount = 1,
-		.pClearValues = &clr
+		.clearValueCount = sizeof(clr) / sizeof(clr[0]),
+		.pClearValues = clr
 	};
 
 	VkSubpassContents cont = VK_SUBPASS_CONTENTS_INLINE /*VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS*/;
@@ -339,8 +472,7 @@ static inline void set_locales()
 
 int main(int argc, char** argv)
 {
-	//QLoggingCategory::setFilterRules("*.debug=true\n*.warning=true\n*.info=true\n*.critical=true\n*.fatal=true");
-	QLoggingCategory::setFilterRules("*=true");
+	QLoggingCategory::setFilterRules("*=true\n*.debug=false\n");
 	qInstallMessageHandler([](QtMsgType ty, const QMessageLogContext& ctx, const QString& log) -> void
 	{
 		auto get_msg_type = [](const QtMsgType& _ty) -> std::string
