@@ -137,8 +137,8 @@ void VkRenderer::initResources()
 	using t_shader = std::tuple<const std::string, VkShaderModule*>;
 
 	for(const t_shader& shader : {
-		std::make_tuple("vert.spv", &m_fragShader),
-		std::make_tuple("frag.spv", &m_vertexShader) })
+		std::make_tuple("vert.spv", &m_vertexShader),
+		std::make_tuple("frag.spv", &m_fragShader) })
 	{
 		const std::string& file = std::get<0>(shader);
 
@@ -235,10 +235,10 @@ void VkRenderer::initResources()
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.viewportCount = 0,
-		.pViewports = nullptr,
-		.scissorCount = 0,
-		.pScissors = nullptr,
+		.viewportCount = 1,
+		.pViewports = nullptr,	/* nullptr => dynamically set */
+		.scissorCount = 1,
+		.pScissors = nullptr,	/* nullptr => dynamically set */
 	};
 
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineRasterizationStateCreateInfo.html
@@ -246,7 +246,17 @@ void VkRenderer::initResources()
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 		.pNext = nullptr,
-		// ...
+		.flags = 0,
+		.depthClampEnable = 0,
+		.rasterizerDiscardEnable = 0,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.cullMode = VK_CULL_MODE_BACK_BIT,
+		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		.depthBiasEnable = 0,
+		.depthBiasConstantFactor = 0.f,
+		.depthBiasClamp = 0.f,
+		.depthBiasSlopeFactor = 0.f,
+		.lineWidth = 1.f,
 	};
 
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineMultisampleStateCreateInfo.html
@@ -254,7 +264,13 @@ void VkRenderer::initResources()
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
 		.pNext = nullptr,
-		// ...
+		.flags = 0,
+		.rasterizationSamples = m_vkwnd->sampleCountFlagBits(),
+		.sampleShadingEnable = 0,
+		.minSampleShading = 0.f,
+		.pSampleMask = nullptr,
+		.alphaToCoverageEnable = 0,
+		.alphaToOneEnable = 0,
 	};
 
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineDepthStencilStateCreateInfo.html
@@ -262,7 +278,49 @@ void VkRenderer::initResources()
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
 		.pNext = nullptr,
-		// ...
+		.flags = 0,
+		.depthTestEnable = 1,
+		.depthWriteEnable = 1,
+		.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+		.depthBoundsTestEnable = 0,
+		.stencilTestEnable = 0,
+		.front = VkStencilOpState
+		{
+			.failOp = VK_STENCIL_OP_KEEP,
+			.passOp = VK_STENCIL_OP_KEEP,
+			.depthFailOp = VK_STENCIL_OP_KEEP,
+			.compareOp = VK_COMPARE_OP_NEVER,
+			.compareMask = 0,
+			.writeMask = 0,
+			.reference = 0,
+		},
+		.back = VkStencilOpState
+		{
+			.failOp = VK_STENCIL_OP_KEEP,
+			.passOp = VK_STENCIL_OP_KEEP,
+			.depthFailOp = VK_STENCIL_OP_KEEP,
+			.compareOp = VK_COMPARE_OP_NEVER,
+			.compareMask = 0,
+			.writeMask = 0,
+			.reference = 0,
+		},
+		.minDepthBounds = 0.f,
+		.maxDepthBounds = 0.f,
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineColorBlendAttachmentState.html
+	VkPipelineColorBlendAttachmentState colorblendattachments[]
+	{
+		{
+			.blendEnable = 0,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.alphaBlendOp = VK_BLEND_OP_ADD,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+		},
 	};
 
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineColorBlendStateCreateInfo.html
@@ -270,8 +328,16 @@ void VkRenderer::initResources()
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
 		.pNext = nullptr,
-		// ...
+		.flags = 0,
+		.logicOpEnable = 0,
+		.logicOp = VK_LOGIC_OP_CLEAR,
+		.attachmentCount = sizeof(colorblendattachments)/sizeof(colorblendattachments[0]),
+		.pAttachments = colorblendattachments,
+		.blendConstants = {0.f, 0.f, 0.f, 0.f},
 	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDynamicState.html
+	VkDynamicState dynstate[] = {{ VK_DYNAMIC_STATE_VIEWPORT }, { VK_DYNAMIC_STATE_SCISSOR} };
 
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineDynamicStateCreateInfo.html
 	VkPipelineDynamicStateCreateInfo dynamicstate
@@ -279,10 +345,64 @@ void VkRenderer::initResources()
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.dynamicStateCount = 0,
-		.pDynamicStates = nullptr,
+		.dynamicStateCount = sizeof(dynstate)/sizeof(dynstate[0]),
+		.pDynamicStates = dynstate,
 	};
 
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutBinding.html
+	VkDescriptorSetLayoutBinding setlayoutbindings[]
+	{
+		{
+			.binding = 0,
+			// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorType.html
+			.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+			.descriptorCount = 0,
+			// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkShaderStageFlagBits.html
+			.stageFlags = 0,
+			.pImmutableSamplers = nullptr,
+		},
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
+	VkDescriptorSetLayoutCreateInfo setlayoutinfo
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.bindingCount = sizeof(setlayoutbindings) / sizeof(setlayoutbindings[0]),
+		.pBindings = setlayoutbindings,
+	};
+
+	if(VkResult err = m_vkfuncs->vkCreateDescriptorSetLayout(m_vkdev, &setlayoutinfo, 0, &m_setlayouts[0]);
+	   err != VK_SUCCESS)
+	{
+		std::cerr << "Error creating set layout: " << get_vk_error(err) << std::endl;
+		return;
+	}
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPushConstantRange.html
+	VkPushConstantRange pushconstrange[] = {};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineLayoutCreateInfo.html
+	VkPipelineLayoutCreateInfo layoutcreateinfo
+	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.setLayoutCount = sizeof(m_setlayouts)/sizeof(m_setlayouts[0]),
+		.pSetLayouts = m_setlayouts,
+		.pushConstantRangeCount = sizeof(pushconstrange)/sizeof(pushconstrange[0]),
+		.pPushConstantRanges = pushconstrange,
+	};
+
+	if(VkResult err = m_vkfuncs->vkCreatePipelineLayout(m_vkdev, &layoutcreateinfo, 0, &m_layout);
+		err != VK_SUCCESS)
+	{
+		std::cerr << "Error creating graphics pipeline layout: " << get_vk_error(err) << std::endl;
+		return;
+	}
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkGraphicsPipelineCreateInfo.html
 	VkGraphicsPipelineCreateInfo createInfos
 	{
 		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -299,24 +419,35 @@ void VkRenderer::initResources()
 		.pDepthStencilState = &depthstencilstate,
 		.pColorBlendState = &colorblendstate,
 		.pDynamicState = &dynamicstate,
-		.layout = VK_NULL_HANDLE,
-		.renderPass = VK_NULL_HANDLE,
+		.layout = m_layout,
+		.renderPass = m_vkwnd->defaultRenderPass(),
 		.subpass = 0,
 		.basePipelineHandle = VK_NULL_HANDLE,
 		.basePipelineIndex = 0,
 	};
 
-	VkPipeline pipeline
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineCacheCreateInfo.html
+	VkPipelineCacheCreateInfo cachecreateinfo
 	{
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.initialDataSize = 0,
+		.pInitialData = nullptr,
 	};
 
-	VkPipelineCache cache = VK_NULL_HANDLE;
+	if(VkResult err = m_vkfuncs->vkCreatePipelineCache(m_vkdev, &cachecreateinfo, 0, &m_cache);
+	   err != VK_SUCCESS)
+	{
+		std::cerr << "Error creating graphics pipeline cache: " << get_vk_error(err) << std::endl;
+		return;
+	}
 
-	/*if(VkResult err = m_vkfuncs->vkCreateGraphicsPipelines(m_vkdev, cache, 1, &createInfos, nullptr, &pipeline);
+	if(VkResult err = m_vkfuncs->vkCreateGraphicsPipelines(m_vkdev, m_cache, 1, &createInfos, nullptr, &m_pipeline);
 		err != VK_SUCCESS)
 	{
 		std::cerr << "Error creating graphics pipeline: " << get_vk_error(err) << std::endl;
-	}*/
+	}
 	// --------------------------------------------------------------------
 }
 
@@ -325,14 +456,47 @@ void VkRenderer::releaseResources()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
 
-	// shader
-	for(VkShaderModule* mod : {&m_fragShader, &m_vertexShader})
+	// handles
+	VK_DEFINE_NON_DISPATCHABLE_HANDLE(vkhandle);
+	vkhandle handles[] =
 	{
-		if(*mod != VK_NULL_HANDLE)
-		{
-			m_vkfuncs->vkDestroyShaderModule(m_vkdev, *mod, 0);
-			*mod = VK_NULL_HANDLE;
-		}
+		// shaders
+		reinterpret_cast<vkhandle>(m_fragShader),
+		reinterpret_cast<vkhandle>(m_vertexShader),
+
+		// set layouts
+		reinterpret_cast<vkhandle>(m_setlayouts[0]),
+
+		// pipeline
+		reinterpret_cast<vkhandle>(m_cache),
+		reinterpret_cast<vkhandle>(m_layout),
+		reinterpret_cast<vkhandle>(m_pipeline),
+	};
+
+	// functions to destroy respective handles
+	using t_destroyfunc = void (QVulkanDeviceFunctions::*)(VkDevice, vkhandle, const VkAllocationCallbacks*);
+	t_destroyfunc destroyfuncs[] =
+	{
+		// shaders
+		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyShaderModule),
+		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyShaderModule),
+
+		// set layouts
+		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyDescriptorSetLayout),
+
+		// pipeline
+		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyPipelineCache),
+		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyPipelineLayout),
+		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyPipeline),
+	};
+
+	for(std::size_t idx=0; idx<sizeof(handles)/sizeof(handles[0]); ++idx)
+	{
+		if(handles[idx] == VK_NULL_HANDLE)
+			continue;
+
+		(m_vkfuncs->*destroyfuncs[idx])(m_vkdev, handles[idx], 0);
+		handles[idx] = VK_NULL_HANDLE;
 	}
 
 	m_vkfuncs = nullptr;
@@ -394,11 +558,15 @@ void VkRenderer::startNextFrame()
 		.pNext = nullptr,
 		.renderPass = m_vkwnd->defaultRenderPass(),
 		.framebuffer = m_vkwnd->currentFramebuffer(),
-		.renderArea = VkRect2D{
+		.renderArea = VkRect2D
+		{
 			.offset = VkOffset2D{.x = 0, .y = 0},
-			.extent = VkExtent2D{
+			.extent = VkExtent2D
+			{
 				.width = (uint32_t)m_vkwnd->swapChainImageSize().width(),
-				.height = (uint32_t)m_vkwnd->swapChainImageSize().height()}},
+				.height = (uint32_t)m_vkwnd->swapChainImageSize().height()
+			},
+		},
 		.clearValueCount = sizeof(clr) / sizeof(clr[0]),
 		.pClearValues = clr
 	};
@@ -472,7 +640,7 @@ static inline void set_locales()
 
 int main(int argc, char** argv)
 {
-	QLoggingCategory::setFilterRules("*=true\n*.debug=false\n");
+	QLoggingCategory::setFilterRules("*=true\n*.debug=true\n");
 	qInstallMessageHandler([](QtMsgType ty, const QMessageLogContext& ctx, const QString& log) -> void
 	{
 		auto get_msg_type = [](const QtMsgType& _ty) -> std::string

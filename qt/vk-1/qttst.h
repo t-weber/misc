@@ -43,6 +43,11 @@ protected:
 	VkShaderModule m_fragShader{VK_NULL_HANDLE};
 	VkShaderModule m_vertexShader{VK_NULL_HANDLE};
 
+	VkPipeline m_pipeline = VK_NULL_HANDLE;
+	VkPipelineLayout m_layout = VK_NULL_HANDLE;
+	VkPipelineCache m_cache = VK_NULL_HANDLE;
+	VkDescriptorSetLayout m_setlayouts[1] = {{ VK_NULL_HANDLE }};
+
 	t_mat m_matPerspective, m_matPerspective_inv;
 	t_mat m_matViewport, m_matViewport_inv;
 	t_mat m_matCam, m_matCam_inv;
