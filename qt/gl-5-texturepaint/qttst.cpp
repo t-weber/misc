@@ -264,7 +264,6 @@ void GlWidget::initializeGL()
 			m_pGl->glVertexAttribPointer(m_attrVertexColor, 4, GL_FLOAT, 0, 0, (void*)(0*sizeof(typename decltype(vecCols)::value_type)));
 		}
 
-
 		{	// texture
 			QImage img("/home/tw/tmp/I/0.jpg");
 			img = img.mirrored(false, true);

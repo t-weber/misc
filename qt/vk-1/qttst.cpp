@@ -5,11 +5,11 @@
  * @license: see 'LICENSE.GPL' file
  *
  * References:
+ *  * https://code.qt.io/cgit/qt/qtbase.git/tree/examples/vulkan/shared/trianglerenderer.cpp
  *  * https://doc.qt.io/qt-5/qvulkanwindow.html
  *  * https://doc.qt.io/qt-5/qvulkaninstance.html
  *  * https://doc.qt.io/qt-5/qvulkanwindowrenderer.html
  *  * https://doc.qt.io/qt-5/qtgui-hellovulkanwindow-example.html
- *  * https://code.qt.io/cgit/qt/qtbase.git/tree/examples/vulkan/shared/trianglerenderer.cpp
  *  * https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkRenderPassBeginInfo.html
  *  * https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkCreateShaderModule.html
  *  * https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#shaders
@@ -153,6 +153,7 @@ void VkRenderer::initResources()
 			continue;
 		}
 
+		// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkShaderModuleCreateInfo.html
 		VkShaderModuleCreateInfo shaderInfo
 		{
 			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, // fixed value
@@ -169,12 +170,7 @@ void VkRenderer::initResources()
 			continue;
 		}
 	}
-	// --------------------------------------------------------------------
 
-
-	// --------------------------------------------------------------------
-	// pipeline stages
-	// --------------------------------------------------------------------
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineShaderStageCreateInfo.html
 	VkPipelineShaderStageCreateInfo shaderstages[2] =
 	{
@@ -198,18 +194,153 @@ void VkRenderer::initResources()
 		},
 	};
 
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkVertexInputBindingDescription.html
+	VkVertexInputBindingDescription vertinputbindingdesc[]
+	{
+		{
+			.binding = 0,
+			.stride = (3*4 + 2) * sizeof(t_real),
+			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+		},
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkVertexInputAttributeDescription.html
+	VkVertexInputAttributeDescription vertinputattrdesc[]
+	{
+		{
+			.location = 0,	// vertex
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = 0,
+		},
+		{
+			.location = 1,	// normal
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = 1*4*sizeof(t_real),
+		},
+		{
+			.location = 2,	// colour
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = 2*4*sizeof(t_real),
+		},
+		{
+			.location = 3,	// uv coords
+			.binding = 0,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = 3*4*sizeof(t_real),
+		},
+	};
+
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineVertexInputStateCreateInfo.html
 	VkPipelineVertexInputStateCreateInfo vertexinputstate
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.vertexBindingDescriptionCount = 0,
-		.pVertexBindingDescriptions = nullptr,
-		.vertexAttributeDescriptionCount = 0,
-		.pVertexAttributeDescriptions = nullptr,
+		.vertexBindingDescriptionCount = sizeof(vertinputbindingdesc)/sizeof(vertinputbindingdesc[0]),
+		.pVertexBindingDescriptions = vertinputbindingdesc,
+		.vertexAttributeDescriptionCount = sizeof(vertinputattrdesc)/sizeof(vertinputattrdesc[0]),
+		.pVertexAttributeDescriptions = vertinputattrdesc,
 	};
 
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutBinding.html
+	VkDescriptorSetLayoutBinding setlayoutbindings[]
+	{
+		{
+			.binding = 0,
+			// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorType.html
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1, //sizeof(vertinputattrdesc)/sizeof(vertinputattrdesc[0]),
+			// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkShaderStageFlagBits.html
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT /*| VK_SHADER_STAGE_FRAGMENT_BIT*/,
+			.pImmutableSamplers = nullptr,
+		},
+	};
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
+	VkDescriptorSetLayoutCreateInfo setlayoutinfo
+	{
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.bindingCount = sizeof(setlayoutbindings) / sizeof(setlayoutbindings[0]),
+		.pBindings = setlayoutbindings,
+	};
+
+	if(VkResult err = m_vkfuncs->vkCreateDescriptorSetLayout(m_vkdev, &setlayoutinfo, 0, &m_setlayouts[0]);
+	   err != VK_SUCCESS)
+	{
+		std::cerr << "Error creating set layout: " << get_vk_error(err) << std::endl;
+		return;
+	}
+	// --------------------------------------------------------------------
+
+
+	// --------------------------------------------------------------------
+	// vertex and uniform buffer
+	// --------------------------------------------------------------------
+	// flatten vertex array into raw float array
+	auto to_float_array = [](const std::vector<t_vec3>& verts, int iRepeat=1,
+		int iInElems=3, int iOutElems=4, t_real fillElem=1.f) -> std::vector<t_real>
+	{
+		std::vector<t_real> vecRet;
+		vecRet.reserve(iRepeat*verts.size()*iOutElems);
+
+		for(const t_vec3& vert : verts)
+		{
+			for(int i=0; i<iRepeat; ++i)
+				for(int iElem=0; iElem<iOutElems; ++iElem)
+					vecRet.push_back(iElem < iInElems ? vert[iElem] : fillElem);
+		}
+		return vecRet;
+	};
+
+	// 3d object
+	auto solid = m::create_plane<t_mat, t_vec3>(m::create<t_vec3>({0,0,-1}), 1.5);
+	auto [verts, norms, uvs] = m::subdivide_triangles<t_vec3>(m::create_triangles<t_vec3>(solid), 2);
+	auto vecVerts = to_float_array(verts, 1, 3, 4, 1.f);
+	auto vecNorms = to_float_array(norms, 4, 3, 4, 0.f);
+	auto vecUVS = to_float_array(uvs, 1, 2, 2, 0.f);
+
+	std::vector<t_real> vecCols;
+	vecCols.reserve(4*verts.size());
+	for(std::size_t iVert=0; iVert<verts.size(); ++iVert)
+	{
+		vecCols.push_back(0); vecCols.push_back(0);
+		vecCols.push_back(1); vecCols.push_back(1);
+	}
+
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkBufferCreateInfo.html
+	VkBufferCreateInfo buffercreateinfo
+	{
+		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.size = sizeof(t_real) * (vecVerts.size() +
+			m_vkwnd->concurrentFrameCount() * (
+				m_matPerspective.size1()*m_matPerspective.size2() +
+				m_matCam.size1()*m_matCam.size2() )),
+		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.queueFamilyIndexCount = 0,
+		.pQueueFamilyIndices = nullptr,
+	};
+
+	if(VkResult err = m_vkfuncs->vkCreateBuffer(m_vkdev, &buffercreateinfo, 0, &m_buffer);
+	   err != VK_SUCCESS)
+	   {
+		   std::cerr << "Error creating buffer: " << get_vk_error(err) << std::endl;
+		   return;
+	   }
+	// --------------------------------------------------------------------
+
+
+	// --------------------------------------------------------------------
+	// pipeline stages
+	// --------------------------------------------------------------------
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineInputAssemblyStateCreateInfo.html
 	VkPipelineInputAssemblyStateCreateInfo inputassemblystate
 	{
@@ -349,37 +480,6 @@ void VkRenderer::initResources()
 		.pDynamicStates = dynstate,
 	};
 
-	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutBinding.html
-	VkDescriptorSetLayoutBinding setlayoutbindings[]
-	{
-		{
-			.binding = 0,
-			// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorType.html
-			.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-			.descriptorCount = 0,
-			// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkShaderStageFlagBits.html
-			.stageFlags = 0,
-			.pImmutableSamplers = nullptr,
-		},
-	};
-
-	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
-	VkDescriptorSetLayoutCreateInfo setlayoutinfo
-	{
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = 0,
-		.bindingCount = sizeof(setlayoutbindings) / sizeof(setlayoutbindings[0]),
-		.pBindings = setlayoutbindings,
-	};
-
-	if(VkResult err = m_vkfuncs->vkCreateDescriptorSetLayout(m_vkdev, &setlayoutinfo, 0, &m_setlayouts[0]);
-	   err != VK_SUCCESS)
-	{
-		std::cerr << "Error creating set layout: " << get_vk_error(err) << std::endl;
-		return;
-	}
-
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPushConstantRange.html
 	VkPushConstantRange pushconstrange[] = {};
 
@@ -464,6 +564,9 @@ void VkRenderer::releaseResources()
 		reinterpret_cast<vkhandle>(m_fragShader),
 		reinterpret_cast<vkhandle>(m_vertexShader),
 
+		// buffer
+		reinterpret_cast<vkhandle>(m_buffer),
+
 		// set layouts
 		reinterpret_cast<vkhandle>(m_setlayouts[0]),
 
@@ -480,6 +583,9 @@ void VkRenderer::releaseResources()
 		// shaders
 		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyShaderModule),
 		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyShaderModule),
+
+		// buffer
+		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyBuffer),
 
 		// set layouts
 		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyDescriptorSetLayout),

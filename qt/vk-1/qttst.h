@@ -43,14 +43,16 @@ protected:
 	VkShaderModule m_fragShader{VK_NULL_HANDLE};
 	VkShaderModule m_vertexShader{VK_NULL_HANDLE};
 
-	VkPipeline m_pipeline = VK_NULL_HANDLE;
-	VkPipelineLayout m_layout = VK_NULL_HANDLE;
-	VkPipelineCache m_cache = VK_NULL_HANDLE;
-	VkDescriptorSetLayout m_setlayouts[1] = {{ VK_NULL_HANDLE }};
+	VkBuffer m_buffer{VK_NULL_HANDLE};
 
-	t_mat m_matPerspective, m_matPerspective_inv;
-	t_mat m_matViewport, m_matViewport_inv;
-	t_mat m_matCam, m_matCam_inv;
+	VkPipeline m_pipeline{VK_NULL_HANDLE};
+	VkPipelineLayout m_layout{VK_NULL_HANDLE};
+	VkPipelineCache m_cache{VK_NULL_HANDLE};
+	VkDescriptorSetLayout m_setlayouts[1] {{ VK_NULL_HANDLE }};
+
+	t_mat m_matPerspective{m::unit<t_mat>(4)}, m_matPerspective_inv{m::unit<t_mat>(4)};
+	t_mat m_matViewport{m::unit<t_mat>(4)}, m_matViewport_inv{m::unit<t_mat>(4)};
+	t_mat m_matCam{m::unit<t_mat>(4)}, m_matCam_inv{m::unit<t_mat>(4)};
 
 	int m_iScreenDims[2] = { -1, -1 };
 

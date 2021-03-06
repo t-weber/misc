@@ -100,13 +100,14 @@ bool equals(const t_vec& vec1, const t_vec& vec2,
 requires is_basic_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
+	using t_size = decltype(vec1.size());
 
 	// size has to be equal
 	if(vec1.size() != vec2.size())
 		return false;
 
 	// check each element
-	for(std::size_t i=0; i<vec1.size(); ++i)
+	for(t_size i=0; i<vec1.size(); ++i)
 	{
 		if constexpr(is_complex<decltype(eps)>)
 		{
@@ -347,9 +348,10 @@ t_vec create(const std::initializer_list<typename t_vec::value_type>& lst)
 requires is_basic_vec<t_vec>
 {
 	t_vec vec = create<t_vec>(lst.size());
+	using t_size = decltype(vec.size());
 
 	auto iterLst = lst.begin();
-	for(std::size_t i=0; i<vec.size(); ++i)
+	for(t_size i=0; i<vec.size(); ++i)
 	{
 		if(iterLst != lst.end())
 		{
@@ -485,9 +487,10 @@ template<class t_vec>
 typename t_vec::value_type inner(const t_vec& vec1, const t_vec& vec2)
 requires is_basic_vec<t_vec>
 {
+	using t_size = decltype(vec1.size());
 	typename t_vec::value_type val(0);
 
-	for(std::size_t i=0; i<vec1.size(); ++i)
+	for(t_size i=0; i<vec1.size(); ++i)
 	{
 		if constexpr(is_complex<typename t_vec::value_type>)
 			val += std::conj(vec1[i]) * vec2[i];
@@ -1718,6 +1721,7 @@ t_mat rotation(const t_vec& vec1, const t_vec& vec2)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	using t_real = typename t_vec::value_type;
+	using t_size = decltype(vec1.size());
 	constexpr t_real eps = 1e-6;
 
 	// rotation axis
@@ -1736,7 +1740,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	{
 		t_mat mat = -unit<t_mat>(vec1.size());
 		// e.g. homogeneous coordinates -> only have -1 on the first 3 diagonal elements
-		for(std::size_t i=3; i<std::min(mat.size1(), mat.size2()); ++i)
+		for(t_size i=3; i<std::min(mat.size1(), mat.size2()); ++i)
 			mat(i,i) = 1;
 		return mat;
 	}
