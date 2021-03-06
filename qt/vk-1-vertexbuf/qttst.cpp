@@ -10,9 +10,6 @@
  *  * https://doc.qt.io/qt-5/qvulkaninstance.html
  *  * https://doc.qt.io/qt-5/qvulkanwindowrenderer.html
  *  * https://doc.qt.io/qt-5/qtgui-hellovulkanwindow-example.html
- *  * https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkRenderPassBeginInfo.html
- *  * https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkCreateShaderModule.html
- *  * https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#shaders
  */
 
 #include "qttst.h"
@@ -78,7 +75,7 @@ VkRenderer::~VkRenderer()
 QPointF VkRenderer::VkToScreenCoords(const t_vec& vec4, bool *pVisible)
 {
 	auto [ vecPersp, vec ] =
-	m::hom_to_screen_coords<t_mat, t_vec>(vec4, m_matCam, m_matPerspective, m_matViewport, true);
+		m::hom_to_screen_coords<t_mat, t_vec>(vec4, m_matCam, m_matPerspective, m_matViewport, true);
 
 	// position not visible -> return a point outside the viewport
 	if(vecPersp[2] > 1.)
@@ -95,6 +92,14 @@ QPointF VkRenderer::VkToScreenCoords(const t_vec& vec4, bool *pVisible)
 void VkRenderer::tick(const std::chrono::milliseconds& ms)
 {
 	//std::cout << ms.count() << std::endl;
+
+	static t_real fAngle = 0.f;
+	fAngle += 0.5f;
+
+	// not yet used
+	m_matCam = m::create<t_mat>({1,0,0,0,  0,1,0,0,  0,0,1,-3,  0,0,0,1});
+	m_matCam *= m::rotation<t_mat, t_vec>(m::create<t_vec>({1.,1.,0.,0.}), fAngle/180.*M_PI, 0);
+	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat>(m_matCam);
 
 	if(m_vkwnd)
 		m_vkwnd->requestUpdate();
@@ -126,6 +131,7 @@ void VkRenderer::initResources()
 
 	// --------------------------------------------------------------------
 	// shaders
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/html/vkspec.html#shaders
 	// --------------------------------------------------------------------
 	if(!fs::exists("vert.spv") || !fs::exists("frag.spv"))
 	{
@@ -163,6 +169,7 @@ void VkRenderer::initResources()
 			.pCode = reinterpret_cast<decltype(VkShaderModuleCreateInfo::pCode)>(bin.data())
 		};
 
+		// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkCreateShaderModule.html
 		if(VkResult err = m_vkfuncs->vkCreateShaderModule(m_vkdev, &shaderInfo, 0, std::get<1>(shader));
 		   err != VK_SUCCESS)
 		{
@@ -244,42 +251,11 @@ void VkRenderer::initResources()
 		.vertexAttributeDescriptionCount = sizeof(vertinputattrdesc)/sizeof(vertinputattrdesc[0]),
 		.pVertexAttributeDescriptions = vertinputattrdesc,
 	};
-
-	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutBinding.html
-	VkDescriptorSetLayoutBinding setlayoutbindings[]
-	{
-		{
-			.binding = 0,
-			// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorType.html
-			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.descriptorCount = 1, //sizeof(vertinputattrdesc)/sizeof(vertinputattrdesc[0]),
-			// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkShaderStageFlagBits.html
-			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT /*| VK_SHADER_STAGE_FRAGMENT_BIT*/,
-			.pImmutableSamplers = nullptr,
-		},
-	};
-
-	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
-	VkDescriptorSetLayoutCreateInfo setlayoutinfo
-	{
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = 0,
-		.bindingCount = sizeof(setlayoutbindings) / sizeof(setlayoutbindings[0]),
-		.pBindings = setlayoutbindings,
-	};
-
-	if(VkResult err = m_vkfuncs->vkCreateDescriptorSetLayout(m_vkdev, &setlayoutinfo, 0, &m_setlayouts[0]);
-	   err != VK_SUCCESS)
-	{
-		std::cerr << "Error creating set layout: " << get_vk_error(err) << std::endl;
-		return;
-	}
 	// --------------------------------------------------------------------
 
 
 	// --------------------------------------------------------------------
-	// vertex and uniform buffer
+	// vertex buffer
 	// --------------------------------------------------------------------
 	// flatten vertex array into raw float array
 	auto to_float_array = [](const std::vector<t_vec3>& verts, int iRepeat=1,
@@ -300,16 +276,18 @@ void VkRenderer::initResources()
 	// 3d object
 	auto solid = m::create_plane<t_mat, t_vec3>(m::create<t_vec3>({0,0,-1}), 1.5);
 	auto [verts, norms, uvs] = m::subdivide_triangles<t_vec3>(m::create_triangles<t_vec3>(solid), 2);
-	auto vecVerts = to_float_array(verts, 1, 3, 4, 1.f);
-	auto vecNorms = to_float_array(norms, 3, 3, 4, 0.f);
-	auto vecUVs = to_float_array(uvs, 1, 2, 2, 0.f);
+	m_vecVerts = to_float_array(verts, 1, 3, 4, 1.f);
+	m_vecNorms = to_float_array(norms, 3, 3, 4, 0.f);
+	m_vecUVs = to_float_array(uvs, 1, 2, 2, 0.f);
 
-	std::vector<t_real> vecCols;
-	vecCols.reserve(4*verts.size());
+	static std::mt19937 rng{std::random_device{}()};
+	m_vecCols.reserve(4*verts.size());
 	for(std::size_t iVert=0; iVert<verts.size(); ++iVert)
 	{
-		vecCols.push_back(0); vecCols.push_back(0);
-		vecCols.push_back(1); vecCols.push_back(1);
+		m_vecCols.push_back(std::uniform_real_distribution<t_real>(0, 1)(rng));
+		m_vecCols.push_back(std::uniform_real_distribution<t_real>(0, 1)(rng));
+		m_vecCols.push_back(std::uniform_real_distribution<t_real>(0, 1)(rng));
+		m_vecCols.push_back(1);
 	}
 
 
@@ -319,12 +297,8 @@ void VkRenderer::initResources()
 		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.size = sizeof(t_real) *
-			(vecVerts.size() + vecNorms.size() + vecCols.size() + vecUVs.size()
-				+ m_vkwnd->concurrentFrameCount() * (
-					m_matPerspective.size1()*m_matPerspective.size2() +
-					m_matCam.size1()*m_matCam.size2() )),
-		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		.size = sizeof(t_real) * (m_vecVerts.size() + m_vecNorms.size() + m_vecCols.size() + m_vecUVs.size()),
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount = 0,
 		.pQueueFamilyIndices = nullptr,
@@ -369,31 +343,31 @@ void VkRenderer::initResources()
 	}
 
 	// copy vertex info
-	std::cout << "Copying " << vecVerts.size()/4 << " vertices." << std::endl;
+	std::cout << "Copying " << m_vecVerts.size()/4 << " vertices." << std::endl;
 	std::size_t memidx = 0;
-	for(std::size_t vertex=0; vertex<vecVerts.size()/4; ++vertex)
+	for(std::size_t vertex=0; vertex<m_vecVerts.size()/4; ++vertex)
 	{
 		// vertex
-		pMem[memidx++] = vecVerts[vertex*4 + 0];
-		pMem[memidx++] = vecVerts[vertex*4 + 1];
-		pMem[memidx++] = vecVerts[vertex*4 + 2];
-		pMem[memidx++] = vecVerts[vertex*4 + 3];
+		pMem[memidx++] = m_vecVerts[vertex*4 + 0];
+		pMem[memidx++] = m_vecVerts[vertex*4 + 1];
+		pMem[memidx++] = m_vecVerts[vertex*4 + 2];
+		pMem[memidx++] = m_vecVerts[vertex*4 + 3];
 
 		// normals
-		pMem[memidx++] = vecNorms[vertex*4 + 0];
-		pMem[memidx++] = vecNorms[vertex*4 + 1];
-		pMem[memidx++] = vecNorms[vertex*4 + 2];
-		pMem[memidx++] = vecNorms[vertex*4 + 3];
+		pMem[memidx++] = m_vecNorms[vertex*4 + 0];
+		pMem[memidx++] = m_vecNorms[vertex*4 + 1];
+		pMem[memidx++] = m_vecNorms[vertex*4 + 2];
+		pMem[memidx++] = m_vecNorms[vertex*4 + 3];
 
 		// colours
-		pMem[memidx++] = vecCols[vertex*4 + 0];
-		pMem[memidx++] = vecCols[vertex*4 + 1];
-		pMem[memidx++] = vecCols[vertex*4 + 2];
-		pMem[memidx++] = vecCols[vertex*4 + 3];
+		pMem[memidx++] = m_vecCols[vertex*4 + 0];
+		pMem[memidx++] = m_vecCols[vertex*4 + 1];
+		pMem[memidx++] = m_vecCols[vertex*4 + 2];
+		pMem[memidx++] = m_vecCols[vertex*4 + 3];
 
 		// uv coords
-		pMem[memidx++] = vecUVs[vertex*4 + 0];
-		pMem[memidx++] = vecUVs[vertex*4 + 1];
+		pMem[memidx++] = m_vecUVs[vertex*2 + 0];
+		pMem[memidx++] = m_vecUVs[vertex*2 + 1];
 	}
 
 	m_vkfuncs->vkUnmapMemory(m_vkdev, m_mem);
@@ -551,8 +525,8 @@ void VkRenderer::initResources()
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.setLayoutCount = sizeof(m_setlayouts)/sizeof(m_setlayouts[0]),
-		.pSetLayouts = m_setlayouts,
+		.setLayoutCount = 0,
+		.pSetLayouts = nullptr,
 		.pushConstantRangeCount = sizeof(pushconstrange)/sizeof(pushconstrange[0]),
 		.pPushConstantRanges = pushconstrange,
 	};
@@ -630,9 +604,6 @@ void VkRenderer::releaseResources()
 		reinterpret_cast<vkhandle>(m_mem),
 		reinterpret_cast<vkhandle>(m_buffer),
 
-		// set layouts
-		reinterpret_cast<vkhandle>(m_setlayouts[0]),
-
 		// pipeline
 		reinterpret_cast<vkhandle>(m_cache),
 		reinterpret_cast<vkhandle>(m_layout),
@@ -650,9 +621,6 @@ void VkRenderer::releaseResources()
 		// buffer
 		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkFreeMemory),
 		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyBuffer),
-
-		// set layouts
-		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyDescriptorSetLayout),
 
 		// pipeline
 		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyPipelineCache),
@@ -682,9 +650,24 @@ void VkRenderer::initSwapChainResources()
 	m_iScreenDims[1] = m_vkwnd->swapChainImageSize().height();
 	std::cout << "window size: " << m_iScreenDims[0] << " x " << m_iScreenDims[1] << "." << std::endl;
 
+	// viewport
 	m_matViewport = m::hom_viewport<t_mat>(m_iScreenDims[0], m_iScreenDims[1], 0., 1.);
 	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat>(m_matViewport);
 
+	m_viewport = VkViewport
+	{
+		.x = 0, .y = 0,
+		.width = (t_real)m_iScreenDims[0], .height = (t_real)m_iScreenDims[1],
+		.minDepth = 0, .maxDepth = 1,
+	};
+
+	m_viewrect = VkRect2D
+	{
+		.offset = VkOffset2D { .x = 0, .y = 0 },
+		.extent = VkExtent2D { .width = m_iScreenDims[0], .height = m_iScreenDims[1] },
+	};
+
+	// not yet used
 	m_matPerspective = m::hom_perspective<t_mat>(
 		0.01, 100., m::pi<t_real>*0.5,
 		t_real(m_iScreenDims[1])/t_real(m_iScreenDims[0]), false, true, true);
@@ -714,14 +697,13 @@ void VkRenderer::physicalDeviceLost()
 
 void VkRenderer::startNextFrame()
 {
-	//std::cout << __PRETTY_FUNCTION__ << std::endl;
-
 	VkClearValue clr[] /* union between .color and .depthStencil */
 	{
-		{ .color = VkClearColorValue{.float32 = {1.f, 1.f, 1.f, 1.f}} },
-		{ .depthStencil = VkClearDepthStencilValue{.depth = 1.f, .stencil = 0} }
+		{ .color = VkClearColorValue{ .float32 = {1.f, 1.f, 1.f, 1.f} } },
+		{ .depthStencil = VkClearDepthStencilValue{ .depth = 1.f, .stencil = 0 } },
 	};
 
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkRenderPassBeginInfo.html
 	VkRenderPassBeginInfo beg
 	{
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,	// fixed value
@@ -730,21 +712,27 @@ void VkRenderer::startNextFrame()
 		.framebuffer = m_vkwnd->currentFramebuffer(),
 		.renderArea = VkRect2D
 		{
-			.offset = VkOffset2D{.x = 0, .y = 0},
-			.extent = VkExtent2D
-			{
-				.width = (uint32_t)m_vkwnd->swapChainImageSize().width(),
-				.height = (uint32_t)m_vkwnd->swapChainImageSize().height()
-			},
+			.offset = VkOffset2D { .x = 0, .y = 0 },
+			.extent = VkExtent2D { .width = m_iScreenDims[0], .height = m_iScreenDims[1] },
 		},
 		.clearValueCount = sizeof(clr) / sizeof(clr[0]),
-		.pClearValues = clr
+		.pClearValues = clr,
 	};
 
 	VkSubpassContents cont = VK_SUBPASS_CONTENTS_INLINE /*VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS*/;
 	m_vkfuncs->vkCmdBeginRenderPass(m_vkwnd->currentCommandBuffer(), &beg, cont);
-	m_vkfuncs->vkCmdEndRenderPass(m_vkwnd->currentCommandBuffer());
 
+	VkPipelineBindPoint bindpoint = VK_PIPELINE_BIND_POINT_GRAPHICS /*VK_PIPELINE_BIND_POINT_COMPUTE*/;
+	VkDeviceSize offs{0};
+
+	m_vkfuncs->vkCmdBindPipeline(m_vkwnd->currentCommandBuffer(), bindpoint, m_pipeline);
+	m_vkfuncs->vkCmdBindVertexBuffers(m_vkwnd->currentCommandBuffer(), 0, 1, &m_buffer, &offs);
+
+	m_vkfuncs->vkCmdSetViewport(m_vkwnd->currentCommandBuffer(), 0, 1, &m_viewport);
+	m_vkfuncs->vkCmdSetScissor(m_vkwnd->currentCommandBuffer(), 0, 1, &m_viewrect);
+
+	m_vkfuncs->vkCmdDraw(m_vkwnd->currentCommandBuffer(), m_vecVerts.size()/4, 1, 0, 0);
+	m_vkfuncs->vkCmdEndRenderPass(m_vkwnd->currentCommandBuffer());
 	m_vkwnd->frameReady();
 }
 // ----------------------------------------------------------------------------

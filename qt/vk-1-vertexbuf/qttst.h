@@ -34,6 +34,9 @@ class VkWnd;
 
 class VkRenderer : public QVulkanWindowRenderer
 {
+private:
+	std::vector<t_real> m_vecVerts, m_vecNorms, m_vecCols, m_vecUVs;
+
 protected:
 	std::shared_ptr<QVulkanInstance> m_vkinst;
 	VkWnd* m_vkwnd = nullptr;
@@ -49,13 +52,14 @@ protected:
 	VkPipeline m_pipeline{VK_NULL_HANDLE};
 	VkPipelineLayout m_layout{VK_NULL_HANDLE};
 	VkPipelineCache m_cache{VK_NULL_HANDLE};
-	VkDescriptorSetLayout m_setlayouts[1] {{ VK_NULL_HANDLE }};
 
 	t_mat m_matPerspective{m::unit<t_mat>(4)}, m_matPerspective_inv{m::unit<t_mat>(4)};
 	t_mat m_matViewport{m::unit<t_mat>(4)}, m_matViewport_inv{m::unit<t_mat>(4)};
 	t_mat m_matCam{m::unit<t_mat>(4)}, m_matCam_inv{m::unit<t_mat>(4)};
 
-	int m_iScreenDims[2] = { -1, -1 };
+	VkViewport m_viewport{};
+	VkRect2D m_viewrect{};
+	std::uint32_t m_iScreenDims[2] = { 800, 600 };
 
 protected:
 	QPointF VkToScreenCoords(const t_vec& vec, bool *pVisible=nullptr);

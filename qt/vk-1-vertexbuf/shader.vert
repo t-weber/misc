@@ -18,11 +18,27 @@ layout(location = 3) in vec2 texcoords;
 layout(location = 0) out vec4 fragcolor;
 layout(location = 1) out vec2 fragtexcoords;
 
-layout(binding = 0) uniform Trafos
-{
-	mat4 proj;
-	mat4 cam;
-};
+
+// hard-coded for the moment, no uniforms yet
+mat4 proj = transpose(mat4(
+	0.75,  0,       0,         0,
+	0.,   -1,       0,         0, 
+	0.,    0, -1.0001, -0.010001,
+	0.,    0,      -1,         0));
+
+//mat4 cam = mat4(1);
+mat4 cam = transpose(mat4(
+	1, 0, 0,  0,
+	0, 1, 0,  0,
+	0, 0, 1, -3,
+	0, 0, 0,  1));
+
+mat4 rot = mat4(
+	0.7, 0.0, -0.7, 0.0,
+	0.0, 1.0,  0.0, 0.0,
+	0.7, 0.0,  0.7, 0.0,
+	0.0, 0.0,  0.0, 1.0);
+
 
 vec3 light_dir = vec3(2, 2, -1);
 
@@ -37,7 +53,7 @@ float lighting(vec3 lightdir)
 
 void main()
 {
-	gl_Position = proj * cam * vertex;
+	gl_Position = proj * cam * rot * vertex;
 
 	float I = lighting(light_dir);
 	fragcolor = vertexcolor * I;
