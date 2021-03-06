@@ -301,8 +301,8 @@ void VkRenderer::initResources()
 	auto solid = m::create_plane<t_mat, t_vec3>(m::create<t_vec3>({0,0,-1}), 1.5);
 	auto [verts, norms, uvs] = m::subdivide_triangles<t_vec3>(m::create_triangles<t_vec3>(solid), 2);
 	auto vecVerts = to_float_array(verts, 1, 3, 4, 1.f);
-	auto vecNorms = to_float_array(norms, 4, 3, 4, 0.f);
-	auto vecUVS = to_float_array(uvs, 1, 2, 2, 0.f);
+	auto vecNorms = to_float_array(norms, 3, 3, 4, 0.f);
+	auto vecUVs = to_float_array(uvs, 1, 2, 2, 0.f);
 
 	std::vector<t_real> vecCols;
 	vecCols.reserve(4*verts.size());
@@ -319,10 +319,11 @@ void VkRenderer::initResources()
 		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-		.size = sizeof(t_real) * (vecVerts.size() +
-			m_vkwnd->concurrentFrameCount() * (
-				m_matPerspective.size1()*m_matPerspective.size2() +
-				m_matCam.size1()*m_matCam.size2() )),
+		.size = sizeof(t_real) *
+			(vecVerts.size() + vecNorms.size() + vecCols.size() + vecUVs.size()
+				+ m_vkwnd->concurrentFrameCount() * (
+					m_matPerspective.size1()*m_matPerspective.size2() +
+					m_matCam.size1()*m_matCam.size2() )),
 		.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		.queueFamilyIndexCount = 0,
@@ -331,10 +332,71 @@ void VkRenderer::initResources()
 
 	if(VkResult err = m_vkfuncs->vkCreateBuffer(m_vkdev, &buffercreateinfo, 0, &m_buffer);
 	   err != VK_SUCCESS)
-	   {
-		   std::cerr << "Error creating buffer: " << get_vk_error(err) << std::endl;
-		   return;
-	   }
+	{
+		std::cerr << "Error creating buffer: " << get_vk_error(err) << std::endl;
+		return;
+	}
+
+	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkMemoryAllocateInfo.html
+	VkMemoryAllocateInfo memallocinfo
+	{
+		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.pNext = nullptr,
+		.allocationSize = buffercreateinfo.size,
+		.memoryTypeIndex = m_vkwnd->hostVisibleMemoryIndex(),
+	};
+
+	if(VkResult err = m_vkfuncs->vkAllocateMemory(m_vkdev, &memallocinfo, 0, &m_mem);
+	   err != VK_SUCCESS)
+	{
+		std::cerr << "Error allocating memory: " << get_vk_error(err) << std::endl;
+		return;
+	}
+
+	if(VkResult err = m_vkfuncs->vkBindBufferMemory(m_vkdev, m_buffer, m_mem, 0);
+	   err != VK_SUCCESS)
+	{
+		std::cerr << "Error binding memory to buffer: " << get_vk_error(err) << std::endl;
+		return;
+	}
+
+	t_real* pMem = nullptr;
+	if(VkResult err = m_vkfuncs->vkMapMemory(m_vkdev, m_mem, 0, VK_WHOLE_SIZE, 0, (void**)&pMem);
+	   err != VK_SUCCESS)
+	{
+		std::cerr << "Error mapping memory: " << get_vk_error(err) << std::endl;
+		return;
+	}
+
+	// copy vertex info
+	std::cout << "Copying " << vecVerts.size()/4 << " vertices." << std::endl;
+	std::size_t memidx = 0;
+	for(std::size_t vertex=0; vertex<vecVerts.size()/4; ++vertex)
+	{
+		// vertex
+		pMem[memidx++] = vecVerts[vertex*4 + 0];
+		pMem[memidx++] = vecVerts[vertex*4 + 1];
+		pMem[memidx++] = vecVerts[vertex*4 + 2];
+		pMem[memidx++] = vecVerts[vertex*4 + 3];
+
+		// normals
+		pMem[memidx++] = vecNorms[vertex*4 + 0];
+		pMem[memidx++] = vecNorms[vertex*4 + 1];
+		pMem[memidx++] = vecNorms[vertex*4 + 2];
+		pMem[memidx++] = vecNorms[vertex*4 + 3];
+
+		// colours
+		pMem[memidx++] = vecCols[vertex*4 + 0];
+		pMem[memidx++] = vecCols[vertex*4 + 1];
+		pMem[memidx++] = vecCols[vertex*4 + 2];
+		pMem[memidx++] = vecCols[vertex*4 + 3];
+
+		// uv coords
+		pMem[memidx++] = vecUVs[vertex*4 + 0];
+		pMem[memidx++] = vecUVs[vertex*4 + 1];
+	}
+
+	m_vkfuncs->vkUnmapMemory(m_vkdev, m_mem);
 	// --------------------------------------------------------------------
 
 
@@ -565,6 +627,7 @@ void VkRenderer::releaseResources()
 		reinterpret_cast<vkhandle>(m_vertexShader),
 
 		// buffer
+		reinterpret_cast<vkhandle>(m_mem),
 		reinterpret_cast<vkhandle>(m_buffer),
 
 		// set layouts
@@ -585,6 +648,7 @@ void VkRenderer::releaseResources()
 		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyShaderModule),
 
 		// buffer
+		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkFreeMemory),
 		reinterpret_cast<t_destroyfunc>(&QVulkanDeviceFunctions::vkDestroyBuffer),
 
 		// set layouts
