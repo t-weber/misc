@@ -32,13 +32,13 @@
 
 namespace m {
 
+
+// ----------------------------------------------------------------------------
+// scalar algos and constants
+// ----------------------------------------------------------------------------
 template<typename T> constexpr T pi = std::numbers::pi_v<T>;
 template<typename T> T golden = std::numbers::phi_v<T>; //T(0.5) + std::sqrt(T(5))/T(2);
 
-
-// ----------------------------------------------------------------------------
-// n-dim algos
-// ----------------------------------------------------------------------------
 
 /**
  * are two scalars equal within an epsilon range?
@@ -48,6 +48,29 @@ bool equals(T t1, T t2, T eps = std::numeric_limits<T>::epsilon())
 requires is_scalar<T>
 {
 	return std::abs(t1 - t2) <= eps;
+}
+
+
+template<typename t_num = unsigned int>
+t_num next_multiple(t_num num, t_num granularity)
+requires is_scalar<t_num>
+{
+	t_num div = num / granularity;
+	bool rest_is_0 = 1;
+
+	if constexpr(std::is_floating_point_v<t_num>)
+	{
+		div = std::floor(div);
+		t_num rest = std::fmod(num, granularity);
+		rest_is_0 = equals(rest, t_num{0});
+	}
+	else
+	{
+		t_num rest = num % granularity;
+		rest_is_0 = (rest==0);
+	}
+
+	return rest_is_0 ? num : (div+1) * granularity;
 }
 
 
@@ -65,6 +88,7 @@ requires is_scalar<t_real>
 	return val;
 }
 
+
 /**
  * are two angles equal within an epsilon range?
  */
@@ -77,8 +101,13 @@ requires is_scalar<T>
 
 	return std::abs(t1 - t2) <= eps;
 }
+// ----------------------------------------------------------------------------
 
 
+
+// ----------------------------------------------------------------------------
+// n-dim algos
+// ----------------------------------------------------------------------------
 /**
  * are two complex numbers equal within an epsilon range?
  */
@@ -90,6 +119,7 @@ requires is_complex<T>
 	return (std::abs(t1.real() - t2.real()) <= eps) &&
 		(std::abs(t1.imag() - t2.imag()) <= eps);
 }
+
 
 /**
  * are two vectors equal within an epsilon range?
@@ -123,6 +153,7 @@ requires is_basic_vec<t_vec>
 
 	return true;
 }
+
 
 /**
  * are two matrices equal within an epsilon range?
@@ -330,10 +361,12 @@ template<class t_mat>
 t_mat trans(const t_mat& mat)
 requires is_mat<t_mat>
 {
+	using t_size = decltype(mat.size1());
+
 	t_mat mat2 = create<t_mat>(mat.size2(), mat.size1());
 
-	for(std::size_t i=0; i<mat.size1(); ++i)
-		for(std::size_t j=0; j<mat.size2(); ++j)
+	for(t_size i=0; i<mat.size1(); ++i)
+		for(t_size j=0; j<mat.size2(); ++j)
 			mat2(j,i) = mat(i,j);
 
 	return mat2;
