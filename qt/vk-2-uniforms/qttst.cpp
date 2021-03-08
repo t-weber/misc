@@ -166,7 +166,7 @@ std::vector<VkPipelineShaderStageCreateInfo> VkRenderer::CreateShaders()
 {
 	if(!fs::exists("vert.spv") || !fs::exists("frag.spv"))
 	{
-		std::cerr << "Vertex or fragment shader could be found." << std::endl;
+		std::cerr << "Vertex or fragment shader could not be found." << std::endl;
 		return std::vector<VkPipelineShaderStageCreateInfo>{};
 	}
 

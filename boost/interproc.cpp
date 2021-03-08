@@ -29,6 +29,22 @@
 #include <boost/interprocess/streams/bufferstream.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#ifdef BOOST_INTERPROCESS_XSI_SHARED_MEMORY_OBJECTS
+	#pragma message("Boost.Interprocess shares memory objects via XSI.")
+#endif
+
+#ifdef BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS
+	#pragma message("Boost.Interprocess shares memory objects via Posix.")
+#endif
+
+#ifdef BOOST_INTERPROCESS_FILESYSTEM_BASED_POSIX_SHARED_MEMORY
+	#pragma message("Boost.Interprocess uses shared memory via the filesystem.")
+#endif
+
+#ifdef BOOST_INTERPROCESS_RUNTIME_FILESYSTEM_BASED_POSIX_SHARED_MEMORY
+	#pragma message("Boost.Interprocess uses shared memory via the runtime filesystem.")
+#endif
+
 namespace interp = boost::interprocess;
 namespace pt = boost::posix_time;
 
