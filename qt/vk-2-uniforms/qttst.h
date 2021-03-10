@@ -71,6 +71,7 @@ protected:
 	VkViewport m_viewports[1];
 	VkRect2D m_viewrects[1];
 	std::uint32_t m_iScreenDims[2] = { 800, 600 };
+	bool m_use_prespective_proj = true;
 
 protected:
 	QPointF VkToScreenCoords(const t_vec& vec, bool *pVisible=nullptr);
@@ -95,6 +96,8 @@ protected:
 		VkPipelineMultisampleStateCreateInfo, VkPipelineDepthStencilStateCreateInfo>
 	CreatePipelineStages() const;
 
+	void UpdatePerspective();
+
 public:
 	VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd);
 	virtual ~VkRenderer();
@@ -111,6 +114,7 @@ public:
 
 	virtual void startNextFrame() override;
 
+	void TogglePerspective();
 	void SetMousePos(const QPointF& pt);
 	void tick(const std::chrono::milliseconds& ms);
 };
@@ -131,6 +135,7 @@ public:
 	virtual QVulkanWindowRenderer* createRenderer() override;
 
 	virtual void mouseMoveEvent(QMouseEvent *pEvt) override;
+	virtual void keyPressEvent(QKeyEvent *pEvt) override;
 };
 
 

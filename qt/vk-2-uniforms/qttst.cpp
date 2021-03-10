@@ -924,9 +924,40 @@ void VkRenderer::releaseResources()
 }
 
 
-void VkRenderer::initSwapChainResources()
+void VkRenderer::TogglePerspective()
+{
+	m_use_prespective_proj = !m_use_prespective_proj;
+	UpdatePerspective();
+}
+
+
+void VkRenderer::UpdatePerspective()
 {
 	using namespace m_ops;
+
+	// perspective projection
+	if(m_use_prespective_proj)
+	{
+		m_matPerspective = m::hom_perspective<t_mat>(
+			0.01, 100., m::pi<t_real>*0.5,
+			t_real(m_iScreenDims[1])/t_real(m_iScreenDims[0]), false, true, true);
+	}
+
+	// orthogonal projection
+	else
+	{
+		m_matPerspective = m::hom_parallel<t_mat>(
+			0.01, 100., -4., 4., -4, 4., false, true, true);
+	}
+
+	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat>(m_matPerspective);
+	std::cout << "projection matrix: " << m_matPerspective << "." << std::endl;
+	std::cout << "inverted projection matrix: " << m_matPerspective_inv << "." << std::endl;
+}
+
+
+void VkRenderer::initSwapChainResources()
+{
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	m_iScreenDims[0] = m_vkwnd->swapChainImageSize().width();
@@ -950,12 +981,7 @@ void VkRenderer::initSwapChainResources()
 		.extent = VkExtent2D { .width = m_iScreenDims[0], .height = m_iScreenDims[1] },
 	};
 
-	m_matPerspective = m::hom_perspective<t_mat>(
-		0.01, 100., m::pi<t_real>*0.5,
-		t_real(m_iScreenDims[1])/t_real(m_iScreenDims[0]), false, true, true);
-	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat>(m_matPerspective);
-	std::cout << "perspective matrix: " << m_matPerspective << "." << std::endl;
-	std::cout << "inverted perspective matrix: " << m_matPerspective_inv << "." << std::endl;
+	UpdatePerspective();
 }
 
 
@@ -1167,6 +1193,16 @@ void VkWnd::mouseMoveEvent(QMouseEvent *pEvt)
 {
 	if(m_vkrenderer)
 		m_vkrenderer->SetMousePos(pEvt->localPos());
+}
+
+
+void VkWnd::keyPressEvent(QKeyEvent *pEvt)
+{
+	if(!m_vkrenderer)
+		return;
+
+	if(pEvt->key() == Qt::Key_Space)
+		m_vkrenderer->TogglePerspective();
 }
 // ----------------------------------------------------------------------------
 
