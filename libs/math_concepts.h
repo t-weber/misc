@@ -12,6 +12,7 @@
 #include <iterator>
 #include <complex>
 #include <concepts>
+//#include <iostream>
 
 
 namespace m {
@@ -23,7 +24,7 @@ namespace m {
  * requirements for a scalar type
  */
 template<class T>
-concept /*bool*/ is_scalar = 
+concept /*bool*/ is_scalar =
 	std::is_floating_point_v<T> || std::is_integral_v<T> /*|| std::is_arithmetic_v<T>*/;
 
 
@@ -35,8 +36,8 @@ concept /*bool*/ is_basic_vec = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 
-	a.size();					// must have a size() member function
-	a.operator[](1);			// must have an operator[]
+	a.size();			// must have a size() member function
+	a.operator[](1);		// must have an operator[]
 };
 
 /**
@@ -45,7 +46,7 @@ concept /*bool*/ is_basic_vec = requires(const T& a)
 template<class T>
 concept /*bool*/ is_dyn_vec = requires(const T& a)
 {
-	T(3);						// constructor with size
+	T(3); T{3};					// constructor with size
 };
 
 /**
@@ -70,9 +71,9 @@ concept /*bool*/ is_basic_mat = requires(const T& a)
 {
 	typename T::value_type;		// must have a value_type
 
-	a.size1();					// must have a size1() member function
-	a.size2();					// must have a size2() member function
-	a.operator()(1,1);			// must have an operator()
+	a.size1();			// must have a size1() member function
+	a.size2();			// must have a size2() member function
+	a.operator()(1,1);		// must have an operator()
 };
 
 /**
@@ -81,7 +82,7 @@ concept /*bool*/ is_basic_mat = requires(const T& a)
 template<class T>
 concept /*bool*/ is_dyn_mat = requires(const T& a)
 {
-	T(3,3);						// constructor with sizes
+	T(3,3);	T{3,3};					// constructor with sizes
 };
 
 /**
@@ -150,11 +151,19 @@ public:
 	// constructors
 	using base_type::base_type;
 	qvec_adapter(const base_type& vec) : base_type{vec} {}
+	qvec_adapter(size_t n=N) : base_type{}, m_n{n} {}
 
-	constexpr size_t size() const { return N; }
+	// copying
+	//qvec_adapter(const qvec_adapter<size_t, N, T, t_mat_base>& other)
+	//	: t_mat_base<1, N, T>(other), m_n{other.m_n} {}
+
+	constexpr size_t size() const { return m_n<N ? m_n : N; }
 
 	T& operator[](size_t i) { return base_type::operator()(i,0); }
 	const T operator[](size_t i) const { return base_type::operator()(i,0); }
+
+private:
+	size_t m_n{N};
 };
 
 
@@ -170,9 +179,17 @@ public:
 	// constructors
 	using base_type::base_type;
 	qmat_adapter(const base_type& mat) : base_type{mat} {}
+	qmat_adapter(size_t rows=ROWS, size_t cols=COLS) : base_type{}, m_rows{rows}, m_cols{cols} {}
 
-	size_t size1() const { return ROWS; }
-	size_t size2() const { return COLS; }
+	// copying
+	//qmat_adapter(const qmat_adapter<size_t, ROWS, COLS, T, t_mat_base>& other)
+	//	: t_mat_base<COLS, ROWS, T>(other), m_rows{other.m_rows}, m_cols{other.m_cols} {}
+
+	constexpr size_t size1() const { return m_rows<ROWS ? m_rows : ROWS; }
+	constexpr size_t size2() const { return m_cols<COLS ? m_cols : COLS; }
+
+private:
+	size_t m_rows{ROWS}, m_cols{COLS};
 };
 
 
@@ -188,11 +205,19 @@ public:
 	// constructors
 	using base_type::base_type;
 	qvecN_adapter(const base_type& vec) : base_type{vec} {}
+	qvecN_adapter(size_t n=N) : base_type{}, m_n{n} {}
 
-	constexpr size_t size() const { return N; }
+	// copying
+	//qvecN_adapter(const qvecN_adapter<size_t, N, T, t_vec_base>& other)
+	//	: t_vec_base(other), m_n{other.m_n} {}
+
+	constexpr size_t size() const { return m_n<N ? m_n : N; }
 
 	T& operator[](size_t i) { return static_cast<base_type&>(*this)[i]; }
 	const T operator[](size_t i) const { return static_cast<const base_type&>(*this)[i]; }
+
+private:
+	size_t m_n{N};
 };
 
 
@@ -208,9 +233,17 @@ public:
 	// constructors
 	using base_type::base_type;
 	qmatNN_adapter(const base_type& mat) : base_type{mat} {}
+	qmatNN_adapter(size_t rows=ROWS, size_t cols=COLS) : base_type{}, m_rows{rows}, m_cols{cols} {}
 
-	size_t size1() const { return ROWS; }
-	size_t size2() const { return COLS; }
+	// copying
+	//qmatNN_adapter(const qmatNN_adapter<size_t, ROWS, COLS, T, t_mat_base>& other)
+	//	: t_mat_base(other), m_rows{other.m_rows}, m_cols{other.m_cols} {}
+
+	constexpr size_t size1() const { return m_rows<ROWS ? m_rows : ROWS; }
+	constexpr size_t size2() const { return m_cols<COLS ? m_cols : COLS; }
+
+private:
+	size_t m_rows{ROWS}, m_cols{COLS};
 };
 // ----------------------------------------------------------------------------
 

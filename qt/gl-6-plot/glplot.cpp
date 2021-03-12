@@ -513,14 +513,14 @@ void GlPlot::resizeGL(int w, int h)
 
 	//std::cerr << std::dec << __func__ << ": w = " << w << ", h = " << h << std::endl;
 	m_matViewport = m::hom_viewport<t_mat_gl>(w, h, 0., 1.);
-	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat_gl>(m_matViewport);
+	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat_gl, t_vec_gl>(m_matViewport);
 
 	auto *pGl = GetGlFunctions();
 	pGl->glViewport(0, 0, w, h);
 	pGl->glDepthRange(0, 1);
 
 	m_matPerspective = m::hom_perspective<t_mat_gl>(0.01, 100., m::pi<t_real_gl>*0.5, t_real_gl(h)/t_real_gl(w));
-	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat_gl>(m_matPerspective);
+	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat_gl, t_vec_gl>(m_matPerspective);
 
 
 	// bind shaders
@@ -541,7 +541,7 @@ void GlPlot::paintGL()
 	auto *pContext = context();
 	if(!pContext) return;
 	QPainter painter(this);
-	painter.setRenderHint(QPainter::HighQualityAntialiasing);
+	painter.setRenderHint(QPainter::Antialiasing);
 
 
 	// gl painting
@@ -700,7 +700,7 @@ void GlPlot::UpdateCam()
 	m_matCam = m_matCamBase;
 	m_matCam *= m_matCamRot;
 	m_matCam *= matZoom;
-	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat_gl>(m_matCam);
+	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat_gl, t_vec_gl>(m_matCam);
 
 	m_bPickerNeedsUpdate = true;
 	QMetaObject::invokeMethod(this, static_cast<void (QOpenGLWidget::*)()>(&QOpenGLWidget::update),
@@ -762,7 +762,7 @@ void GlPlot::EndRotation()
 
 void GlPlot::UpdatePicker()
 {
-	const bool show_picked_triangle = false;
+	const bool show_picked_triangle = true;
 
 	// picker ray
 	auto [org, dir] = m::hom_line_from_screen_coords<t_mat_gl, t_vec_gl>(

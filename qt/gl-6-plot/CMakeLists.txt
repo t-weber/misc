@@ -13,8 +13,8 @@ find_package(Qt5 REQUIRED COMPONENTS Core Gui Widgets OpenGL)
 set(CMAKE_AUTOUIC TRUE)
 set(CMAKE_AUTOMOC TRUE)
 
-set(CMAKE_CXX_STANDARD 17)
-add_definitions(-std=c++17 -fconcepts)
+set(CMAKE_CXX_STANDARD 20)
+add_definitions(-std=c++20)
 add_definitions(${Boost_CXX_FLAGS})
 include_directories("${PROJECT_SOURCE_DIR}" "${Boost_INCLUDE_DIRS}/..")
 

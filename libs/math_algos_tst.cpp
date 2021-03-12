@@ -16,7 +16,9 @@ using namespace m_ops;
 #include <vector>
 #include <array>
 
-#ifdef USE_UBLAS	// ublas containers use deprecated std::allocator::construct
+#define USE_UBLAS 0
+
+#if USE_UBLAS == 1	// ublas containers use deprecated std::allocator::construct
 	#include <boost/numeric/ublas/matrix.hpp>
 	#include <boost/numeric/ublas/vector.hpp>
 	#include <boost/numeric/ublas/io.hpp>
@@ -32,7 +34,7 @@ namespace ty = boost::typeindex;
 #include <QtGui/QVector4D>
 
 
-#ifdef USE_UBLAS
+#if USE_UBLAS == 1
 template<class T>
 ublas::vector<T> operator*(const ublas::matrix<T>& mat, const ublas::vector<T>& vec)
 {
@@ -83,9 +85,9 @@ void vecmat_tsts()
 	mat3(0,0) = 1; mat3(0,1) = 2; mat3(0,2) = 3;
 	mat3(1,0) = 1; mat3(1,1) = 2; mat3(1,2) = 2;
 	mat3(2,0) = 3; mat3(2,1) = 2; mat3(2,2) = 1;
-	std::cout << "det = " << det<t_mat>(mat3) << "\n";
+	std::cout << "det = " << det<t_mat, t_vec>(mat3) << "\n";
 
-	auto [matInv, bInvExists] = inv<t_mat>(mat3);
+	auto [matInv, bInvExists] = inv<t_mat, t_vec>(mat3);
 	std::cout << "\ninverse: " << std::boolalpha << bInvExists << "\n";
 	std::cout << matInv(0,0) << " " << matInv(0,1) << " " << matInv(0,2) << "\n";
 	std::cout << matInv(1,0) << " " << matInv(1,1) << " " << matInv(1,2) << "\n";
@@ -128,14 +130,14 @@ void vecmat_tsts()
 	{	// mirror to [x 0 0]
 		//t_vec vecMirror = vecToMirror - create<t_vec>({std::sqrt(a*a + b*b + c*c), 0, 0});
 		//t_mat opMirror = ortho_mirror_op<t_mat, t_vec>(vecMirror, false);
-		t_mat opMirror = ortho_mirror_zero_op<t_mat, t_vec>(vecToMirror, 0);
+		auto [opMirror, mirrored] = ortho_mirror_zero_op<t_mat, t_vec>(vecToMirror, 0);
 		t_vec vecMirrored = opMirror * vecToMirror;
 		std::cout << vecMirrored[0] << " "  << vecMirrored[1]  << " " << vecMirrored[2] << "\n";
 	}
 	{ // mirror to [x y 0]
 		//t_vec vecMirror = vecToMirror - create<t_vec>({a, std::sqrt(b*b + c*c), 0});
 		//t_mat opMirror = ortho_mirror_op<t_mat, t_vec>(vecMirror, false);
-		t_mat opMirror = ortho_mirror_zero_op<t_mat, t_vec>(vecToMirror, 1);
+		auto [opMirror, mirrored] = ortho_mirror_zero_op<t_mat, t_vec>(vecToMirror, 1);
 		t_vec vecMirrored = opMirror * vecToMirror;
 		std::cout << vecMirrored[0] << " "  << vecMirrored[1]  << " " << vecMirrored[2] << "\n";
 	}
@@ -195,7 +197,7 @@ void vecmat_tsts()
 		line1[0], line1[1], line2[0], line2[1]);
 	std::cout << std::boolalpha << bValid << ",  " << pt1[0] << " " << pt1[1] << " " << pt1[2] << ",  "
 		<< pt2[0] << " " << pt2[1] << " " << pt2[2] << ",  dist: " << distLines << "\n";
-	std::cout << "dist line-line (direct): " << det<t_mat>(create<t_mat, t_vec>({t_vec(line1[0]-line2[0]), line1[1], line2[1]}))
+	std::cout << "dist line-line (direct): " << det<t_mat, t_vec>(create<t_mat, t_vec>({t_vec(line1[0]-line2[0]), line1[1], line2[1]}))
 		/ norm<t_vec>(cross<t_vec>(line1[1], line2[1])) << "\n";
 
 	std::cout << "\nintersect_plane_plane\n";
@@ -209,7 +211,7 @@ void vecmat_tsts()
 
 	std::cout << "\nQR\n";
 	t_mat matOrg = create<t_mat>({1, 23, 4,  5, -3, 23,  9, -3, -4});
-	auto [Q, R] = qr<t_mat, t_vec>(matOrg);
+	auto [Q, R, mirr] = qr<t_mat, t_vec>(matOrg);
 	std::cout << Q(0,0) << " " << Q(0,1) << " " << Q(0,2) << "\n";
 	std::cout << Q(1,0) << " " << Q(1,1) << " " << Q(1,2) << "\n";
 	std::cout << Q(2,0) << " " << Q(2,1) << " " << Q(2,2) << "\n";
@@ -274,7 +276,7 @@ void vecmat_tsts()
 	std::cout << A(1,0) << " " << A(1,1) << " " << A(1,2) << "\n";
 	std::cout << A(2,0) << " " << A(2,1) << " " << A(2,2) << "\n";
 
-	auto [B2, B2Ok] = inv<t_mat>(trans<t_mat>(A/t_real(2*M_PI)));
+	auto [B2, B2Ok] = inv<t_mat, t_vec>(trans<t_mat>(A/t_real(2*M_PI)));
 	std::cout << "\nB2\n";
 	std::cout << B2(0,0) << " " << B2(0,1) << " " << B2(0,2) << "\n";
 	std::cout << B2(1,0) << " " << B2(1,1) << " " << B2(1,2) << "\n";
@@ -324,7 +326,7 @@ void vecmat_tsts_nonsquare()
 	{
 		std::cout << "\nQR -- non-square matrix\n";
 		t_mat matOrg = create<t_mat>({{1, 23},  {5, -3},  {9, -3}});
-		auto [Q, R] = qr<t_mat, t_vec>(matOrg);
+		auto [Q, R, mirr] = qr<t_mat, t_vec>(matOrg);
 		t_mat QR = Q*R;
 		std::cout << "org = " << matOrg << "\n";
 		std::cout << "Q = " << Q << "\n";
@@ -335,7 +337,7 @@ void vecmat_tsts_nonsquare()
 	{
 		std::cout << "\nQR -- special case 1\n";
 		t_mat matOrg = create<t_mat>({{3.4, 0},  {5, -3},  {9, -3}});
-		auto [Q, R] = qr<t_mat, t_vec>(matOrg);
+		auto [Q, R, mirr] = qr<t_mat, t_vec>(matOrg);
 		t_mat QR = Q*R;
 		std::cout << "org = " << matOrg << "\n";
 		std::cout << "Q = " << Q << "\n";
@@ -347,7 +349,7 @@ void vecmat_tsts_nonsquare()
 	{
 		std::cout << "\nQR -- special case 2\n";
 		t_mat matOrg = create<t_mat>({{0, 0, 0}, {3.4, 4, 3},  {5, -3, -1},  {9, -3, 2}});
-		auto [Q, R] = qr<t_mat, t_vec>(matOrg);
+		auto [Q, R, mirr] = qr<t_mat, t_vec>(matOrg);
 		t_mat QR = Q*R;
 		std::cout << "org = " << matOrg << "\n";
 		std::cout << "Q = " << Q << "\n";
@@ -396,10 +398,10 @@ int main()
 {
 	constexpr bool bUseSTL = 1;
 	constexpr bool bUseQt = 1;
-	constexpr bool bUseUblas = 0;
+	constexpr bool bUseUblas = USE_UBLAS;
 	constexpr bool bUseInternals = 1;
 
-#ifdef USE_UBLAS
+#if USE_UBLAS == 1
 	// using dynamic STL containers
 	if constexpr(bUseSTL)
 	{
@@ -465,7 +467,7 @@ int main()
 		vecmat_tsts<t_vec, t_mat>();
 		vecmat_tsts_hom<t_vec, t_mat>();
 
-		auto [matInv, bInvExists] = inv<t_mat>(create<t_mat>(
+		auto [matInv, bInvExists] = inv<t_mat, t_vec>(create<t_mat>(
 		{
 			1, 2, 3, 4,
 			4, 3, 2, 1,
@@ -483,7 +485,7 @@ int main()
 	}
 
 
-#ifdef USE_UBLAS
+#if USE_UBLAS == 1
 	// using ublas classes
 	if constexpr(bUseUblas)
 	{

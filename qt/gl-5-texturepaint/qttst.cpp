@@ -26,6 +26,9 @@
 namespace algo = boost::algorithm;
 
 
+#include "../../libs/math_conts.h"
+
+
 // ----------------------------------------------------------------------------
 // error codes: https://www.khronos.org/opengl/wiki/OpenGL_Error
 #define LOGGLERR { if(auto err = m_pGl->glGetError(); err != GL_NO_ERROR) \
@@ -329,14 +332,14 @@ void GlWidget::resizeGL(int w, int h)
 	if(!m_pGl) return;
 
 	m_matViewport = m::hom_viewport<t_mat>(w, h, 0., 1.);
-	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat>(m_matViewport);
+	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matViewport);
 
 
 	m_pGl->glViewport(0, 0, w, h);
 	m_pGl->glDepthRange(0, 1);
 
 	m_matPerspective = m::hom_perspective<t_mat>(0.01, 100., m::pi<t_real>*0.5, t_real(h)/t_real(w));
-	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat>(m_matPerspective);
+	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matPerspective);
 
 
 	// bind shaders
@@ -462,7 +465,7 @@ void GlWidget::tick(const std::chrono::milliseconds& ms)
 
 	m_matCam = m::create<t_mat>({1,0,0,0,  0,1,0,0,  0,0,1,-3,  0,0,0,1});
 	m_matCam *= m::rotation<t_mat, t_vec>(m::create<t_vec>({1.,1.,0.,0.}), fAngle/180.*M_PI, 0);
-	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat>(m_matCam);
+	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matCam);
 
 	updatePicker();
 	update();
@@ -519,8 +522,10 @@ void GlWidget::updatePicker()
 		if(bInters)
 		{
 			std::vector<t_vec3> polyuv{{ m_uvs[startidx+0], m_uvs[startidx+1], m_uvs[startidx+2] }};
+
+			using t_mat_tmp = m::mat<t_real>;
 			//auto uv = m::poly_uv_ortho<t_vec3>(poly[0], poly[1], poly[2], polyuv[0], polyuv[1], polyuv[2], vecInters);
-			auto uv = m::poly_uv<t_mat, t_vec3>(poly[0], poly[1], poly[2], polyuv[0], polyuv[1], polyuv[2], vecInters);
+			auto uv = m::poly_uv<t_mat_tmp, t_vec3>(poly[0], poly[1], poly[2], polyuv[0], polyuv[1], polyuv[2], vecInters);
 			m_curUV[0] = uv[0]; m_curUV[1] = uv[1];
 
 			//std::cout << "Intersection with polygon " << startidx/3 << ", uv: " << uv[0] << ", " << uv[1] << std::endl;

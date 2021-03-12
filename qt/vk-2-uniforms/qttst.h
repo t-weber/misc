@@ -11,6 +11,7 @@
 #include <QVulkanWindow>
 #include <QVulkanWindowRenderer>
 #include <QVulkanDeviceFunctions>
+#include <QMatrix3x3>
 #include <QMatrix4x4>
 #include <QVector4D>
 #include <QVector3D>
@@ -29,6 +30,7 @@ using t_vec2 = m::qvecN_adapter<int, 2, t_real, QVector2D>;
 using t_vec3 = m::qvecN_adapter<int, 3, t_real, QVector3D>;
 using t_vec = m::qvecN_adapter<int, 4, t_real, QVector4D>;
 using t_mat = m::qmatNN_adapter<int, 4, 4, t_real, QMatrix4x4>;
+using t_mat3 = m::qmatNN_adapter<int, 3, 3, t_real, QMatrix3x3>;
 
 
 class VkWnd;

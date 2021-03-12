@@ -97,7 +97,7 @@ void VkRenderer::tick(const std::chrono::milliseconds& ms)
 
 	m_matCam = m::create<t_mat>({1,0,0,0,  0,1,0,0,  0,0,1,-3,  0,0,0,1});
 	m_matCam *= m::rotation<t_mat, t_vec>(m::create<t_vec>({1.,1.,0.,0.}), fAngle/180.*M_PI, 0);
-	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat>(m_matCam);
+	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matCam);
 
 	UpdatePicker();
 
@@ -131,7 +131,9 @@ void VkRenderer::UpdatePicker()
 
 		auto [vecInters, bInters, lamInters] =
 			m::intersect_line_poly<t_vec3>(
-				t_vec3(org[0], org[1], org[2]), t_vec3(dir[0], dir[1], dir[2]), poly);
+				t_vec3(org[0], org[1], org[2]),
+				t_vec3(dir[0], dir[1], dir[2]),
+				poly);
 
 		if(bInters)
 		{
@@ -142,7 +144,8 @@ void VkRenderer::UpdatePicker()
 				m_triangleuvs[startidx+2]
 			}};
 
-			auto uv = m::poly_uv<t_mat, t_vec3>(poly[0], poly[1], poly[2],
+			using t_mat_tmp = m::mat<t_real>;
+			auto uv = m::poly_uv<t_mat_tmp, t_vec3>(poly[0], poly[1], poly[2],
 				polyuv[0], polyuv[1], polyuv[2], vecInters);
 
 			m_veccurUV[0] = uv[0]; m_veccurUV[1] = uv[1];
@@ -950,7 +953,7 @@ void VkRenderer::UpdatePerspective()
 			0.01, 100., -4., 4., -4, 4., false, true, true);
 	}
 
-	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat>(m_matPerspective);
+	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matPerspective);
 	std::cout << "projection matrix: " << m_matPerspective << "." << std::endl;
 	std::cout << "inverted projection matrix: " << m_matPerspective_inv << "." << std::endl;
 }
@@ -966,7 +969,7 @@ void VkRenderer::initSwapChainResources()
 
 	// viewport
 	m_matViewport = m::hom_viewport<t_mat>(m_iScreenDims[0], m_iScreenDims[1], 0., 1.);
-	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat>(m_matViewport);
+	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matViewport);
 
 	m_viewports[0] = VkViewport
 	{
