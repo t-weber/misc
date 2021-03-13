@@ -213,6 +213,68 @@ requires is_mat<t_mat>
 
 
 /**
+ * linearise a matrix to a vector container
+ */
+template<class t_vec, class t_mat>
+t_vec convert(const t_mat& mat)
+requires is_mat<t_mat> && is_basic_vec<t_vec>
+{
+	using T_src = typename t_mat::value_type;
+	using T_dst = typename t_vec::value_type;
+	using t_idx = decltype(mat.size1());
+
+	t_vec vec;
+
+	for(t_idx iRow=0; iRow<mat.size1(); ++iRow)
+		for(t_idx iCol=0; iCol<mat.size2(); ++iCol)
+			vec.push_back(T_dst(mat(iRow, iCol)));
+
+	return vec;
+}
+
+
+/**
+ * converts matrix containers of different value types
+ */
+template<class t_mat_dst, class t_mat_src>
+t_mat_dst convert(const t_mat_src& mat)
+requires is_mat<t_mat_dst> && is_mat<t_mat_src>
+{
+	using T_src = typename t_mat_src::value_type;
+	using T_dst = typename t_mat_dst::value_type;
+	using t_idx = decltype(mat.size1());
+
+	t_mat_dst matdst = create<t_mat_dst>(mat.size1(), mat.size2());
+
+	for(t_idx iRow=0; iRow<mat.size1(); ++iRow)
+		for(t_idx iCol=0; iCol<mat.size2(); ++iCol)
+			matdst(iRow, iCol) = T_dst(mat(iRow, iCol));
+
+	return matdst;
+}
+
+
+/**
+ * converts vector containers of different value types
+ */
+template<class t_vec_dst, class t_vec_src>
+t_vec_dst convert(const t_vec_src& vec)
+requires is_vec<t_vec_dst> && is_vec<t_vec_src>
+{
+	using T_src = typename t_vec_src::value_type;
+	using T_dst = typename t_vec_dst::value_type;
+	using t_idx = decltype(vec.size());
+
+	t_vec_dst vecdst = create<t_vec_dst>(vec.size());
+
+	for(t_idx i=0; i<vec.size(); ++i)
+		vecdst[i] = T_dst(vec[i]);
+
+	return vecdst;
+}
+
+
+/**
  * set submatrix to unit
  */
 template<class t_mat>
@@ -1028,25 +1090,6 @@ requires is_vec<t_vec>
 
 
 /**
- * linearise a matrix to a vector container
- */
-template<class t_mat, template<class...> class t_cont>
-t_cont<typename t_mat::value_type> flatten(const t_mat& mat)
-requires is_mat<t_mat> && is_basic_vec<t_cont<typename t_mat::value_type>>
-{
-	using T = typename t_mat::value_type;
-	using t_idx = decltype(mat.size1());
-	t_cont<T> vec;
-
-	for(t_idx iRow=0; iRow<mat.size1(); ++iRow)
-		for(t_idx iCol=0; iCol<mat.size2(); ++iCol)
-			vec.push_back(mat(iRow, iCol));
-
-	return vec;
-}
-
-
-/**
  * submatrix removing a column/row from a matrix stored in a vector container
  */
 template<class t_vec>
@@ -1202,12 +1245,12 @@ requires is_mat<t_mat>
 		res = -res;
 
 	// test sign of det(Q)
-	//std::vector<T> matFlatQ = flatten<t_mat, std::vector>(Q);
+	//std::vector<T> matFlatQ = convert<std::vector<T>, t_mat>(Q);
 	//T detQ = flat_det<std::vector<T>>(matFlatQ, Q.size1());
 	//if(detQ < 0.) res = -res;
 
 #else
-	std::vector<T> matFlat = flatten<t_mat, std::vector>(mat);
+	std::vector<T> matFlat = convert<std::vector<T>, t_mat>(mat);
 	res = flat_det<std::vector<T>>(matFlat, mat.size1());
 #endif
 
@@ -1256,7 +1299,7 @@ requires is_mat<t_mat> && is_vec<t_vec>
 
 #else
 	using t_matvec = std::vector<T>;
-	const t_matvec matFlat = flatten<t_mat, std::vector>(mat);
+	const t_matvec matFlat = convert<std::vector<T>, t_mat>(mat);
 	const T fullDet = flat_det<t_matvec>(matFlat, N);
 #endif
 

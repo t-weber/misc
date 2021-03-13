@@ -34,6 +34,17 @@ void det_tests()
 }
 
 
+template<class t_mat1, class t_mat2>
+void conv_tests()
+{
+	t_mat1 mat1 = create<t_mat1>({1, 23, 4,  5, -3, 23,  9, -3, -4});
+	t_mat2 mat2 = convert<t_mat2, t_mat1>(mat1);
+
+	std::cout << mat1 << std::endl;
+	std::cout << mat2 << std::endl;
+}
+
+
 int main()
 {
 	using t_real = double;
@@ -45,5 +56,7 @@ int main()
 
 	det_tests<t_real, t_vec, t_mat>();
 	det_tests<t_cplx, t_vec_cplx, t_mat_cplx>();
+
+	conv_tests<t_mat, t_mat_cplx>();
 	return 0;
 }
