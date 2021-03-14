@@ -275,6 +275,23 @@ requires is_vec<t_vec_dst> && is_vec<t_vec_src>
 
 
 /**
+ * converts a container of objects
+ */
+template<class t_obj_dst, class t_obj_src, template<class...> class t_cont>
+t_cont<t_obj_dst> convert(const t_cont<t_obj_src>& src_objs)
+requires (is_vec<t_obj_dst> || is_mat<t_obj_dst>) && (is_vec<t_obj_src> || is_mat<t_obj_src>)
+{
+	t_cont<t_obj_dst> dst_objs;
+
+	for(const t_obj_src& src_obj : src_objs)
+		dst_objs.emplace_back(convert<t_obj_dst, t_obj_src>(src_obj));
+
+	return dst_objs;
+}
+
+
+
+/**
  * set submatrix to unit
  */
 template<class t_mat>

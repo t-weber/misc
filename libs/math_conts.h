@@ -528,7 +528,6 @@ public:
 	const T& operator()(std::size_t row, std::size_t col) const { return m_data[row*m_colsize + col]; }
 	T& operator()(std::size_t row, std::size_t col) { return m_data[row*m_colsize + col]; }
 
-
 	friend mat operator+(const mat& mat1, const mat& mat2) { return m_ops::operator+(mat1, mat2); }
 	friend mat operator-(const mat& mat1, const mat& mat2) { return m_ops::operator-(mat1, mat2); }
 	friend const mat& operator+(const mat& mat1) { return m_ops::operator+(mat1); }
