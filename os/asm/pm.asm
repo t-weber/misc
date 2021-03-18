@@ -16,6 +16,7 @@
 
 %define WORD_SIZE        4
 %define CHAROUT          000b_8000h	; base address for character output
+%define SCREEN_SIZE      80*20
 %define STACK_START      0000_ffffh	; some (arbitrary) stack base address
 %define NUM_GDT_ENTRIES  4
 %define MBR_BOOTSIG_ADDR $$ + 200h-2	; 510 bytes after section start
@@ -31,7 +32,7 @@
 	lgdt [gdtr]
 
 	mov eax, cr0
-	or al, 1b		; protection enable bit
+	or eax, 1b		; protection enable bit
 	mov cr0, eax
 
 	jmp code_descr-descr_base_addr : start
@@ -49,17 +50,40 @@ start:
 	; data segment
 	mov ax, 0000000000001_0_00b	; segment index 1, gdt, ring=0
 	mov ds, ax
+	mov es, ax
 
 	; stack segment
 	mov ax, 0000000000010_0_00b	; segment index 2, gdt, ring=0
 	mov ss, ax
 	mov esp, dword STACK_START
 
+	call clear
+
+	push dword 0000_1111b	; attrib
 	push str1
 	call write
 	pop eax
 
 	call exit
+
+
+;
+; clear screen
+;
+clear:
+	mov edi, dword CHAROUT
+	mov ecx, dword SCREEN_SIZE
+
+	clear_write_loop:
+		mov [edi], byte 20h	; store char
+		add edi, 2	; next output char index
+		dec ecx		; decrement length counter
+		cmp ecx, 0
+		jz clear_write_loop_end
+		jmp clear_write_loop
+	clear_write_loop_end:
+
+	ret
 
 
 ;
@@ -70,55 +94,62 @@ write:
 	mov esi, [esp + WORD_SIZE]	; argument: char*
 	push esi
 	call strlen
+	mov ecx, eax	; string length
 	pop esi
 
-	push ebx
-	push ecx
-	push edx
-
-	mov eax, dword CHAROUT
-	mov ebx, [esp + WORD_SIZE*(1+3)]	; char*
+	mov edi, dword CHAROUT
+	mov esi, [esp + WORD_SIZE*1]	; char*
+	mov dh, [esp + WORD_SIZE*2]	; attrib
 
 	write_loop:
-		mov dl, byte [ebx]	; dereference char*
-		mov [eax], dl	; store char
-		add eax, 2	; next output char index
+		mov dl, byte [esi]	; dereference char*
+		mov [edi], dl	; store char
+		inc edi		; to char attribute index
+		mov [edi], dh	; store char attributes
+		inc edi		; next output char index
 		dec ecx		; decrement length counter
-		inc ebx		; increment char pointer
+		inc esi		; increment char pointer
 		cmp ecx, 0
 		jz write_loop_end
 		jmp write_loop
 	write_loop_end:
 
-	pop edx
-	pop ecx
-	pop ebx
 	ret
 
 
 ;
 ; strlen
 ; @param [esp + WORD_SIZE] pointer to a string
-; @returns length in ecx
+; @returns length in eax
 ;
 strlen:
-	push edx
-	xor ecx, ecx		; counter = 0
+	mov esi, [esp + WORD_SIZE*1]	; argument: string_ptr
+	mov edi, esi	; argument: char*
 
-	count_chars:
-		mov esi, [esp + WORD_SIZE*(1+1)]	; argument: string_ptr
-		add esi, ecx	; string_ptr += counter
-		mov dl, [esi]	; dl = *string_ptr
-		cmp dl, 0
-		jz count_chars_end
-		inc ecx			; ++counter
-		jmp count_chars
-	count_chars_end:
+;	count_chars:
+;		mov dl, byte [edi]	; dl = *string_ptr
+;		cmp dl, 0
+;		jz count_chars_end
+;		inc ecx		; ++counter
+;		inc edi		; ++str_ptr
+;		jmp count_chars
+;	count_chars_end:
+;
+;	mov eax, ecx
+;	ret
 
-	pop edx
+	mov ecx, 0xffff	; max. string length
+	xor eax, eax	; look for 0
+	repnz scasb
+
+	mov eax, edi	; eax = end_ptr
+	sub eax, esi	; eax -= begin_ptr
 	ret
 
 
+;
+; halt
+;
 exit:
 	hlt
 ; -----------------------------------------------------------------------------
