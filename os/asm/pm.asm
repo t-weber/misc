@@ -16,7 +16,7 @@
 
 %define WORD_SIZE        4
 %define CHAROUT          000b_8000h	; base address for character output
-%define SCREEN_SIZE      80*20
+%define SCREEN_SIZE      80*25
 %define STACK_START      0000_ffffh	; some (arbitrary) stack base address
 %define NUM_GDT_ENTRIES  4
 %define MBR_BOOTSIG_ADDR $$ + 200h-2	; 510 bytes after section start
@@ -71,18 +71,21 @@ start:
 ; clear screen
 ;
 clear:
-	mov edi, dword CHAROUT
-	mov ecx, dword SCREEN_SIZE
+	mov edi, dword CHAROUT	; base address
+	mov ecx, dword SCREEN_SIZE	; size
 
-	clear_write_loop:
-		mov [edi], byte 20h	; store char
-		add edi, 2	; next output char index
-		dec ecx		; decrement length counter
-		cmp ecx, 0
-		jz clear_write_loop_end
-		jmp clear_write_loop
-	clear_write_loop_end:
+	;clear_write_loop:
+	;	mov [edi], byte 00h	; store char
+	;	add edi, 2	; next output char index
+	;	dec ecx		; decrement length counter
+	;	cmp ecx, 0
+	;	jz clear_write_loop_end
+	;	jmp clear_write_loop
+	;clear_write_loop_end:
+	;ret
 
+	mov ax, word 00_00h
+	rep stosw
 	ret
 
 
@@ -97,7 +100,7 @@ write:
 	mov ecx, eax	; string length
 	pop esi
 
-	mov edi, dword CHAROUT
+	mov edi, dword CHAROUT	; base address
 	mov esi, [esp + WORD_SIZE*1]	; char*
 	mov dh, [esp + WORD_SIZE*2]	; attrib
 
@@ -144,6 +147,7 @@ strlen:
 
 	mov eax, edi	; eax = end_ptr
 	sub eax, esi	; eax -= begin_ptr
+	sub eax, 1
 	ret
 
 
