@@ -165,13 +165,14 @@ bool equals(const t_mat& mat1, const t_mat& mat2,
 requires is_mat<t_mat>
 {
 	using T = typename t_mat::value_type;
+	using t_size = decltype(mat1.size1());
 
 	if(mat1.size1() != mat2.size1() || mat1.size2() != mat2.size2())
 		return false;
 
-	for(std::size_t i=0; i<mat1.size1(); ++i)
+	for(t_size i=0; i<mat1.size1(); ++i)
 	{
-		for(std::size_t j=0; j<mat1.size2(); ++j)
+		for(t_size j=0; j<mat1.size2(); ++j)
 		{
 			if(!equals<T>(mat1(i,j), mat2(i,j), eps))
 				return false;
@@ -295,11 +296,17 @@ requires (is_vec<t_obj_dst> || is_mat<t_obj_dst>) && (is_vec<t_obj_src> || is_ma
  * set submatrix to unit
  */
 template<class t_mat>
-void unit(t_mat& mat, std::size_t rows_begin, std::size_t cols_begin, std::size_t rows_end, std::size_t cols_end)
+void unit(t_mat& mat, 
+	decltype(mat.size1()) rows_begin, 
+	decltype(mat.size2()) cols_begin, 
+	decltype(mat.size1()) rows_end, 
+	decltype(mat.size2()) cols_end)
 requires is_mat<t_mat>
 {
-	for(std::size_t i=rows_begin; i<rows_end; ++i)
-		for(std::size_t j=cols_begin; j<cols_end; ++j)
+	using t_size = decltype(mat.size1());
+
+	for(t_size i=rows_begin; i<rows_end; ++i)
+		for(t_size j=cols_begin; j<cols_end; ++j)
 			mat(i,j) = (i==j ? 1 : 0);
 }
 
@@ -336,10 +343,11 @@ template<class t_mat>
 t_mat zero(std::size_t N1, std::size_t N2)
 requires is_mat<t_mat>
 {
+	using t_size = decltype(t_mat{}.size1());
 	t_mat mat = create<t_mat>(N1, N2);
 
-	for(std::size_t i=0; i<mat.size1(); ++i)
-		for(std::size_t j=0; j<mat.size2(); ++j)
+	for(t_size i=0; i<mat.size1(); ++i)
+		for(t_size j=0; j<mat.size2(); ++j)
 			mat(i,j) = 0;
 
 	return mat;
@@ -408,13 +416,15 @@ bool is_symm_or_herm(const t_mat& mat,
 	typename t_mat::value_type eps = std::numeric_limits<typename t_mat::value_type>::epsilon())
 requires is_mat<t_mat>
 {
+	using t_size = decltype(mat.size1());
 	using t_elem = typename t_mat::value_type;
+
 	if(mat.size1() != mat.size2())
 		return false;
 
-	for(std::size_t i=0; i<mat.size1(); ++i)
+	for(t_size i=0; i<mat.size1(); ++i)
 	{
-		for(std::size_t j=i+1; j<mat.size2(); ++j)
+		for(t_size j=i+1; j<mat.size2(); ++j)
 		{
 			if constexpr(is_complex<t_elem>)
 			{
@@ -580,6 +590,7 @@ requires is_mat<t_mat> && is_basic_vec<t_vec>
 	return vec;
 }
 
+
 /**
  * get a row vector from a matrix
  */
@@ -587,12 +598,41 @@ template<class t_mat, class t_vec>
 t_vec row(const t_mat& mat, std::size_t row)
 requires is_mat<t_mat> && is_basic_vec<t_vec>
 {
+	using t_size = decltype(mat.size1());
 	t_vec vec = create<t_vec>(mat.size2());
 
-	for(std::size_t i=0; i<mat.size2(); ++i)
+	for(t_size i=0; i<mat.size2(); ++i)
 		vec[i] = mat(row, i);
 
 	return vec;
+}
+
+
+/**
+ * set a column vector in a matrix
+ */
+template<class t_mat, class t_vec>
+void set_col(t_mat& mat, const t_vec& vec, std::size_t col)
+requires is_mat<t_mat> && is_basic_vec<t_vec>
+{
+	using t_size = decltype(mat.size1());
+
+	for(t_size i=0; i<mat.size1(); ++i)
+		mat(i, col) = vec[i];
+}
+
+
+/**
+ * set a row vector in a matrix
+ */
+template<class t_mat, class t_vec>
+void set_row(t_mat& mat, const t_vec& vec, std::size_t row)
+requires is_mat<t_mat> && is_basic_vec<t_vec>
+{
+	using t_size = decltype(mat.size2());
+
+	for(t_size i=0; i<mat.size2(); ++i)
+		mat(row, i) = vec[i];
 }
 
 
@@ -625,6 +665,8 @@ template<class t_vec1, class t_vec2>
 typename t_vec1::value_type inner(const t_vec1& vec1, const t_vec2& vec2)
 requires is_basic_vec<t_vec1> && is_basic_vec<t_vec2>
 {
+	using t_size = decltype(vec1.size());
+
 	if(vec1.size()==0 || vec2.size()==0)
 		return typename t_vec1::value_type{};
 
@@ -632,7 +674,7 @@ requires is_basic_vec<t_vec1> && is_basic_vec<t_vec2>
 	auto val = vec1[0]*vec2[0];
 
 	// remaining elements
-	for(std::size_t i=1; i<std::min(vec1.size(), vec2.size()); ++i)
+	for(t_size i=1; i<std::min(vec1.size(), vec2.size()); ++i)
 	{
 		if constexpr(is_complex<typename t_vec1::value_type>)
 		{
@@ -668,8 +710,10 @@ template<class t_vec, class t_real = typename t_vec::value_type>
 typename t_vec::value_type norm(const t_vec& vec, t_real n)
 requires is_basic_vec<t_vec>
 {
+	using t_size = decltype(vec.size());
+
 	t_real d = t_real{0};
-	for(std::size_t i=0; i<vec.size(); ++i)
+	for(t_size i=0; i<vec.size(); ++i)
 		d += std::pow(std::abs(vec[i]), n);
 	n = std::pow(d, t_real(1)/n);
 	return n;
@@ -683,13 +727,15 @@ template<class t_mat, class t_vec>
 t_mat outer(const t_vec& vec1, const t_vec& vec2)
 requires is_basic_vec<t_vec> && is_mat<t_mat>
 {
-	const std::size_t N1 = vec1.size();
-	const std::size_t N2 = vec2.size();
+	using t_size = decltype(vec1.size());
+
+	const t_size N1 = vec1.size();
+	const t_size N2 = vec2.size();
 	t_mat mat = create<t_mat>(N1, N2);
 
-	for(std::size_t n1=0; n1<N1; ++n1)
+	for(t_size n1=0; n1<N1; ++n1)
 	{
-		for(std::size_t n2=0; n2<N2; ++n2)
+		for(t_size n2=0; n2<N2; ++n2)
 		{
 			if constexpr(is_complex<typename t_vec::value_type>)
 				mat(n1, n2) = std::conj(vec1[n1]) * vec2[n2];
@@ -741,11 +787,13 @@ template<class t_mat, class t_vec>
 t_vec lower_index(const t_mat& metric_co, const t_vec& vec_contra)
 requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 {
-	const std::size_t N = vec_contra.size();
+	using t_size = decltype(vec_contra.size());
+
+	const t_size N = vec_contra.size();
 	t_vec vec_co = zero<t_vec>(N);
 
-	for(std::size_t i=0; i<N; ++i)
-		for(std::size_t j=0; j<N; ++j)
+	for(t_size i=0; i<N; ++i)
+		for(t_size j=0; j<N; ++j)
 			vec_co[i] += metric_co(i,j) * vec_contra[j];
 
 	return vec_co;
@@ -760,11 +808,13 @@ template<class t_mat, class t_vec>
 t_vec raise_index(const t_mat& metric_contra, const t_vec& vec_co)
 requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
 {
-	const std::size_t N = vec_co.size();
+	using t_size = decltype(vec_co.size());
+
+	const t_size N = vec_co.size();
 	t_vec vec_contra = zero<t_vec>(N);
 
-	for(std::size_t i=0; i<N; ++i)
-		for(std::size_t j=0; j<N; ++j)
+	for(t_size i=0; i<N; ++i)
+		for(t_size j=0; j<N; ++j)
 			vec_contra[i] += metric_contra(i,j) * vec_co[j];
 
 	return vec_contra;
@@ -893,7 +943,8 @@ t_real dist_pt_line(const t_vec& pt,
 	bool bLineIsFinite=true)
 requires is_vec<t_vec>
 {
-	const std::size_t dim = linePt1.size();
+	using t_size = decltype(pt.size());
+	const t_size dim = linePt1.size();
 
 	const t_vec lineDir = linePt2 - linePt1;
 	const auto [nearestPt, dist] = project_line<t_vec>(pt, linePt1, lineDir, false);
@@ -901,8 +952,8 @@ requires is_vec<t_vec>
 
 	// get point component with max. difference
 	t_real diff = -1.;
-	std::size_t compidx = 0;
-	for(std::size_t i=0; i<dim; ++i)
+	t_size compidx = 0;
+	for(t_size i=0; i<dim; ++i)
 	{
 		t_real newdiff = std::abs(linePt2[i] - linePt1[i]);
 		if(newdiff > diff)
@@ -939,7 +990,9 @@ template<class t_mat, class t_vec>
 t_mat ortho_projector(const t_vec& vec, bool bIsNormalised = true)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
-	const std::size_t iSize = vec.size();
+	using t_size = decltype(vec.size());
+
+	const t_size iSize = vec.size();
 	return unit<t_mat>(iSize) -
 		projector<t_mat, t_vec>(vec, bIsNormalised);
 }
@@ -954,8 +1007,10 @@ template<class t_mat, class t_vec>
 t_mat ortho_mirror_op(const t_vec& vec, bool bIsNormalised = true)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
+	using t_size = decltype(vec.size());
 	using T = typename t_vec::value_type;
-	const std::size_t iSize = vec.size();
+
+	const t_size iSize = vec.size();
 
 	return unit<t_mat>(iSize) -
 		T(2)*projector<t_mat, t_vec>(vec, bIsNormalised);
@@ -967,19 +1022,21 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * @see (Scarpino11), p. 268
  */
 template<class t_mat, class t_vec>
-std::tuple<t_mat, bool> ortho_mirror_zero_op(const t_vec& vec, std::size_t row)
+std::tuple<t_mat, bool> ortho_mirror_zero_op(const t_vec& vec, decltype(vec.size()) row)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
+	using t_size = decltype(vec.size());
 	using T = typename t_vec::value_type;
-	const std::size_t N = vec.size();
+
+	const t_size N = vec.size();
 
 	t_vec vecSub = zero<t_vec>(N);
-	for(std::size_t i=0; i<row; ++i)
+	for(t_size i=0; i<row; ++i)
 		vecSub[i] = vec[i];
 
 	// norm of rest vector
 	T n = T(0);
-	for(std::size_t i=row; i<N; ++i)
+	for(t_size i=row; i<N; ++i)
 		n += vec[i]*vec[i];
 	vecSub[row] = std::sqrt(n);
 
@@ -995,7 +1052,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * QR decomposition of a matrix
- * @returns [Q, R]
+ * @returns [Q, R, number of mirror operations]
  * @see (Scarpino11), pp. 269-272
  */
 template<class t_mat, class t_vec>
@@ -1107,6 +1164,39 @@ requires is_vec<t_vec>
 
 
 /**
+ * find orthonormal substitute basis for vector space (Gram-Schmidt algo)
+ * remove orthogonal projections to all other base vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
+ * @see (Arens15), p. 744
+ * @see https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process
+ */
+template<class t_mat, class t_vec>
+t_mat orthonorm(const t_mat& mat)
+requires is_mat<t_mat> && is_vec<t_vec>
+{
+	using t_size = decltype(mat.size1());
+	using t_real = typename t_mat::value_type;
+
+	t_mat matOut = mat;
+
+	for(t_size colidx=0; colidx<mat.size2(); ++colidx)
+	{
+		t_vec vecSys = col<t_mat, t_vec>(mat, colidx);
+		t_vec vecOrthoProj = vecSys;
+
+		// subtract projections to other basis vectors
+		for(t_size newcolidx=0; newcolidx<colidx; ++newcolidx)
+			vecOrthoProj -= project<t_vec>(vecSys, col<t_mat, t_vec>(matOut, newcolidx), true);
+
+		// normalise and set column
+		vecOrthoProj /= norm<t_vec>(vecOrthoProj);
+		set_col(matOut, vecOrthoProj, colidx);
+	}
+
+	return matOut;
+}
+
+
+/**
  * submatrix removing a column/row from a matrix stored in a vector container
  */
 template<class t_vec>
@@ -1115,14 +1205,15 @@ t_vec flat_submat(const t_vec& mat,
 	std::size_t iRemRow, std::size_t iRemCol)
 requires is_basic_vec<t_vec>
 {
+	using t_size = decltype(mat.size());
 	t_vec vec;
 
-	for(std::size_t iRow=0; iRow<iNumRows; ++iRow)
+	for(t_size iRow=0; iRow<iNumRows; ++iRow)
 	{
 		if(iRow == iRemRow)
 			continue;
 
-		for(std::size_t iCol=0; iCol<iNumCols; ++iCol)
+		for(t_size iCol=0; iCol<iNumCols; ++iCol)
 		{
 			if(iCol == iRemCol)
 				continue;
@@ -1175,6 +1266,7 @@ template<class t_vec>
 typename t_vec::value_type flat_det(const t_vec& mat, std::size_t iN)
 requires is_basic_vec<t_vec>
 {
+	using t_size = decltype(mat.size());
 	using T = typename t_vec::value_type;
 
 	// special cases
@@ -1187,14 +1279,14 @@ requires is_basic_vec<t_vec>
 
 
 	T fullDet = T(0);
-	std::size_t iRow = 0;
+	t_size iRow = 0;
 
 	// get row with maximum number of zeros
-	std::size_t iMaxNumZeros = 0;
-	for(std::size_t iCurRow=0; iCurRow<iN; ++iCurRow)
+	t_size iMaxNumZeros = 0;
+	for(t_size iCurRow=0; iCurRow<iN; ++iCurRow)
 	{
-		std::size_t iNumZeros = 0;
-		for(std::size_t iCurCol=0; iCurCol<iN; ++iCurCol)
+		t_size iNumZeros = 0;
+		for(t_size iCurCol=0; iCurCol<iN; ++iCurCol)
 		{
 			if(equals<T>(mat[iCurRow*iN + iCurCol], T(0)))
 				++iNumZeros;
@@ -1209,7 +1301,7 @@ requires is_basic_vec<t_vec>
 
 
 	// recursively expand determiant along a row
-	for(std::size_t iCol=0; iCol<iN; ++iCol)
+	for(t_size iCol=0; iCol<iN; ++iCol)
 	{
 		const T elem = mat[iRow*iN + iCol];
 		if(equals<T>(elem, 0))
@@ -1282,11 +1374,13 @@ template<class t_mat>
 typename t_mat::value_type trace(const t_mat& mat)
 requires is_mat<t_mat>
 {
+	using t_size = decltype(mat.size1());
 	using T = typename t_mat::value_type;
+
 	T _tr = T(0);
 
-	std::size_t N = std::min(mat.size1(), mat.size2());
-	for(std::size_t i=0; i<N; ++i)
+	t_size N = std::min(mat.size1(), mat.size2());
+	for(t_size i=0; i<N; ++i)
 		_tr += mat(i,i);
 
 	return _tr;
@@ -1373,12 +1467,14 @@ template<class t_mat, class t_vec,
 t_cont_out<t_vec> recip(const t_cont_in<t_vec>& lstReal, typename t_vec::value_type c=1)
 requires is_mat<t_mat> && is_basic_vec<t_vec>
 {
+	using t_size = decltype(t_vec{}.size());
+
 	const t_mat basis = create<t_mat, t_vec, t_cont_in>(lstReal);
 	auto [basis_inv, bOk] = inv<t_mat, t_vec>(basis);
 	basis_inv *= c;
 
 	t_cont_out<t_vec> lstRecip;
-	for(std::size_t currow=0; currow<basis_inv.size1(); ++currow)
+	for(t_size currow=0; currow<basis_inv.size1(); ++currow)
 	{
 		const t_vec rowvec = row<t_mat, t_vec>(basis_inv, currow);
 		lstRecip.emplace_back(std::move(rowvec));
@@ -1396,20 +1492,22 @@ template<class t_vec, template<class...> class t_cont = std::initializer_list>
 t_vec cross(const t_cont<t_vec>& vecs)
 requires is_basic_vec<t_vec>
 {
+	using t_size = decltype(t_vec{}.size());
 	using T = typename t_vec::value_type;
+
 	// N also has to be equal to the vector size!
-	const std::size_t N = vecs.size()+1;
+	const t_size N = vecs.size()+1;
 	t_vec vec = zero<t_vec>(N);
 
-	for(std::size_t iComp=0; iComp<N; ++iComp)
+	for(t_size iComp=0; iComp<N; ++iComp)
 	{
 		std::vector<T> mat = zero<std::vector<T>>(N*N);
 		mat[0*N + iComp] = T(1);
 
-		std::size_t iRow = 0;
+		t_size iRow = 0;
 		for(const t_vec& vec : vecs)
 		{
-			for(std::size_t iCol=0; iCol<N; ++iCol)
+			for(t_size iCol=0; iCol<N; ++iCol)
 				mat[(iRow+1)*N + iCol] = vec[iCol];
 			++iRow;
 		}
@@ -3048,12 +3146,13 @@ t_vec su2_matrices(bool bIncludeUnit = false)
 requires is_basic_vec<t_vec> && is_mat<typename t_vec::value_type>
 	&& is_complex<typename t_vec::value_type::value_type>
 {
+	using t_size = decltype(t_vec{}.size());
 	using t_mat = typename t_vec::value_type;
 
 	t_vec vec;
 	if(bIncludeUnit)
 		vec.emplace_back(unit<t_mat>(2));
-	for(std::size_t i=0; i<3; ++i)
+	for(t_size i=0; i<3; ++i)
 		vec.emplace_back(su2_matrix<t_mat>(i));
 
 	return vec;
@@ -3269,10 +3368,11 @@ template<class t_vec>
 t_vec conj(const t_vec& vec)
 requires is_basic_vec<t_vec>
 {
-	const std::size_t N = vec.size();
+	using t_size = decltype(vec.size());
+	const t_size N = vec.size();
 	t_vec vecConj = zero<t_vec>(N);
 
-	for(std::size_t iComp=0; iComp<N; ++iComp)
+	for(t_size iComp=0; iComp<N; ++iComp)
 	{
 		if constexpr(is_complex<typename t_vec::value_type>)
 			vecConj[iComp] = std::conj(vec[iComp]);
@@ -3291,10 +3391,11 @@ template<class t_mat>
 t_mat herm(const t_mat& mat)
 requires is_basic_mat<t_mat>
 {
+	using t_size = decltype(mat.size1());
 	t_mat mat2 = create<t_mat>(mat.size2(), mat.size1());
 
-	for(std::size_t i=0; i<mat.size1(); ++i)
-		for(std::size_t j=0; j<mat.size2(); ++j)
+	for(t_size i=0; i<mat.size1(); ++i)
+		for(t_size j=0; j<mat.size2(); ++j)
 		{
 			if constexpr(is_complex<typename t_mat::value_type>)
 				mat2(j,i) = std::conj(mat(i,j));

@@ -45,9 +45,10 @@ template<class t_vec>
 t_vec operator-(const t_vec& vec1)
 requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
+	using t_size = decltype(t_vec{}.size());
 	t_vec vec(vec1.size());
 
-	for(std::size_t i=0; i<vec1.size(); ++i)
+	for(t_size i=0; i<vec1.size(); ++i)
 		vec[i] = -vec1[i];
 
 	return vec;
@@ -61,6 +62,8 @@ template<class t_vec>
 t_vec operator+(const t_vec& vec1, const t_vec& vec2)
 requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
+	using t_size = decltype(t_vec{}.size());
+
 	if constexpr(m::is_dyn_vec<t_vec>)
 		assert((vec1.size() == vec2.size()));
 	else
@@ -68,7 +71,7 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 
 	t_vec vec(vec1.size());
 
-	for(std::size_t i=0; i<vec1.size(); ++i)
+	for(t_size i=0; i<vec1.size(); ++i)
 		vec[i] = vec1[i] + vec2[i];
 
 	return vec;
@@ -93,9 +96,10 @@ template<class t_vec>
 t_vec operator*(const t_vec& vec1, typename t_vec::value_type d)
 requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
+	using t_size = decltype(t_vec{}.size());
 	t_vec vec(vec1.size());
 
-	for(std::size_t i=0; i<vec1.size(); ++i)
+	for(t_size i=0; i<vec1.size(); ++i)
 		vec[i] = vec1[i] * d;
 
 	return vec;
@@ -179,9 +183,10 @@ template<class t_vec>
 std::ostream& operator<<(std::ostream& ostr, const t_vec& vec)
 requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
-	const std::size_t N = vec.size();
+	using t_size = decltype(t_vec{}.size());
+	const t_size N = vec.size();
 
-	for(std::size_t i=0; i<N; ++i)
+	for(t_size i=0; i<N; ++i)
 	{
 		ostr << vec[i];
 		if(i < N-1)
@@ -245,10 +250,11 @@ template<class t_mat>
 t_mat operator-(const t_mat& mat1)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
+	using t_size = decltype(t_mat{}.size1());
 	t_mat mat(mat1.size1(), mat1.size2());
 
-	for(std::size_t i=0; i<mat1.size1(); ++i)
-		for(std::size_t j=0; j<mat1.size2(); ++j)
+	for(t_size i=0; i<mat1.size1(); ++i)
+		for(t_size j=0; j<mat1.size2(); ++j)
 			mat(i,j) = -mat1(i,j);
 
 	return mat;
@@ -262,6 +268,8 @@ template<class t_mat>
 t_mat operator+(const t_mat& mat1, const t_mat& mat2)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
+	using t_size = decltype(t_mat{}.size1());
+
 	if constexpr(m::is_dyn_mat<t_mat>)
 		assert((mat1.size1() == mat2.size1() && mat1.size2() == mat2.size2()));
 	else
@@ -269,8 +277,8 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 	t_mat mat(mat1.size1(), mat1.size2());
 
-	for(std::size_t i=0; i<mat1.size1(); ++i)
-		for(std::size_t j=0; j<mat1.size2(); ++j)
+	for(t_size i=0; i<mat1.size1(); ++i)
+		for(t_size j=0; j<mat1.size2(); ++j)
 			mat(i,j) = mat1(i,j) + mat2(i,j);
 
 	return mat;
@@ -295,10 +303,11 @@ template<class t_mat>
 t_mat operator*(const t_mat& mat1, typename t_mat::value_type d)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
+	using t_size = decltype(t_mat{}.size1());
 	t_mat mat(mat1.size1(), mat1.size2());
 
-	for(std::size_t i=0; i<mat1.size1(); ++i)
-		for(std::size_t j=0; j<mat1.size2(); ++j)
+	for(t_size i=0; i<mat1.size1(); ++i)
+		for(t_size j=0; j<mat1.size2(); ++j)
 			mat(i,j) = mat1(i,j) * d;
 
 	return mat;
@@ -333,6 +342,8 @@ template<class t_mat>
 t_mat operator*(const t_mat& mat1, const t_mat& mat2)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
+	using t_size = decltype(t_mat{}.size1());
+
 	if constexpr(m::is_dyn_mat<t_mat>)
 		assert((mat1.size2() == mat2.size1()));
 	else
@@ -340,12 +351,12 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 	t_mat matRet(mat1.size1(), mat2.size2());
 
-	for(std::size_t row=0; row<matRet.size1(); ++row)
+	for(t_size row=0; row<matRet.size1(); ++row)
 	{
-		for(std::size_t col=0; col<matRet.size2(); ++col)
+		for(t_size col=0; col<matRet.size2(); ++col)
 		{
 			matRet(row, col) = 0;
-			for(std::size_t i=0; i<mat1.size2(); ++i)
+			for(t_size i=0; i<mat1.size2(); ++i)
 				matRet(row, col) += mat1(row, i) * mat2(i, col);
 		}
 	}
@@ -384,12 +395,14 @@ template<class t_mat>
 std::ostream& operator<<(std::ostream& ostr, const t_mat& mat)
 requires m::is_basic_mat<t_mat> //&& m::is_dyn_mat<t_mat>
 {
-	const std::size_t ROWS = mat.size1();
-	const std::size_t COLS = mat.size2();
+	using t_size = decltype(t_mat{}.size1());
 
-	for(std::size_t row=0; row<ROWS; ++row)
+	const t_size ROWS = mat.size1();
+	const t_size COLS = mat.size2();
+
+	for(t_size row=0; row<ROWS; ++row)
 	{
-		for(std::size_t col=0; col<COLS; ++col)
+		for(t_size col=0; col<COLS; ++col)
 		{
 			ostr << mat(row, col);
 			if(col < COLS-1)
@@ -411,13 +424,15 @@ template<class t_mat>
 std::ostream& niceprint(std::ostream& ostr, const t_mat& mat)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
-	const std::size_t ROWS = mat.size1();
-	const std::size_t COLS = mat.size2();
+	using t_size = decltype(t_mat{}.size1());
 
-	for(std::size_t i=0; i<ROWS; ++i)
+	const t_size ROWS = mat.size1();
+	const t_size COLS = mat.size2();
+
+	for(t_size i=0; i<ROWS; ++i)
 	{
 		ostr << "(";
-		for(std::size_t j=0; j<COLS; ++j)
+		for(t_size j=0; j<COLS; ++j)
 			ostr << std::setw(ostr.precision()*1.5) << std::right << mat(i,j);
 		ostr << ")";
 
@@ -443,6 +458,8 @@ t_vec operator*(const t_mat& mat, const t_vec& vec)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 	&& m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
+	using t_size = decltype(t_mat{}.size1());
+
 	if constexpr(m::is_dyn_mat<t_mat>)
 		assert((mat.size2() == vec.size()));
 	else
@@ -451,10 +468,10 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 	t_vec vecRet(mat.size1());
 
-	for(std::size_t row=0; row<mat.size1(); ++row)
+	for(t_size row=0; row<mat.size1(); ++row)
 	{
 		vecRet[row] = typename t_vec::value_type{/*0*/};
-		for(std::size_t col=0; col<mat.size2(); ++col)
+		for(t_size col=0; col<mat.size2(); ++col)
 		{
 			auto elem = mat(row, col) * vec[col];
 			vecRet[row] = vecRet[row] + elem;

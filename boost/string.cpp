@@ -27,9 +27,11 @@ t_cont<t_str> tokenise(const t_str& _str, const t_str& strSeparators=" \t")
 	auto is_sep = [&strSeparators](auto c) -> bool
 	{
 		for(auto csep : strSeparators)
+		{
 			if(c == csep)
 				return true;
-			return false;
+		}
+		return false;
 	};
 
 	// trim whitespaces

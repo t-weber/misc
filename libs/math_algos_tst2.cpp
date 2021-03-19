@@ -45,6 +45,21 @@ void conv_tests()
 }
 
 
+template<class t_mat, class t_vec>
+void qr_tests()
+{
+	t_mat mat = create<t_mat>({1, 23, 4,  5, -3, 23,  9, -3, -4});
+	auto [Q, R, num_mirr] = qr<t_mat, t_vec>(mat);
+	auto Q2 = orthonorm<t_mat, t_vec>(mat);
+
+	std::cout << "M = " << mat << std::endl;
+	std::cout << "Q = " << Q << std::endl;
+	std::cout << "Q2 = " << Q2 << std::endl;
+	std::cout << "R = " << R << std::endl;
+	std::cout << "QR = " << Q*R << std::endl;
+}
+
+
 int main()
 {
 	using t_real = double;
@@ -58,5 +73,7 @@ int main()
 	det_tests<t_cplx, t_vec_cplx, t_mat_cplx>();
 
 	conv_tests<t_mat, t_mat_cplx>();
+	qr_tests<t_mat, t_vec>();
+
 	return 0;
 }
