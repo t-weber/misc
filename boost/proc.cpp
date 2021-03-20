@@ -103,6 +103,9 @@ int main(int argc, char** argv)
 		proc::group group;
 		proc::child ch1{path1, "-a", proc::std_out>pipe, proc::std_err>errstream, env, group};
 		proc::child ch2{path2, "-r", proc::std_in<pipe, proc::std_out>outstream, proc::std_err>errstream2, env, group};
+
+		std::cout << "child 1 pid: " << ch1.id() << std::endl;
+		std::cout << "child 2 pid: " << ch2.id() << std::endl;
 		group.wait();
 
 		std::copy(std::istream_iterator<std::string>{outstream}, std::istream_iterator<std::string>{},
