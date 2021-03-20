@@ -9,11 +9,12 @@
  *  * https://github.com/boostorg/property_tree/blob/develop/examples/debug_settings.cpp
  *  * https://github.com/boostorg/property_tree/blob/develop/test/test_property_tree.hpp
  *
- * gcc -o ptree ptree.cpp -std=c++17 -lstdc++ -lboost_iostreams
+ * g++ -std=c++20 -o ptree ptree.cpp -lboost_iostreams
  */
 
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/info_parser.hpp>
@@ -28,6 +29,9 @@ namespace ptree = boost::property_tree;
 #include <boost/iostreams/filter/bzip2.hpp>
 namespace ios = boost::iostreams;
 
+#include <boost/algorithm/string.hpp>
+namespace algo = boost::algorithm;
+
 
 // ----------------------------------------------------------------------------
 // type name helper
@@ -39,6 +43,43 @@ std::string get_type_str(const auto& obj)
 	return ty::type_id_with_cvr<decltype(obj)>().pretty_name();
 }
 // ----------------------------------------------------------------------------
+
+
+/**
+ * replaces all values in a property tree
+ */
+template<class t_prop, class t_map>
+void replace_values(t_prop& prop, const t_map& map)
+requires requires(const t_prop& prop, const t_map& map)
+{
+	// prop and map have to be iterable
+	prop.begin();
+	prop.end();
+
+	map.begin();
+	map.end();
+}
+{
+	// replace string according to key-value pairs in map
+	const auto& replace_str = [&map](std::string& str) -> void
+	{
+		for(const auto& pair : map)
+			algo::replace_all(str, pair.first, pair.second);
+	};
+
+	// iterate tree nodes
+	for(auto& node : prop)
+	{
+		//std::cout << node.first << std::endl;
+		if(std::string val = node.second.template get<std::string>(""); !val.empty())
+		{
+			replace_str(val);
+			node.second.template put_value<std::string>(val);
+		}
+
+		replace_values(node.second, map);
+	}
+}
 
 
 int main()
@@ -78,6 +119,13 @@ int main()
 			std::cerr << ex.what() << std::endl;
 			return -1;
 		}
+
+		// replace values
+		std::unordered_map<std::string, std::string> map
+		{
+			{"123456", "123456_987654"},
+		};
+		replace_values(prop, map);
 
 		// get value
 		std::cout << prop.get<int>("root.test", 0) << std::endl;
