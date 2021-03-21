@@ -16,11 +16,17 @@
 
 %define WORD_SIZE        4
 %define CHAROUT          000b_8000h	; base address for character output
-%define SCREEN_SIZE      80*25
-%define STACK_START      0000_ffffh	; some (arbitrary) stack base address
+%define SCREEN_ROW_SIZE  25
+%define SCREEN_COL_SIZE  80
+%define SCREEN_SIZE      SCREEN_ROW_SIZE * SCREEN_COL_SIZE
+%define STACK_START      00ff_ffffh	; some (arbitrary) stack base address
+;%define STACK_START     000b_8200h		; test: write into screen memory
 %define NUM_GDT_ENTRIES  4
 %define MBR_BOOTSIG_ADDR $$ + 200h-2	; 510 bytes after section start
+%define USE_STRING_OPS	; use optimised string functions
 
+%define NUM_DEC          8	; number of decimals to print
+%define INPUT_NUM        11	; input number for calculation
 
 
 ; -----------------------------------------------------------------------------
@@ -35,7 +41,7 @@
 	or eax, 1b		; protection enable bit
 	mov cr0, eax
 
-	jmp code_descr-descr_base_addr : start
+	jmp code_descr-descr_base_addr : start	; automatically sets cs
 ; -----------------------------------------------------------------------------
 
 
@@ -57,52 +63,105 @@ start:
 	mov ss, ax
 	mov esp, dword STACK_START
 
+	push dword CHAROUT	; address to write to
+	push dword SCREEN_SIZE	; number of characters to write
 	call clear
+	add esp, WORD_SIZE*2	; remove args from stack
 
+	push dword CHAROUT		; address to write to
+	push dword 1111_0000b	; attrib
+	push str_title
+	call write_str
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*4		; address to write to
 	push dword 0000_1111b	; attrib
-	push str1
-	call write
-	pop eax
+	push dword INPUT_NUM
+	call write_num
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*4 + (NUM_DEC+1)*2		; address to write to
+	push dword 0000_1111b	; attrib
+	push str_fac
+	call write_str
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	push dword INPUT_NUM
+	call fact
+	add esp, WORD_SIZE*1	; remove arg from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*4 + (NUM_DEC+4)*2		; address to write to
+	push dword 0000_1111b	; attrib
+	push eax	; result from fact
+	call write_num
+	add esp, WORD_SIZE*3	; remove args from stack
 
 	call exit
+
+
+;
+; factorials
+;
+fact:
+	mov eax, [esp + WORD_SIZE*1]	; number
+	cmp eax, 2		; recursion end condition
+	jle fact_end
+
+	mov edx, eax
+	dec eax
+
+	push edx
+	push eax
+	call fact
+	add esp, WORD_SIZE*1	; remove arg from stack
+
+	pop edx
+	mul edx
+
+	fact_end:
+	ret
 
 
 ;
 ; clear screen
 ;
 clear:
-	mov edi, dword CHAROUT	; base address
-	mov ecx, dword SCREEN_SIZE	; size
+	mov ecx, [esp + WORD_SIZE]		; size
+	mov edi, [esp + WORD_SIZE*2]	; base address
 
-	;clear_write_loop:
-	;	mov [edi], byte 00h	; store char
-	;	add edi, 2	; next output char index
-	;	dec ecx		; decrement length counter
-	;	cmp ecx, 0
-	;	jz clear_write_loop_end
-	;	jmp clear_write_loop
-	;clear_write_loop_end:
-	;ret
-
+%ifdef USE_STRING_OPS
 	mov ax, word 00_00h
 	rep stosw
+
+%else
+	clear_write_loop:
+		mov [edi], word 00_00h	; store char
+		add edi, 2	; next output char index
+		dec ecx		; decrement length counter
+		cmp ecx, 0
+		jz clear_write_loop_end
+		jmp clear_write_loop
+	clear_write_loop_end:
+%endif
+
 	ret
 
 
+
 ;
-; write to charout
+; write a string to charout
 ; @param [esp + WORD_SIZE] pointer to a string
 ;
-write:
-	mov esi, [esp + WORD_SIZE]	; argument: char*
-	push esi
+write_str:
+	mov eax, [esp + WORD_SIZE]	; argument: char*
+	push eax
 	call strlen
 	mov ecx, eax	; string length
-	pop esi
+	add esp, WORD_SIZE	; remove arg from stack
 
-	mov edi, dword CHAROUT	; base address
 	mov esi, [esp + WORD_SIZE*1]	; char*
-	mov dh, [esp + WORD_SIZE*2]	; attrib
+	mov dh, [esp + WORD_SIZE*2]		; attrib
+	mov edi, [esp + WORD_SIZE*3]	; base address
 
 	write_loop:
 		mov dl, byte [esi]	; dereference char*
@@ -121,6 +180,45 @@ write:
 
 
 ;
+; write a decimal number to charout
+; @param [esp + WORD_SIZE] pointer to a string
+;
+write_num:
+	mov edi, [esp + WORD_SIZE*3]	; base address
+
+	mov ecx, NUM_DEC	; number of decimals to print
+	mov eax, ecx
+	shl eax, 1
+	add edi, eax	; write from the end to the beginning
+	inc edi		; start with char attrib
+
+	mov eax, [esp + WORD_SIZE*1]	; number
+
+	num_write_loop:
+		push ecx
+		xor edx, edx
+		mov ecx, dword 10
+		div ecx		; div result -> eax, mod result -> edx
+		pop ecx
+
+		mov dh, [esp + WORD_SIZE*2]		; attrib
+		mov [edi], dh	; store char attributes
+		dec edi		; next output char index
+
+		add dl, '0'		; convert to ascii char
+		mov [edi], dl	; store char
+		dec edi		; to char attribute index
+
+		dec ecx		; decrement length counter
+		cmp ecx, 0
+		jz num_write_loop_end
+		jmp num_write_loop
+	num_write_loop_end:
+
+	ret
+
+
+;
 ; strlen
 ; @param [esp + WORD_SIZE] pointer to a string
 ; @returns length in eax
@@ -129,18 +227,7 @@ strlen:
 	mov esi, [esp + WORD_SIZE*1]	; argument: string_ptr
 	mov edi, esi	; argument: char*
 
-;	count_chars:
-;		mov dl, byte [edi]	; dl = *string_ptr
-;		cmp dl, 0
-;		jz count_chars_end
-;		inc ecx		; ++counter
-;		inc edi		; ++str_ptr
-;		jmp count_chars
-;	count_chars_end:
-;
-;	mov eax, ecx
-;	ret
-
+%ifdef USE_STRING_OPS
 	mov ecx, 0xffff	; max. string length
 	xor eax, eax	; look for 0
 	repnz scasb
@@ -148,6 +235,20 @@ strlen:
 	mov eax, edi	; eax = end_ptr
 	sub eax, esi	; eax -= begin_ptr
 	sub eax, 1
+
+%else
+	count_chars:
+		mov dl, byte [edi]	; dl = *string_ptr
+		cmp dl, 0
+		jz count_chars_end
+		inc ecx		; ++counter
+		inc edi		; ++str_ptr
+		jmp count_chars
+	count_chars_end:
+
+	mov eax, ecx
+%endif
+
 	ret
 
 
@@ -195,32 +296,32 @@ data_descr: istruc descr_struc
 	at limit0_15, db 0xff, 0xff
 	at base0_23, db 00h, 00h, 00h
 	at access, db 1_00_1_0_0_1_0b	; present=1, ring=0, code/data=1, exec=0, expand-down=0, writable=1, accessed=0
-	at sizes_limit16_19, db 1_1_00_1111b	; granularity=1, size=1
+	at sizes_limit16_19, db 1_1_00_1111b	; granularity=1, 32bit=1
 	at base24_31, db 00h
 iend
 
 stack_descr: istruc descr_struc
-	at limit0_15, db 0xff, 0xff
-	at base0_23, db 00h, 00h, 00h
-	at access, db 1_00_1_0_0_1_0b	; present=1, ring=0, code/data=1, exec=0, expand-down=1, writable=1, accessed=0
-	at sizes_limit16_19, db 1_1_00_1111b	; granularity=1, size=1
-	at base24_31, db 00h
+	at limit0_15, db 0x00, 0x00
+	at base0_23, db 0x00, 0x00, 0x00
+	at access, db 1_00_1_0_1_1_0b	; present=1, ring=0, code/data=1, exec=0, expand-down=1, writable=1, accessed=0
+	at sizes_limit16_19, db 1_1_00_0000b	; granularity=1, 32bit=1
+	at base24_31, db 0x00
 iend
 
 code_descr: istruc descr_struc
 	at limit0_15, db 0xff, 0xff
 	at base0_23, db 00h, 00h, 00h
 	at access, db 1_00_1_1_0_1_0b	; present=1, ring=0, code/data=1, exec=1, conform=0, readable=1, accessed=0
-	at sizes_limit16_19, db 1_1_00_1111b	; granularity=1, size=1
+	at sizes_limit16_19, db 1_1_00_1111b	; granularity=1, 32bit=1
 	at base24_31, db 00h
 iend
 
 
-str1: db \
-	"--------------------------------------------------------------------------------",\
-	"                            In 32-bit protected mode.                           ",\
-	"--------------------------------------------------------------------------------",\
+str_title: db \
+	"                      Protected Mode Factorial Calculation                      ",\
 	00h
+
+str_fac: db "! = ", 00h
 ; -----------------------------------------------------------------------------
 
 
