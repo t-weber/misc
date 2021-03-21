@@ -63,6 +63,8 @@ VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd)
 	: m_vkinst{vk}, m_vkwnd{wnd}
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
+
+	m_cam.SetTranslation(0., 0., -3.);
 }
 
 
@@ -76,7 +78,7 @@ QPointF VkRenderer::VkToScreenCoords(const t_vec& vec4, bool *pVisible)
 {
 	auto [ vecPersp, vec ] =
 		m::hom_to_screen_coords<t_mat, t_vec>(vec4,
-			m_matCam, m_matPerspective, m_matViewport, true);
+			m_cam.GetMatrix(), m_matPerspective, m_matViewport, true);
 
 	// position not visible -> return a point outside the viewport
 	if(vecPersp[2] > 1.)
@@ -92,12 +94,23 @@ QPointF VkRenderer::VkToScreenCoords(const t_vec& vec4, bool *pVisible)
 
 void VkRenderer::tick(const std::chrono::milliseconds& ms)
 {
-	static t_real fAngle = 0.f;
-	fAngle += t_real(ms.count() / 50.f);
+	//static t_real fAngle = 0.f;
+	//fAngle += t_real(ms.count() / 50.f);
 
-	m_matCam = m::create<t_mat>({1,0,0,0,  0,1,0,0,  0,0,1,-3,  0,0,0,1});
-	m_matCam *= m::rotation<t_mat, t_vec>(m::create<t_vec>({1.,1.,0.,0.}), fAngle/180.*M_PI, 0);
-	std::tie(m_matCam_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matCam);
+	constexpr const t_real moveDelta = 0.1;
+	constexpr const t_real rotateDelta = 0.015*m::pi<t_real>;
+
+	m_cam.Translate(0, m_moving[0]*moveDelta);
+	m_cam.Translate(1, m_moving[1]*moveDelta);
+	m_cam.Translate(2, m_moving[2]*moveDelta);
+
+	m_cam.Rotate(0, m_rotating[0]*rotateDelta);
+	m_cam.Rotate(1, m_rotating[1]*rotateDelta);
+	m_cam.Rotate(2, m_rotating[2]*rotateDelta);
+
+	//using namespace m_ops;
+	//std::cout << m_cam.GetMatrix() << std::endl;
+	//std::cout << m_cam.GetMatrixInv() << std::endl;
 
 	UpdatePicker();
 
@@ -117,7 +130,7 @@ void VkRenderer::UpdatePicker()
 {
 	auto [org, dir] = m::hom_line_from_screen_coords<t_mat, t_vec>(
 		m_posMouse.x(), m_posMouse.y(), 0., 1.,
-		m_matCam_inv, m_matPerspective_inv,
+		m_cam.GetMatrixInv(), m_matPerspective_inv,
 		m_matViewport_inv, &m_matViewport, false);
 
 	for(std::size_t startidx=0; startidx+2<m_triangles.size(); startidx+=3)
@@ -296,8 +309,10 @@ std::size_t VkRenderer::GetNumVertexBufferElements() const
  */
 std::size_t VkRenderer::GetNumUniformBufferElements() const
 {
+	const auto& matCam = m_cam.GetMatrix();
+
 	return m_matPerspective.size1()*m_matPerspective.size2() +
-		m_matCam.size1()*m_matCam.size2() +
+		matCam.size1()*matCam.size2() +
 		m_veccurUV.size();
 }
 
@@ -1081,6 +1096,8 @@ void VkRenderer::UpdateUniforms()
 		return;
 	}
 
+	const auto& matCam = m_cam.GetMatrix();
+
 	// matrices
 	for(std::size_t i=0; i<4; ++i)
 	{
@@ -1090,7 +1107,7 @@ void VkRenderer::UpdateUniforms()
 			pMem[j*4 + i] = m_matPerspective(i,j);
 
 			// camera matrix
-			pMem[4*4 + j*4 + i] = m_matCam(i,j);
+			pMem[4*4 + j*4 + i] = matCam(i,j);
 		}
 	}
 
@@ -1196,6 +1213,8 @@ void VkWnd::mouseMoveEvent(QMouseEvent *pEvt)
 {
 	if(m_vkrenderer)
 		m_vkrenderer->SetMousePos(pEvt->localPos());
+
+	QVulkanWindow::mouseMoveEvent(pEvt);
 }
 
 
@@ -1206,6 +1225,88 @@ void VkWnd::keyPressEvent(QKeyEvent *pEvt)
 
 	if(pEvt->key() == Qt::Key_Space)
 		m_vkrenderer->TogglePerspective();
+
+	/* // direct cam: controls
+	constexpr const t_real moveDelta = 0.1;
+	constexpr const t_real rotateDelta = 0.015*m::pi<t_real>;
+
+	if(pEvt->key() == Qt::Key_A)
+		m_vkrenderer->GetCamera().Translate(0, moveDelta);
+	if(pEvt->key() == Qt::Key_D)
+		m_vkrenderer->GetCamera().Translate(0, -moveDelta);
+	if(pEvt->key() == Qt::Key_W)
+		m_vkrenderer->GetCamera().Translate(2, moveDelta);
+	if(pEvt->key() == Qt::Key_S)
+		m_vkrenderer->GetCamera().Translate(2, -moveDelta);
+	if(pEvt->key() == Qt::Key_E)
+		m_vkrenderer->GetCamera().Translate(1, moveDelta);
+	if(pEvt->key() == Qt::Key_Q)
+		m_vkrenderer->GetCamera().Translate(1, -moveDelta);
+
+	if(pEvt->key() == Qt::Key_Up)
+		m_vkrenderer->GetCamera().Rotate(0, rotateDelta);
+	if(pEvt->key() == Qt::Key_Down)
+		m_vkrenderer->GetCamera().Rotate(0, -rotateDelta);
+	if(pEvt->key() == Qt::Key_Left)
+		m_vkrenderer->GetCamera().Rotate(1, -rotateDelta);
+	if(pEvt->key() == Qt::Key_Right)
+		m_vkrenderer->GetCamera().Rotate(1, rotateDelta);
+	if(pEvt->key() == Qt::Key_Y)
+		m_vkrenderer->GetCamera().Rotate(2, rotateDelta);
+	if(pEvt->key() == Qt::Key_C)
+		m_vkrenderer->GetCamera().Rotate(2, -rotateDelta);
+	*/
+
+	if(pEvt->key() == Qt::Key_A)
+		m_vkrenderer->SetMoving(0, 1.);
+	if(pEvt->key() == Qt::Key_D)
+		m_vkrenderer->SetMoving(0, -1.);
+	if(pEvt->key() == Qt::Key_W)
+		m_vkrenderer->SetMoving(2, 1.);
+	if(pEvt->key() == Qt::Key_S)
+		m_vkrenderer->SetMoving(2, -1.);
+	if(pEvt->key() == Qt::Key_E)
+		m_vkrenderer->SetMoving(1, 1.);
+	if(pEvt->key() == Qt::Key_Q)
+		m_vkrenderer->SetMoving(1, -1.);
+
+	if(pEvt->key() == Qt::Key_Up)
+		m_vkrenderer->SetRotating(0, 1.);
+	if(pEvt->key() == Qt::Key_Down)
+		m_vkrenderer->SetRotating(0, -1.);
+	if(pEvt->key() == Qt::Key_Left)
+		m_vkrenderer->SetRotating(1, -1.);
+	if(pEvt->key() == Qt::Key_Right)
+		m_vkrenderer->SetRotating(1, 1.);
+	if(pEvt->key() == Qt::Key_Y)
+		m_vkrenderer->SetRotating(2, 1.);
+	if(pEvt->key() == Qt::Key_C)
+		m_vkrenderer->SetRotating(2, -1.);
+
+	QVulkanWindow::keyPressEvent(pEvt);
+}
+
+
+void VkWnd::keyReleaseEvent(QKeyEvent *pEvt)
+{
+	if(!m_vkrenderer)
+		return;
+
+	if(pEvt->key() == Qt::Key_A || pEvt->key() == Qt::Key_D)
+		m_vkrenderer->SetMoving(0, 0.);
+	if(pEvt->key() == Qt::Key_W || pEvt->key() == Qt::Key_S)
+		m_vkrenderer->SetMoving(2, 0.);
+	if(pEvt->key() == Qt::Key_E || pEvt->key() == Qt::Key_Q)
+		m_vkrenderer->SetMoving(1, 0.);
+
+	if(pEvt->key() == Qt::Key_Up || pEvt->key() == Qt::Key_Down)
+		m_vkrenderer->SetRotating(0, 0.);
+	if(pEvt->key() == Qt::Key_Left || pEvt->key() == Qt::Key_Right)
+		m_vkrenderer->SetRotating(1, 0.);
+	if(pEvt->key() == Qt::Key_Y || pEvt->key() == Qt::Key_C)
+		m_vkrenderer->SetRotating(2, 0.);
+
+	QVulkanWindow::keyReleaseEvent(pEvt);
 }
 // ----------------------------------------------------------------------------
 

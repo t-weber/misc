@@ -23,6 +23,7 @@
 
 #include "../../libs/math_algos.h"
 #include "../../libs/math_conts.h"
+#include "cam.h"
 
 
 using t_real = float;
@@ -67,8 +68,10 @@ protected:
 
 	t_mat m_matPerspective{m::unit<t_mat>(4)}, m_matPerspective_inv{m::unit<t_mat>(4)};
 	t_mat m_matViewport{m::unit<t_mat>(4)}, m_matViewport_inv{m::unit<t_mat>(4)};
-	t_mat m_matCam{m::unit<t_mat>(4)}, m_matCam_inv{m::unit<t_mat>(4)};
 	t_vec2 m_veccurUV = m::create<t_vec2>({ 0.f, 0.f });
+	Camera<t_mat, t_vec, t_real> m_cam;
+	t_real m_moving[3] = {0., 0., 0.};
+	t_real m_rotating[3] = {0., 0., 0.};
 
 	VkViewport m_viewports[1];
 	VkRect2D m_viewrects[1];
@@ -119,6 +122,10 @@ public:
 	void TogglePerspective();
 	void SetMousePos(const QPointF& pt);
 	void tick(const std::chrono::milliseconds& ms);
+
+	Camera<t_mat, t_vec, t_real>& GetCamera() { return m_cam; }
+	void SetMoving(std::size_t axis, t_real val) { m_moving[axis] = val; }
+	void SetRotating(std::size_t axis, t_real val) { m_rotating[axis] = val; }
 };
 
 
@@ -138,6 +145,7 @@ public:
 
 	virtual void mouseMoveEvent(QMouseEvent *pEvt) override;
 	virtual void keyPressEvent(QKeyEvent *pEvt) override;
+	virtual void keyReleaseEvent(QKeyEvent *pEvt) override;
 };
 
 
