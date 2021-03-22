@@ -1,4 +1,5 @@
 ;
+; calculates factorials in a 512 B bootsector protected mode program
 ; @author Tobias Weber
 ; @date feb-2021
 ; @license see 'LICENSE.GPL' file
@@ -25,8 +26,9 @@
 %define MBR_BOOTSIG_ADDR $$ + 200h-2	; 510 bytes after section start
 %define USE_STRING_OPS	; use optimised string functions
 
-%define NUM_DEC          8	; number of decimals to print
-%define INPUT_NUM        11	; input number for calculation
+%define NUM_DEC          9	; number of decimals to print
+%define MAX_FACT         12	; maximum input number for calculation
+
 
 
 ; -----------------------------------------------------------------------------
@@ -63,44 +65,74 @@ start:
 	mov ss, ax
 	mov esp, dword STACK_START
 
-	push dword CHAROUT	; address to write to
+	push dword CHAROUT		; address to write to
 	push dword SCREEN_SIZE	; number of characters to write
 	call clear
 	add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT		; address to write to
 	push dword 1111_0000b	; attrib
-	push str_title
+	push str_title			; string
 	call write_str
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*4		; address to write to
-	push dword 0000_1111b	; attrib
-	push dword INPUT_NUM
-	call write_num
-	add esp, WORD_SIZE*3	; remove args from stack
+	; loop input numbers
+	mov dword [esp + 1*WORD_SIZE], 1	; start counter
+	input_loop_begin:
+		mov eax, dword [esp + 1*WORD_SIZE]	; current counter
+		mov edx, SCREEN_COL_SIZE*2
+		mul edx
+		mov [esp + 2*WORD_SIZE], dword eax	; line offset
 
-	push dword CHAROUT + SCREEN_COL_SIZE*4 + (NUM_DEC+1)*2		; address to write to
-	push dword 0000_1111b	; attrib
-	push str_fac
-	call write_str
-	add esp, WORD_SIZE*3	; remove args from stack
+		mov edx, dword CHAROUT + SCREEN_COL_SIZE*4		; address to write to
+		;mov eax, dword [esp + 2*WORD_SIZE]	; line offset
+		add eax, edx
+		mov ecx, dword [esp + 1*WORD_SIZE]	; current counter
+		push dword eax			; address to write to
+		push dword 0000_1111b	; attrib
+		push dword ecx			; number to write
+		call write_num
+		add esp, WORD_SIZE*3	; remove args from stack
 
-	push dword INPUT_NUM
-	call fact
-	add esp, WORD_SIZE*1	; remove arg from stack
+		mov edx, dword CHAROUT + SCREEN_COL_SIZE*4 + (NUM_DEC+1)*2		; address to write to
+		mov eax, dword [esp + 2*WORD_SIZE]	; line offset
+		add eax, edx
+		push dword eax			; address to write to
+		push dword 0000_1111b	; attrib
+		push str_fac			; string to write to
+		call write_str
+		add esp, WORD_SIZE*3	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*4 + (NUM_DEC+4)*2		; address to write to
-	push dword 0000_1111b	; attrib
-	push eax	; result from fact
-	call write_num
-	add esp, WORD_SIZE*3	; remove args from stack
+		mov eax, dword [esp + 1*WORD_SIZE]	; current counter
+		push dword eax
+		call fact
+		add esp, WORD_SIZE*1	; remove arg from stack
+		mov ecx, eax			; get result
+
+		mov edx, dword CHAROUT + SCREEN_COL_SIZE*4 + (NUM_DEC+4)*2		; address to write to
+		mov eax, dword [esp + 2*WORD_SIZE]	; line offset
+		add eax, edx
+		push dword eax			; address to write to
+		push dword 0000_1111b	; attrib
+		push ecx				; result from fact
+		call write_num
+		add esp, WORD_SIZE*3	; remove args from stack
+
+		mov eax, dword [esp + 1*WORD_SIZE]	; current counter
+		cmp eax, MAX_FACT
+		jge input_loop_end
+		inc eax
+		mov dword [esp + 1*WORD_SIZE], eax	; current counter
+		jmp input_loop_begin
+	input_loop_end:
 
 	call exit
 
 
 ;
-; factorials
+; calculate factorials
+; dword argument on stack
+; returns result in eax
 ;
 fact:
 	mov eax, [esp + WORD_SIZE*1]	; number
@@ -111,6 +143,7 @@ fact:
 	dec eax
 
 	push edx
+
 	push eax
 	call fact
 	add esp, WORD_SIZE*1	; remove arg from stack
@@ -330,5 +363,5 @@ str_fac: db "! = ", 00h
 ; MBR, see https://en.wikipedia.org/wiki/Master_boot_record
 ; -----------------------------------------------------------------------------
 mbr_fill: times MBR_BOOTSIG_ADDR - mbr_fill db 0xf4	; fill with hlt
-mbr_bootsig: dw 0xaa55	; boot signature
+mbr_bootsig: dw 0xaa55	; boot signature at end of boot sector
 ; -----------------------------------------------------------------------------
