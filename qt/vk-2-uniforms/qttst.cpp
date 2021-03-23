@@ -65,6 +65,7 @@ VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd)
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	m_cam.SetTranslation(0., 0., -3.);
+	m_cam.Update();
 }
 
 
@@ -107,6 +108,8 @@ void VkRenderer::tick(const std::chrono::milliseconds& ms)
 	m_cam.Rotate(0, m_rotating[0]*rotateDelta);
 	m_cam.Rotate(1, m_rotating[1]*rotateDelta);
 	m_cam.Rotate(2, m_rotating[2]*rotateDelta);
+
+	m_cam.Update();
 
 	//using namespace m_ops;
 	//std::cout << m_cam.GetMatrix() << std::endl;
@@ -1279,9 +1282,9 @@ void VkWnd::keyPressEvent(QKeyEvent *pEvt)
 	if(pEvt->key() == Qt::Key_Right)
 		m_vkrenderer->SetRotating(1, 1.);
 	if(pEvt->key() == Qt::Key_Y)
-		m_vkrenderer->SetRotating(2, 1.);
-	if(pEvt->key() == Qt::Key_C)
 		m_vkrenderer->SetRotating(2, -1.);
+	if(pEvt->key() == Qt::Key_C)
+		m_vkrenderer->SetRotating(2, 1.);
 
 	QVulkanWindow::keyPressEvent(pEvt);
 }
