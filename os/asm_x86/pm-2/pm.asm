@@ -1,13 +1,7 @@
 ;
-; calculates factorials in a protected mode program
 ; @author Tobias Weber
 ; @date feb-2021
 ; @license see 'LICENSE.GPL' file
-;
-; nasm -w+all -o pm.x86 -f bin pm.asm
-; qemu-system-i386 -drive format=raw,file=pm.x86,index=0
-; bochs "floppya: 1_44=pm.x86, status=inserted" "boot:floppy"
-; debugging: qemu-system-x86_64 -d cpu -drive format=raw,file=pm.x86,index=0 2> /tmp/cpu.txt
 ;
 ; references:
 ;	- https://wiki.osdev.org/Babystep7
@@ -20,27 +14,26 @@
 %define WORD_SIZE        4
 %define WORD_SIZE_16     2
 
+; see https://jbwyatt.com/253/emu/memory.html
 %define CHAROUT          000b_8000h ; base address for character output
 %define SCREEN_ROW_SIZE  25
 %define SCREEN_COL_SIZE  80
 %define SCREEN_SIZE      SCREEN_ROW_SIZE * SCREEN_COL_SIZE
 
-; see: https://wiki.osdev.org/Memory_Map_(x86) and https://en.wikipedia.org/wiki/Master_boot_record
-%define BOOTSECT_START   7c00h
+; see https://wiki.osdev.org/Memory_Map_(x86) and https://en.wikipedia.org/wiki/Master_boot_record
+;%define BOOTSECT_START   7c00h
 %define STACK_START_16   7fffh      ; some (arbitrary) stack base address
 %define STACK_START      00ff_ffffh ; some (arbitrary) stack base address
 ;%define STACK_START     000b_8200h ; test: write into screen memory
 %define NUM_GDT_ENTRIES  4
 
-%define SECTOR_SIZE      200h
-%define MBR_BOOTSIG_ADDR $$ + SECTOR_SIZE-2 ; 510 bytes after section start
-%define NUM_SECTORS      1                  ; without counting the boot sector
-%define END_ADDR         $$ + SECTOR_SIZE * (NUM_SECTORS + 1)
-%define FILL_BYTE        0xf4               ; fill with hlt
+%define SECTOR_SIZE       200h
+%define MBR_BOOTSIG_ADDR  $$ + SECTOR_SIZE-2 ; 510 bytes after section start
+%define NUM_TOTAL_SECTORS 10                 ; without counting the boot sector, check "pm.x86" file size
+%define END_ADDR          $$ + SECTOR_SIZE * 2
+%define FILL_BYTE         0xf4               ; fill with hlt
 
 %define USE_STRING_OPS      ; use optimised string functions
-%define NUM_DEC          9  ; number of decimals to print
-%define MAX_FACT         12 ; maximum input number for calculation
 
 
 
@@ -49,7 +42,7 @@
 ; in boot sector
 ; -----------------------------------------------------------------------------
 [bits 16]
-[org BOOTSECT_START]
+;[org BOOTSECT_START]	; not needed, set by linker
 	mov sp, STACK_START_16
 	mov bp, STACK_START_16
 	push dx
@@ -66,13 +59,13 @@
 	;stop_16: jmp stop_16
 
 	; read all needed sectors
-	; see: https://en.wikipedia.org/wiki/INT_13H#INT_13h_AH=02h:_Read_Sectors_From_Drive
+	; see https://en.wikipedia.org/wiki/INT_13H#INT_13h_AH=02h:_Read_Sectors_From_Drive
 	xor ax, ax
 	mov es, ax
 	pop dx
 	mov ah, 02h		; func
-	mov al, byte NUM_SECTORS; sector count
-	mov bx, word start32	; destination address es:bx
+	mov al, byte NUM_TOTAL_SECTORS	; sector count
+	mov bx, word start_32	; destination address es:bx
 	mov cx, 00_02h	; C = 0, S = 2
 	mov dh, 00h	; H = 0
 	int 13h
@@ -87,7 +80,7 @@
 	mov cr0, eax
 
 	; go to 32 bit code
-	jmp code_descr-descr_base_addr : start32	; automatically sets cs
+	jmp code_descr-descr_base_addr : start_32	; automatically sets cs
 
 
 ;
@@ -236,7 +229,7 @@ code_descr: istruc descr_struc
 iend
 
 
-str_start_16: db "Starting...", 00h
+str_start_16: db "Starting 16bit...", 00h
 ; -----------------------------------------------------------------------------
 
 
@@ -257,7 +250,7 @@ mbr_bootsig: dw 0xaa55	; boot signature at end of boot sector
 ; starting in second 512B sector
 ; -----------------------------------------------------------------------------
 [bits 32]
-start32:
+start_32:
 	;sti
 
 	; data segment
@@ -270,101 +263,28 @@ start32:
 	mov ss, ax
 	mov esp, dword STACK_START
 
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear
-	add esp, WORD_SIZE*2	; remove args from stack
+	;push dword CHAROUT	; address to write to
+	;push dword SCREEN_SIZE	; number of characters to write
+	;call clear_32
+	;add esp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT	; address to write to
-	push dword 1111_0000b	; attrib
-	push str_title		; string
-	call write_str
+	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push dword 0000_1111b	; attrib
+	push str_start_32	; string
+	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	; loop input numbers
-	mov dword [esp + 1*WORD_SIZE], 1	; start counter
-	input_loop_begin:
-		mov eax, dword [esp + 1*WORD_SIZE]	; current counter
-		mov edx, SCREEN_COL_SIZE*2
-		mul edx
-		mov [esp + 2*WORD_SIZE], dword eax	; line offset
-
-		mov edx, dword CHAROUT + SCREEN_COL_SIZE*4		; address to write to
-		;mov eax, dword [esp + 2*WORD_SIZE]	; line offset
-		add eax, edx
-		mov ecx, dword [esp + 1*WORD_SIZE]	; current counter
-		push dword eax			; address to write to
-		push dword 0000_1111b	; attrib
-		push dword ecx			; number to write
-		call write_num
-		add esp, WORD_SIZE*3	; remove args from stack
-
-		mov edx, dword CHAROUT + SCREEN_COL_SIZE*4 + (NUM_DEC+1)*2		; address to write to
-		mov eax, dword [esp + 2*WORD_SIZE]	; line offset
-		add eax, edx
-		push dword eax			; address to write to
-		push dword 0000_1111b	; attrib
-		push str_fac			; string to write to
-		call write_str
-		add esp, WORD_SIZE*3	; remove args from stack
-
-		mov eax, dword [esp + 1*WORD_SIZE]	; current counter
-		push dword eax
-		call fact
-		add esp, WORD_SIZE*1	; remove arg from stack
-		mov ecx, eax			; get result
-
-		mov edx, dword CHAROUT + SCREEN_COL_SIZE*4 + (NUM_DEC+4)*2		; address to write to
-		mov eax, dword [esp + 2*WORD_SIZE]	; line offset
-		add eax, edx
-		push dword eax			; address to write to
-		push dword 0000_1111b	; attrib
-		push ecx				; result from fact
-		call write_num
-		add esp, WORD_SIZE*3	; remove args from stack
-
-		mov eax, dword [esp + 1*WORD_SIZE]	; current counter
-		cmp eax, MAX_FACT
-		jge input_loop_end
-		inc eax
-		mov dword [esp + 1*WORD_SIZE], eax	; current counter
-		jmp input_loop_begin
-	input_loop_end:
+	[extern entrypoint]
+	call entrypoint
 
 	call exit
 
 
 ;
-; calculate factorials
-; dword argument on stack
-; returns result in eax
-;
-fact:
-	mov eax, [esp + WORD_SIZE*1]	; number
-	cmp eax, 2		; recursion end condition
-	jle fact_end
-
-	mov edx, eax
-	dec eax
-
-	push edx
-
-	push eax
-	call fact
-	add esp, WORD_SIZE*1	; remove arg from stack
-
-	pop edx
-	mul edx
-
-	fact_end:
-	ret
-
-
-;
 ; clear screen
 ;
-clear:
-	mov ecx, [esp + WORD_SIZE]	; size
+clear_32:
+	mov ecx, [esp + WORD_SIZE]		; size
 	mov edi, [esp + WORD_SIZE*2]	; base address
 
 %ifdef USE_STRING_OPS
@@ -389,11 +309,13 @@ clear:
 ;
 ; write a string to charout
 ; @param [esp + WORD_SIZE] pointer to a string
+; @param [esp + WORD_SIZE*2] attributes
+; @param [esp + WORD_SIZE*3] base address to write to
 ;
-write_str:
+write_str_32:
 	mov eax, [esp + WORD_SIZE]	; argument: char*
 	push eax
-	call strlen
+	call strlen_32
 	mov ecx, eax	; string length
 	add esp, WORD_SIZE	; remove arg from stack
 
@@ -418,50 +340,11 @@ write_str:
 
 
 ;
-; write a decimal number to charout
-; @param [esp + WORD_SIZE] pointer to a string
-;
-write_num:
-	mov edi, [esp + WORD_SIZE*3]	; base address
-
-	mov ecx, NUM_DEC	; number of decimals to print
-	mov eax, ecx
-	shl eax, 1
-	add edi, eax	; write from the end to the beginning
-	inc edi		; start with char attrib
-
-	mov eax, [esp + WORD_SIZE*1]	; number
-
-	num_write_loop:
-		push ecx
-		xor edx, edx
-		mov ecx, dword 10
-		div ecx		; div result -> eax, mod result -> edx
-		pop ecx
-
-		mov dh, [esp + WORD_SIZE*2]		; attrib
-		mov [edi], dh	; store char attributes
-		dec edi		; next output char index
-
-		add dl, '0'		; convert to ascii char
-		mov [edi], dl	; store char
-		dec edi		; to char attribute index
-
-		dec ecx		; decrement length counter
-		cmp ecx, 0
-		jz num_write_loop_end
-		jmp num_write_loop
-	num_write_loop_end:
-
-	ret
-
-
-;
 ; strlen
 ; @param [esp + WORD_SIZE] pointer to a string
 ; @returns length in eax
 ;
-strlen:
+strlen_32:
 	mov esi, [esp + WORD_SIZE*1]	; argument: char*
 
 %ifdef USE_STRING_OPS
@@ -504,13 +387,7 @@ exit:
 ; -----------------------------------------------------------------------------
 ; data
 ; -----------------------------------------------------------------------------
-str_title: db \
-	"                      Protected Mode Factorial Calculation                      ",\
-	00h
-
-str_fac: db "! = ", 00h
-; -----------------------------------------------------------------------------
-
-
+str_start_32: db "Starting 32bit...", 00h
 
 sector_fill: times END_ADDR - sector_fill db FILL_BYTE
+; -----------------------------------------------------------------------------
