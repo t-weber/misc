@@ -152,7 +152,7 @@ begin
 			--
 			-- first clock cycle
 			--
-			when ReadOrWrite => null;
+			when ReadOrWrite =>
 				if in_enable='1' then
 					if in_writeenable='1' then
 						addr_next <= in_addr;

@@ -8,6 +8,7 @@
 
 ASM=nasm
 CC=clang
+#CC=gcc
 LD=ld
 
 echo -e "Assembling..."
@@ -23,7 +24,7 @@ if ! ${CC} -m32 -O2 -march=i686 -ffreestanding -c -o main.o main.c; then
 fi
 
 echo -e "Linking..."
-if ! ${LD} -m elf_i386 --oformat binary -o pm.x86 -Ttext=0x7c00 pm.o main.o; then
+if ! ${LD} -s -m elf_i386 --oformat=binary --section-start=.text=0x7c00 -o pm.x86 pm.o main.o; then
 	echo -e "Error linking."
 	exit -1
 fi

@@ -152,7 +152,7 @@ void entrypoint()
 	write_str("Factorial", attr_bold, CHAROUT + (SCREEN_COL_SIZE*2 + spacing) * 2);
 	write_str("Fibonacci", attr_bold, CHAROUT + (SCREEN_COL_SIZE*2 + spacing*2) * 2);
 
-	for(u32 num=1; num<12; ++num)
+	for(u32 num=1; num<=12; ++num)
 	{
 		u32 num_fact = fact(num);
 		u32 num_fibo = fibo(num);
