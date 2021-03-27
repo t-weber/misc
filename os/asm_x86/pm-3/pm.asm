@@ -29,10 +29,11 @@
 %define NUM_IDT_ENTRIES   256
 
 %define SECTOR_SIZE       200h
-%define MBR_BOOTSIG_ADDR  $$ + SECTOR_SIZE - 2 ; 510 bytes after section start
-%define NUM_TOTAL_SECTORS 15                 ; without counting the boot sector, check "pm.x86" file size
-%define END_ADDR          $$ + SECTOR_SIZE * 7
-%define FILL_BYTE         0xf4               ; fill with hlt
+%define MBR_BOOTSIG_ADDR  ($$ + SECTOR_SIZE - 2) ; 510 bytes after section start
+%define NUM_ASM_SECTORS   10         ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
+%define NUM_C_SECTORS     9          ; number of sectors for c code
+%define END_ADDR          ($$ + SECTOR_SIZE * NUM_ASM_SECTORS)
+%define FILL_BYTE         0xf4       ; fill with hlt
 
 ; see https://wiki.osdev.org/PIC
 %define PIC0_INSTR        0x20
@@ -69,7 +70,7 @@
 	mov es, ax
 	pop dx
 	mov ah, 02h		; func
-	mov al, byte NUM_TOTAL_SECTORS	; sector count
+	mov al, byte (NUM_ASM_SECTORS + NUM_C_SECTORS - 1) ; sector count (boot sector already loaded)
 	mov bx, word start_32	; destination address es:bx
 	mov cx, 00_02h	; C = 0, S = 2
 	mov dh, 00h	; H = 0
