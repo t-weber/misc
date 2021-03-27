@@ -79,8 +79,8 @@
 	or eax, 1b
 	mov cr0, eax
 
-	; go to 32 bit code
-	jmp code_descr-descr_base_addr : start_32	; automatically sets cs
+	; go to 32 bit code in code segment: index 2, gdt, ring=0
+	jmp 0000000000011_0_00b : start_32	; automatically sets cs
 
 
 ;
