@@ -13,8 +13,8 @@
 
 
 void reverse_str(char* buf, u32 len);
-void uint_to_str(u32 num, char* buf);
-void int_to_str(i32 num, char* buf);
+void uint_to_str(u32 num, u32 base, char* buf);
+void int_to_str(i32 num, u32 base, char* buf);
 
 u32 strlen(char *str);
 void memset(i8* mem, i8 val, u32 size);

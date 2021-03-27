@@ -9,12 +9,12 @@
 #define __PM_DEFINES_H__
 
 
-#define u8  unsigned char
-#define i8  char
-#define u16 unsigned short
-#define i16 short
-#define u32 unsigned int
-#define i32 int
+typedef unsigned char u8;
+typedef char i8;
+typedef unsigned short u16;
+typedef short i16;
+typedef unsigned int u32;
+typedef int i32;
 
 
 #define SCREEN_ROW_SIZE 25

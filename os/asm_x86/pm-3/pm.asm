@@ -36,11 +36,13 @@
 %define FILL_BYTE         0xf4       ; fill with hlt
 
 ; see https://wiki.osdev.org/PIC
-%define PIC0_INSTR        0x20
-%define PIC1_INSTR        0xa0
-%define PIC0_DATA         0x21
-%define PIC1_DATA         0xa1
+%define PIC0_INSTR_PORT   0x20
+%define PIC1_INSTR_PORT   0xa0
+%define PIC0_DATA_PORT    0x21
+%define PIC1_DATA_PORT    0xa1
 
+; https://wiki.osdev.org/%228042%22_PS/2_Controller
+%define KEYB_DATA_PORT    0x60
 
 
 ; -----------------------------------------------------------------------------
@@ -80,10 +82,10 @@
 	cli
 
 	; disable all hardware interrupts except keyboard (irq 1)
-	mov al, 0b1111_1101
-	out PIC0_DATA, al
-	mov al, 0b1111_1111
-	out PIC1_DATA, al
+	mov al, 1111_1101b
+	out PIC0_DATA_PORT, al
+	mov al, 1111_1111b
+	out PIC1_DATA_PORT, al
 
 	; load gdt register
 	lgdt [gdtr]
@@ -368,14 +370,16 @@ strlen_32:
 ; halt
 ;
 exit:
-	hlt
+	;cli
+	hlt_loop: hlt	; loop, because hlt can be interrupted
+	jmp hlt_loop
 ; -----------------------------------------------------------------------------
 
 
 
 ; -----------------------------------------------------------------------------
 ; interrupt service routines
-; see https://wiki.osdev.org/Interrupt_Service_Routines
+; see https://wiki.osdev.org/Interrupt_Service_Routines and https://wiki.osdev.org/Interrupts
 ; -----------------------------------------------------------------------------
 
 ;
@@ -385,19 +389,30 @@ isr_null:
 	iret
 
 
+; see https://wiki.osdev.org/%228042%22_PS/2_Controller
 isr_keyb:
 	pushad
 
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	;push dword CHAROUT	; address to write to
+	;push dword SCREEN_SIZE	; number of characters to write
+	;call clear_32
+	;add esp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
-	push str_keyb_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	;push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	;push dword 0000_1111b	; attrib
+	;push str_keyb_32	; string
+	;call write_str_32
+	;add esp, WORD_SIZE*3	; remove args from stack
+
+	[extern keyb_event]
+	xor eax, eax
+	in al, KEYB_DATA_PORT
+	push eax
+	call keyb_event
+	add esp, WORD_SIZE
+
+	mov al, 0010_0000b
+	out PIC0_INSTR_PORT, al
 
 	popad
 	iret

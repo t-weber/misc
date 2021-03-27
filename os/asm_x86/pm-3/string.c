@@ -22,18 +22,25 @@ void reverse_str(char* buf, u32 len)
 }
 
 
-void uint_to_str(u32 num, char* buf)
+void uint_to_str(u32 num, u32 base, char* buf)
 {
 	u32 idx = 0;
 	while(1)
 	{
-		u32 mod = num % 10;
-		num /= 10;
+		u32 mod = num % base;
+		num /= base;
 
 		if(num==0 && mod==0)
+		{
+			if(idx == 0)
+				buf[idx++] = '0';
 			break;
+		}
 
-		buf[idx] = (char)mod + 0x30;
+		if(mod <= 9)
+			buf[idx] = (char)mod + '0';
+		else
+			buf[idx] = (char)(mod-10) + 'a';
 		++idx;
 	}
 
@@ -44,7 +51,7 @@ void uint_to_str(u32 num, char* buf)
 }
 
 
-void int_to_str(i32 num, char* buf)
+void int_to_str(i32 num, u32 base, char* buf)
 {
 	u32 idx = 0;
 	u32 beg = 0;
@@ -60,13 +67,21 @@ void int_to_str(i32 num, char* buf)
 
 	while(1)
 	{
-		i32 mod = num % 10;
-		num /= 10;
+		i32 mod = num % base;
+		num /= base;
 
 		if(num==0 && mod==0)
-			break;
+		{
+			if(idx == 0)
+				buf[idx++] = '0';
 
-		buf[idx] = (char)mod + 0x30;
+			break;
+		}
+
+		if(mod <= 9)
+			buf[idx] = (char)mod + '0';
+		else
+			buf[idx] = (char)(mod-10) + 'a';
 		++idx;
 	}
 
