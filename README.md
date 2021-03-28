@@ -1,2 +1,2 @@
 # misc
-Useful code snippets and tests.
+Miscellaneous code snippets and tests.
