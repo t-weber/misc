@@ -19,6 +19,7 @@
 %define SCREEN_ROW_SIZE   25
 %define SCREEN_COL_SIZE   80
 %define SCREEN_SIZE       SCREEN_ROW_SIZE * SCREEN_COL_SIZE
+%define ATTR_BOLD         0000_1111b
 
 ; see https://wiki.osdev.org/Memory_Map_(x86) and https://en.wikipedia.org/wiki/Master_boot_record
 %define BOOTSECT_START    7c00h
@@ -30,16 +31,26 @@
 
 %define SECTOR_SIZE       200h
 %define MBR_BOOTSIG_ADDR  ($$ + SECTOR_SIZE - 2) ; 510 bytes after section start
-%define NUM_ASM_SECTORS   10         ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
-%define NUM_C_SECTORS     9          ; number of sectors for c code
+%define NUM_ASM_SECTORS   8          ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
+%define NUM_C_SECTORS     11         ; number of sectors for c code
 %define END_ADDR          ($$ + SECTOR_SIZE * NUM_ASM_SECTORS)
 %define FILL_BYTE         0xf4       ; fill with hlt
+
+; see https://en.wikipedia.org/wiki/INT_13H
+%define BIOS_FLOPPY0      0x00
+%define BIOS_HDD0         0x80
 
 ; see https://wiki.osdev.org/PIC
 %define PIC0_INSTR_PORT   0x20
 %define PIC1_INSTR_PORT   0xa0
 %define PIC0_DATA_PORT    0x21
 %define PIC1_DATA_PORT    0xa1
+%define PIC0_INT_OFFS     0x20
+%define PIC1_INT_OFFS     0x28
+
+; see https://wiki.osdev.org/Programmable_Interval_Timer
+%define TIMER_INSTR_PORT  0x43
+%define TIMER_DATA_PORT   0x40
 
 ; https://wiki.osdev.org/%228042%22_PS/2_Controller
 %define KEYB_DATA_PORT    0x60
@@ -59,7 +70,7 @@
 	call clear_16
 
 	; write start message
-	push word 0000_1111b	; attrib
+	push word ATTR_BOLD	; attrib
 	push word str_start_16	; string
 	call write_str_16
 	pop ax	; remove args from stack
@@ -68,24 +79,34 @@
 
 	; read all needed sectors
 	; see https://en.wikipedia.org/wiki/INT_13H#INT_13h_AH=02h:_Read_Sectors_From_Drive
-	xor ax, ax
-	mov es, ax
 	pop dx
+	;xor ax, ax
+	mov ax, cs
+	mov es, ax
 	mov ah, 02h		; func
 	mov al, byte (NUM_ASM_SECTORS + NUM_C_SECTORS - 1) ; sector count (boot sector already loaded)
-	mov bx, word start_32	; destination address es:bx
-	mov cx, 00_02h	; C = 0, S = 2
-	mov dh, 00h	; H = 0
-	int 13h
+	mov bx, word start_32 ; destination address es:bx
+	mov cx, 00_02h    ; C = 0, S = 2
+	mov dh, 00h       ; H = 0
+	;mov dl, BIOS_HDD0 ; drive
+	clc
+	int 13h	; sets carry flag on failure
+	jnc load_sectors_succeeded_16
+		; write error message on failure
+		push word ATTR_BOLD	; attrib
+		push word str_load_error_16	; string
+		call write_str_16
+		pop ax	; remove args from stack
+		pop ax	; remove args from stack
+		call exit_16
+	load_sectors_succeeded_16:
+
 
 	; disable interrupts
 	cli
 
-	; disable all hardware interrupts except keyboard (irq 1)
-	mov al, 1111_1101b
-	out PIC0_DATA_PORT, al
-	mov al, 1111_1111b
-	out PIC1_DATA_PORT, al
+	; configure pics
+	call config_pics_16
 
 	; load gdt register
 	lgdt [gdtr]
@@ -97,6 +118,62 @@
 
 	; go to 32 bit code
 	jmp code_descr-gdt_base_addr : start_32	; automatically sets cs
+
+
+
+;
+; configure pics
+; see https://wiki.osdev.org/8259_PIC
+; see https://www.eeeguide.com/8259-programmable-interrupt-controller
+;
+config_pics_16:
+	; primary pic
+	mov al, 000_1_0_0_0_1b   ; command 1
+	out PIC0_INSTR_PORT, al
+	mov al, PIC0_INT_OFFS    ; command 2, offset for interrupts
+	out PIC0_DATA_PORT, al
+	mov al, 0000_0100b       ; command 3, secondary pic at irq 2
+	out PIC0_DATA_PORT, al
+	mov al, 000_0_00_1_1b    ; command 4
+	out PIC0_DATA_PORT, al
+	mov al, 1111_1000b       ; enable timer (irq 0), keyboard (irq 1) and secondary pic (irq 2)
+	out PIC0_DATA_PORT, al
+
+	; secondary pic
+	mov al, 000_1_0_0_0_1b   ; command 1
+	out PIC1_INSTR_PORT, al
+	mov al, PIC1_INT_OFFS    ; command 2, offset for interrupts
+	out PIC1_DATA_PORT, al
+	mov al, 00000_000b       ; command 3, secondary pic with id=0
+	out PIC1_DATA_PORT, al
+	mov al, 000_0_00_1_1b    ; command 4
+	out PIC1_DATA_PORT, al
+	mov al, 1111_1111b       ; disable all hardware interrupts
+	;mov al, 1111_1110b      ; disable all hardware interrupts except rtc (irq 8)
+	out PIC1_DATA_PORT, al
+
+	; start timer, see https://wiki.osdev.org/Programmable_Interval_Timer
+	; set frequency divider lower and upper byte
+	mov al, 0xff
+	out TIMER_DATA_PORT, al
+	mov al, 0x00
+	out TIMER_DATA_PORT, al
+	; start timer
+	mov al, 00_00_000_0b
+	out TIMER_INSTR_PORT, al
+
+	ret
+
+
+
+;
+; halt
+;
+exit_16:
+	;cli
+	hlt_loop_16: hlt	; loop, because hlt can be interrupted
+	jmp hlt_loop_16
+
 
 
 ;
@@ -223,29 +300,30 @@ gdt_base_addr:
 data_descr: istruc gdt_struc
 	at gdt_limit0_15, db 0xff, 0xff
 	at gdt_base0_23, db 00h, 00h, 00h
-	at gdt_access, db 1_00_1_0_0_1_0b		; present=1, ring=0, code/data=1, exec=0, expand-down=0, writable=1, accessed=0
-	at gdt_sizes_limit16_19, db 1_1_00_1111b	; granularity=1, 32bit=1
+	at gdt_access, db 1_00_1_0_0_1_0b        ; present=1, ring=0, code/data=1, exec=0, expand-down=0, writable=1, accessed=0
+	at gdt_sizes_limit16_19, db 1_1_00_1111b ; granularity=1, 32bit=1
 	at gdt_base24_31, db 00h
 iend
 
 stack_descr: istruc gdt_struc
 	at gdt_limit0_15, db 0x00, 0x00
 	at gdt_base0_23, db 00h, 00h, 00h
-	at gdt_access, db 1_00_1_0_1_1_0b		; present=1, ring=0, code/data=1, exec=0, expand-down=1, writable=1, accessed=0
-	at gdt_sizes_limit16_19, db 1_1_00_0000b	; granularity=1, 32bit=1
+	at gdt_access, db 1_00_1_0_1_1_0b        ; present=1, ring=0, code/data=1, exec=0, expand-down=1, writable=1, accessed=0
+	at gdt_sizes_limit16_19, db 1_1_00_0000b ; granularity=1, 32bit=1
 	at gdt_base24_31, db 00h
 iend
 
 code_descr: istruc gdt_struc
 	at gdt_limit0_15, db 0xff, 0xff
 	at gdt_base0_23, db 00h, 00h, 00h
-	at gdt_access, db 1_00_1_1_0_1_0b		; present=1, ring=0, code/data=1, exec=1, conform=0, readable=1, accessed=0
-	at gdt_sizes_limit16_19, db 1_1_00_1111b	; granularity=1, 32bit=1
+	at gdt_access, db 1_00_1_1_0_1_0b        ; present=1, ring=0, code/data=1, exec=1, conform=0, readable=1, accessed=0
+	at gdt_sizes_limit16_19, db 1_1_00_1111b ; granularity=1, 32bit=1
 	at gdt_base24_31, db 00h
 iend
 
 
 str_start_16: db "Starting 16bit...", 00h
+str_load_error_16: db "Error loading sectors.", 00h
 ; -----------------------------------------------------------------------------
 
 
@@ -288,15 +366,16 @@ start_32:
 	;add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
+	push dword ATTR_BOLD	; attrib
 	push str_start_32	; string
 	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
+	;stop_32: jmp stop_32
 
 	[extern entrypoint]
 	call entrypoint
 
-	call exit
+	call exit_32
 
 
 ;
@@ -369,7 +448,7 @@ strlen_32:
 ;
 ; halt
 ;
-exit:
+exit_32:
 	;cli
 	hlt_loop: hlt	; loop, because hlt can be interrupted
 	jmp hlt_loop
@@ -393,26 +472,32 @@ isr_null:
 isr_keyb:
 	pushad
 
-	;push dword CHAROUT	; address to write to
-	;push dword SCREEN_SIZE	; number of characters to write
-	;call clear_32
-	;add esp, WORD_SIZE*2	; remove args from stack
-
-	;push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	;push dword 0000_1111b	; attrib
-	;push str_keyb_32	; string
-	;call write_str_32
-	;add esp, WORD_SIZE*3	; remove args from stack
-
-	[extern keyb_event]
 	xor eax, eax
 	in al, KEYB_DATA_PORT
 	push eax
+	[extern keyb_event]
 	call keyb_event
 	add esp, WORD_SIZE
 
-	mov al, 0010_0000b
-	out PIC0_INSTR_PORT, al
+	popad
+	iret
+
+
+isr_timer:
+	pushad
+
+	[extern timer_event]
+	call timer_event
+
+	popad
+	iret
+
+
+isr_rtc:
+	pushad
+
+	[extern rtc_event]
+	call rtc_event
 
 	popad
 	iret
@@ -425,12 +510,42 @@ isr_div0:
 	add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
+	push dword ATTR_BOLD	; attrib
 	push str_div0_32	; string
 	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit
+	jmp exit_32
+
+
+isr_overflow:
+	push dword CHAROUT	; address to write to
+	push dword SCREEN_SIZE	; number of characters to write
+	call clear_32
+	add esp, WORD_SIZE*2	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push dword ATTR_BOLD	; attrib
+	push str_overflow_32	; string
+	call write_str_32
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	jmp exit_32
+
+
+isr_bounds:
+	push dword CHAROUT	; address to write to
+	push dword SCREEN_SIZE	; number of characters to write
+	call clear_32
+	add esp, WORD_SIZE*2	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push dword ATTR_BOLD	; attrib
+	push str_bounds_32	; string
+	call write_str_32
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	jmp exit_32
 
 
 isr_instr:
@@ -440,12 +555,27 @@ isr_instr:
 	add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
+	push dword ATTR_BOLD	; attrib
 	push str_instr_32	; string
 	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit
+	jmp exit_32
+
+
+isr_dev:
+	push dword CHAROUT	; address to write to
+	push dword SCREEN_SIZE	; number of characters to write
+	call clear_32
+	add esp, WORD_SIZE*2	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push dword ATTR_BOLD	; attrib
+	push str_dev_32	; string
+	call write_str_32
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	jmp exit_32
 
 
 isr_tssfault:
@@ -455,12 +585,12 @@ isr_tssfault:
 	add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
+	push dword ATTR_BOLD	; attrib
 	push str_tssfault_32	; string
 	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit
+	jmp exit_32
 
 
 isr_segfault_notavail:
@@ -470,12 +600,12 @@ isr_segfault_notavail:
 	add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
+	push dword ATTR_BOLD	; attrib
 	push str_segfault_notavail_32	; string
 	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit
+	jmp exit_32
 
 
 isr_segfault_stack:
@@ -485,12 +615,12 @@ isr_segfault_stack:
 	add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
+	push dword ATTR_BOLD	; attrib
 	push str_segfault_stack_32	; string
 	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit
+	jmp exit_32
 
 
 isr_pagefault:
@@ -500,12 +630,12 @@ isr_pagefault:
 	add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
+	push dword ATTR_BOLD	; attrib
 	push str_pagefault_32	; string
 	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit
+	jmp exit_32
 
 
 isr_df:
@@ -515,12 +645,27 @@ isr_df:
 	add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
+	push dword ATTR_BOLD	; attrib
 	push str_df_32	; string
 	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit
+	jmp exit_32
+
+
+isr_overrun:
+	push dword CHAROUT	; address to write to
+	push dword SCREEN_SIZE	; number of characters to write
+	call clear_32
+	add esp, WORD_SIZE*2	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push dword ATTR_BOLD	; attrib
+	push str_overrun_32	; string
+	call write_str_32
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	jmp exit_32
 
 
 isr_gpf:
@@ -530,12 +675,69 @@ isr_gpf:
 	add esp, WORD_SIZE*2	; remove args from stack
 
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword 0000_1111b	; attrib
+	push dword ATTR_BOLD	; attrib
 	push str_gpf_32	; string
 	call write_str_32
 	add esp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit
+	jmp exit_32
+
+
+isr_fpu:
+	push dword CHAROUT	; address to write to
+	push dword SCREEN_SIZE	; number of characters to write
+	call clear_32
+	add esp, WORD_SIZE*2	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push dword ATTR_BOLD	; attrib
+	push str_fpu_32	; string
+	call write_str_32
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	jmp exit_32
+
+isr_align:
+	push dword CHAROUT	; address to write to
+	push dword SCREEN_SIZE	; number of characters to write
+	call clear_32
+	add esp, WORD_SIZE*2	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push dword ATTR_BOLD	; attrib
+	push str_align_32	; string
+	call write_str_32
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	jmp exit_32
+
+isr_mce:
+	push dword CHAROUT	; address to write to
+	push dword SCREEN_SIZE	; number of characters to write
+	call clear_32
+	add esp, WORD_SIZE*2	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push dword ATTR_BOLD	; attrib
+	push str_mce_32	; string
+	call write_str_32
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	jmp exit_32
+
+isr_simd:
+	push dword CHAROUT	; address to write to
+	push dword SCREEN_SIZE	; number of characters to write
+	call clear_32
+	add esp, WORD_SIZE*2	; remove args from stack
+
+	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push dword ATTR_BOLD	; attrib
+	push str_simd_32	; string
+	call write_str_32
+	add esp, WORD_SIZE*3	; remove args from stack
+
+	jmp exit_32
 ; -----------------------------------------------------------------------------
 
 
@@ -602,19 +804,19 @@ idt_descr_3: istruc idt_struc
 iend
 
 idt_descr_4: istruc idt_struc
-	at idt_offs0_15, dw isr_null
+	at idt_offs0_15, dw isr_overflow
 	at idt_codeseg, dw code_descr-gdt_base_addr
 	at idt_reserved, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_overflow) >> 10h
 iend
 
 idt_descr_5: istruc idt_struc
-	at idt_offs0_15, dw isr_null
+	at idt_offs0_15, dw isr_bounds
 	at idt_codeseg, dw code_descr-gdt_base_addr
 	at idt_reserved, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_bounds) >> 10h
 iend
 
 idt_descr_6: istruc idt_struc
@@ -626,11 +828,11 @@ idt_descr_6: istruc idt_struc
 iend
 
 idt_descr_7: istruc idt_struc
-	at idt_offs0_15, dw isr_null
+	at idt_offs0_15, dw isr_dev
 	at idt_codeseg, dw code_descr-gdt_base_addr
 	at idt_reserved, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_dev) >> 10h
 iend
 
 idt_descr_8: istruc idt_struc
@@ -642,11 +844,11 @@ idt_descr_8: istruc idt_struc
 iend
 
 idt_descr_9: istruc idt_struc
-	at idt_offs0_15, dw isr_keyb
+	at idt_offs0_15, dw isr_overrun
 	at idt_codeseg, dw code_descr-gdt_base_addr
 	at idt_reserved, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_keyb) >> 10h
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_overrun) >> 10h
 iend
 
 idt_descr_10: istruc idt_struc
@@ -689,21 +891,98 @@ idt_descr_14: istruc idt_struc
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_pagefault) >> 10h
 iend
 
-times (NUM_IDT_ENTRIES-(14+1))*idt_struc_size db 0	; null descriptors
+idt_descr_15: istruc idt_struc
+	at idt_offs0_15, dw isr_null
+	at idt_codeseg, dw code_descr-gdt_base_addr
+	at idt_reserved, db 00h
+	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
+iend
+
+idt_descr_16: istruc idt_struc
+	at idt_offs0_15, dw isr_fpu
+	at idt_codeseg, dw code_descr-gdt_base_addr
+	at idt_reserved, db 00h
+	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_fpu) >> 10h
+iend
+
+idt_descr_17: istruc idt_struc
+	at idt_offs0_15, dw isr_align
+	at idt_codeseg, dw code_descr-gdt_base_addr
+	at idt_reserved, db 00h
+	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_align) >> 10h
+iend
+
+idt_descr_18: istruc idt_struc
+	at idt_offs0_15, dw isr_mce
+	at idt_codeseg, dw code_descr-gdt_base_addr
+	at idt_reserved, db 00h
+	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_mce) >> 10h
+iend
+
+idt_descr_19: istruc idt_struc
+	at idt_offs0_15, dw isr_simd
+	at idt_codeseg, dw code_descr-gdt_base_addr
+	at idt_reserved, db 00h
+	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_simd) >> 10h
+iend
+
+; null descriptors till the beginning of the primary pic interrupts
+times (PIC0_INT_OFFS-(19+1))*idt_struc_size db 0
+
+idt_descr_32: istruc idt_struc
+	at idt_offs0_15, dw isr_timer
+	at idt_codeseg, dw code_descr-gdt_base_addr
+	at idt_reserved, db 00h
+	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_timer) >> 10h
+iend
+
+idt_descr_33: istruc idt_struc
+	at idt_offs0_15, dw isr_keyb
+	at idt_codeseg, dw code_descr-gdt_base_addr
+	at idt_reserved, db 00h
+	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_keyb) >> 10h
+iend
+
+; null descriptors till the beginning of the secondary pic interrupts
+times (PIC1_INT_OFFS-(33+1))*idt_struc_size db 0
+
+idt_descr_40: istruc idt_struc
+	at idt_offs0_15, dw isr_rtc
+	at idt_codeseg, dw code_descr-gdt_base_addr
+	at idt_reserved, db 00h
+	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
+	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_rtc) >> 10h
+iend
+
+; null descriptors for the rest of the interrupts
+times (NUM_IDT_ENTRIES-(40+1))*idt_struc_size db 0
 
 
 str_start_32: db "Starting 32bit...", 00h
 
-str_keyb_32: db "*** Keyboard Interrupt ***", 00h
-
 str_div0_32: db "*** Exception: Division by Zero ***", 00h
+str_overflow_32: db "*** Exception: Overflow ***", 00h
+str_bounds_32: db "*** Exception: Out of Bounds ***", 00h
 str_instr_32: db "*** Fault: Unknown Instruction ***", 00h
+str_overrun_32: db "*** Fault: Overrun ***", 00h
+str_dev_32: db "*** Fault: No Device ***", 00h
 str_tssfault_32: db "*** Fault: TSS ***", 00h
 str_segfault_notavail_32: db "*** Segmentation Fault: Not Available ***", 00h
 str_segfault_stack_32: db "*** Segmentation Fault: Stack ***", 00h
 str_pagefault_32: db "*** Paging Fault ***", 00h
 str_df_32: db "*** Double Fault ***", 00h
 str_gpf_32: db "*** General Protection Fault ***", 00h
+str_fpu_32: db "*** Fault: FPU ***", 00h
+str_align_32: db "*** Exception: Alignment ***", 00h
+str_mce_32: db "*** Exception: MCE ***", 00h
+str_simd_32: db "*** Exception: SIMD ***", 00h
 
 
 sector_fill: times END_ADDR - sector_fill db FILL_BYTE
