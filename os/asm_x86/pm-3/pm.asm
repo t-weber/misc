@@ -24,7 +24,7 @@
 ; see https://wiki.osdev.org/Memory_Map_(x86) and https://en.wikipedia.org/wiki/Master_boot_record
 %define BOOTSECT_START    7c00h
 %define STACK_START_16    7fffh      ; some (arbitrary) stack base address
-%define STACK_START       00ff_ffffh ; some (arbitrary) stack base address
+%define STACK_START       003_ffffh ; some (arbitrary) stack base address
 
 %define NUM_GDT_ENTRIES   4
 %define NUM_IDT_ENTRIES   256
@@ -51,6 +51,7 @@
 ; see https://wiki.osdev.org/Programmable_Interval_Timer
 %define TIMER_INSTR_PORT  0x43
 %define TIMER_DATA_PORT   0x40
+%define TIMER_VAL         0x00ff
 
 ; https://wiki.osdev.org/%228042%22_PS/2_Controller
 %define KEYB_DATA_PORT    0x60
@@ -83,7 +84,7 @@
 	;xor ax, ax
 	mov ax, cs
 	mov es, ax
-	mov ah, 02h		; func
+	mov ah, 02h       ; func
 	mov al, byte (NUM_ASM_SECTORS + NUM_C_SECTORS - 1) ; sector count (boot sector already loaded)
 	mov bx, word start_32 ; destination address es:bx
 	mov cx, 00_02h    ; C = 0, S = 2
@@ -100,7 +101,6 @@
 		pop ax	; remove args from stack
 		call exit_16
 	load_sectors_succeeded_16:
-
 
 	; disable interrupts
 	cli
@@ -154,9 +154,9 @@ config_pics_16:
 
 	; start timer, see https://wiki.osdev.org/Programmable_Interval_Timer
 	; set frequency divider lower and upper byte
-	mov al, 0xff
+	mov al, byte TIMER_VAL
 	out TIMER_DATA_PORT, al
-	mov al, 0x00
+	mov al, byte TIMER_VAL >> 8
 	out TIMER_DATA_PORT, al
 	; start timer
 	mov al, 00_00_000_0b

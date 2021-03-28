@@ -91,12 +91,26 @@ void keyb_event(u32 ch)
 void timer_event()
 {
 	static u32 rtc = 0;
-	static const u32 div_sec = 4679;
+	static const u32 div_sec = 468;
 
-	char buf_rtc[32];
-	uint_to_str(rtc/div_sec, 10, buf_rtc);
-	write_str("Uptime:", attr_bold, CHAROUT + (SCREEN_COL_SIZE*(SCREEN_ROW_SIZE-1) + 9) * 2);
-	write_str(buf_rtc, attr_norm, CHAROUT + (SCREEN_COL_SIZE*(SCREEN_ROW_SIZE-1) + 9 + 8) * 2);
+	static u32 last_val = 0xffffffff;
+	u32 val = rtc / div_sec;
+
+	if(val != last_val)
+	{
+		char buf_val[32];
+		uint_to_str(val, 10, buf_val);
+		u32 buflen = strlen(buf_val);
+
+		// add decimal point
+		buf_val[buflen] = buf_val[buflen-1];
+		buf_val[buflen-1] = '.';
+
+		write_str("Uptime:", attr_bold, CHAROUT + (SCREEN_COL_SIZE*(SCREEN_ROW_SIZE-1) + 9) * 2);
+		write_str(buf_val, attr_norm, CHAROUT + (SCREEN_COL_SIZE*(SCREEN_ROW_SIZE-1) + 9 + 8) * 2);
+
+		last_val = val;
+	}
 
 	++rtc;
 }
