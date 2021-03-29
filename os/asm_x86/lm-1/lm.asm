@@ -377,7 +377,6 @@ start_32:
 	; page directory start at 4MB
 	mov eax, 40_0000h
 	mov edi, eax
-
 	; number of page directory entries
 	mov ecx, 1024
 	ptd_loop:
@@ -402,8 +401,6 @@ start_32:
 		jz ptd_loop_end
 		jmp ptd_loop
 	ptd_loop_end:
-
-	;shl eax, 12	; not shifted, instead page directories are aligned on a 2^12 bits boundary!
 	mov cr3, eax
 
 	; set page size extension

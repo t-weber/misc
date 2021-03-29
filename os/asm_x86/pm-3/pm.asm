@@ -14,6 +14,12 @@
 %define WORD_SIZE         4
 %define WORD_SIZE_16      2
 
+%define CR0_PROTECT_BIT   0
+%define CR0_PAGING_BIT    31
+%define CR4_PAGESIZE_BIT  4
+%define CR4_ADDREXT_BIT   5
+%define USE_PAGING        1
+
 ; see https://jbwyatt.com/253/emu/memory.html
 %define CHAROUT           000b_8000h ; base address for character output
 %define SCREEN_ROW_SIZE   25
@@ -24,7 +30,7 @@
 ; see https://wiki.osdev.org/Memory_Map_(x86) and https://en.wikipedia.org/wiki/Master_boot_record
 %define BOOTSECT_START    7c00h
 %define STACK_START_16    7fffh      ; some (arbitrary) stack base address
-%define STACK_START       03f_ffffh  ; some (arbitrary) stack base address
+%define STACK_START       07f_ffffh  ; some (arbitrary) stack base address below 8MB
 
 %define NUM_GDT_ENTRIES   4
 %define NUM_IDT_ENTRIES   256
@@ -113,7 +119,7 @@
 
 	; set protection enable bit
 	mov eax, cr0
-	or eax, 1b
+	or eax, 1b << CR0_PROTECT_BIT
 	mov cr0, eax
 
 	; go to 32 bit code
@@ -355,6 +361,42 @@ start_32:
 	mov ss, ax
 	mov esp, dword STACK_START
 	mov ebp, dword STACK_START
+
+%ifdef USE_PAGING
+	mov eax, (1b << 12) ; page directory start address at 4MB
+	mov edi, eax
+	;mov ecx, 1024      ; number of page directory entries
+	mov ecx, 2          ; number of page directory entries
+	mov ebx, 0          ; current page frame address
+	ptd_loop:
+		; size=1, dirty=0, accessed=0, cache=0, write through=0, supervisor=1, write=1, present=1
+		mov [edi + ptd4_flags], byte 1000_0111b
+		mov [edi + ptd4_offs32_34_flags8_12], byte 000_0_000_0b  ; addr table=0, global=0
+		mov edx, ebx
+		;and edx, 11b
+		shl edx, 6  ; lower two bits of base address
+		mov [edi + ptd4_offs22_23_offs35_40], byte dl
+		mov edx, ebx
+		shr edx, 2  ; next bits of base address
+		mov [edi + ptd4_offs24_31], byte dl
+
+		add ebx, 1   ; page frame size: 2^12
+		add edi, ptd4_struc_size
+		dec ecx
+		cmp ecx, 0
+		jz ptd_loop_end
+		jmp ptd_loop
+	ptd_loop_end:
+	mov cr3, eax        ; page table address
+
+	mov eax, cr4
+	or eax, 1b << CR4_PAGESIZE_BIT
+	mov cr4, eax        ; set page size extension
+
+	mov eax, cr0
+	or eax, 1b << CR0_PAGING_BIT
+	mov cr0, eax        ; enable paging
+%endif
 
 	; load idt register and enable interrupts
 	lidt [idtr]
@@ -745,6 +787,18 @@ isr_simd:
 ; -----------------------------------------------------------------------------
 ; data
 ; -----------------------------------------------------------------------------
+
+; page table dir entry for 4MB pages
+; see https://wiki.osdev.org/Paging and http://www.lowlevel.eu/wiki/Paging
+struc ptd4_struc
+	ptd4_flags resb 1
+	ptd4_offs32_34_flags8_12 resb 1
+	ptd4_offs22_23_offs35_40 resb 1
+	ptd4_offs24_31 resb 1
+endstruc
+
+
+
 ; see https://wiki.osdev.org/Interrupt_Descriptor_Table
 ; idt table description
 struc idtr_struc
