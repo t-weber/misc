@@ -25,6 +25,14 @@
 %define CR4_PAGESIZE      4
 %define CR4_ADDREXT       5
 
+%define PAGING_PML4_START     (1b << 23)                       ; PML4 paging table starts at 8 MB
+%define PAGING_PDPT_START     (PAGING_PML4_START + (1b << 12)) ; page dir. pointer table starts at +4kB
+%define PAGING_PTD_START      (PAGING_PDPT_START + (1b << 12)) ; page table dir. starts at +4kB
+%define PAGING_FRAME_START    0b                               ; start address of page frames
+%define PAGING_PTD_ENTRY_SIZE 8
+%define PAGING_PTD_ENTRIES    4                                ; number of page table directory entries, max. 512
+%define PAGING_FRAME_SIZE     (1b << 21)                       ; 2 MB page frames
+
 ; see https://jbwyatt.com/253/emu/memory.html
 %define CHAROUT           000b_8000h ; base address for character output
 %define SCREEN_ROW_SIZE   25
@@ -42,8 +50,8 @@
 
 %define SECTOR_SIZE       200h
 %define MBR_BOOTSIG_ADDR  ($$ + SECTOR_SIZE - 2) ; 510 bytes after section start
-%define NUM_ASM_SECTORS   9          ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
-%define NUM_C_SECTORS     19         ; number of sectors for c code
+%define NUM_ASM_SECTORS   13         ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
+%define NUM_C_SECTORS     14         ; number of sectors for c code
 %define END_ADDR          ($$ + SECTOR_SIZE * NUM_ASM_SECTORS)
 %define FILL_BYTE         0xf4       ; fill with hlt
 
@@ -374,39 +382,40 @@ start_32:
 	add esp, WORD_SIZE_32*3	; remove args from stack
 	;call exit_32
 
-	; page directory start at 4MB
-	mov eax, 40_0000h
-	mov edi, eax
-	; number of page directory entries
-	mov ecx, 1024
+	; paging
+	; see https://wiki.osdev.org/Paging and http://www.lowlevel.eu/wiki/Paging
+	mov eax, PAGING_FRAME_START ; start address of page frames
+	mov ebx, PAGING_PTD_START   ; page table dir. start address
+	mov ecx, PAGING_PTD_ENTRIES ; number of page table directory entries
 	ptd_loop:
-		; size=1, dirty=0, accessed=0, cache=0, write through=0, supervisor=1, write=1, present=1
-		;mov [edi + ptd2_flags], byte 1000_0111b
-		; addr table=0, global=0
-		;mov [edi + ptd2_reserved0_2_flags8_12], byte 000_0_000_0b
-		;mov [edi + ptd2_reserved3_7_offs0_2], byte 000000_00b
-		;mov [edi + ptd2_offs3_10], byte 00h
-		;mov [edi + ptd2_offs4_reserved], dword 00_00_00_00h ; all pages pointing to the same page frame for the moment...
+		; lower dword
+		mov dword [ebx + 0], dword eax
+		; size=1, avail=1, accessed=0, cache flags=00, supervisor=1, write=1, present=1
+		or byte [ebx + 0], byte 110_00_111b
+		; upper dword
+		mov dword [ebx + 4], dword 00_00_00_00h
 
-		; size=1, dirty=0, accessed=0, cache=0, write through=0, supervisor=1, write=1, present=1
-		mov [edi + ptd4_flags], byte 1000_0111b
-		; addr table=0, global=0
-		mov [edi + ptd4_offs32_34_flags8_12], byte 000_0_000_0b
-		mov [edi + ptd4_offs35_40_offs22_23], byte 000000_00b
-		mov [edi + ptd4_offs24_31], byte 0000_0000b ; all pages pointing to the same page frame for the moment...
+		add ebx, PAGING_PTD_ENTRY_SIZE ; next page entry
+		add eax, PAGING_FRAME_SIZE     ; next page frame (2 MB)
 
-		add edi, ptd4_struc_size
-		dec ecx
+		dec ecx                        ; next counter
 		cmp ecx, 0
-		jz ptd_loop_end
-		jmp ptd_loop
-	ptd_loop_end:
-	mov cr3, eax
+		jnz ptd_loop                   ; loop if counter > 0
 
-	; set page size extension
-	mov eax, cr4
-	or eax, 1b << CR4_PAGESIZE ;| 1b << CR4_ADDREXT
-	mov cr4, eax
+	; page dir. pointer table
+	mov dword [PAGING_PDPT_START + 0], dword PAGING_PTD_START  ; page table dir. start address
+	; avail=1, accessed=0, cache flags=00, supervisor=1, write=1, present=1
+	or byte [PAGING_PDPT_START + 0], byte 010_00_111b
+	mov dword [PAGING_PDPT_START + 4], dword 00_00_00_00h
+
+	; pml4 table
+	mov dword [PAGING_PML4_START + 0], dword PAGING_PDPT_START ; page dir. pointer table start address
+	; avail=1, accessed=0, cache flags=00, supervisor=1, write=1, present=1
+	or byte [PAGING_PML4_START + 0], byte 010_00_111b
+	mov dword [PAGING_PML4_START + 4], dword 00_00_00_00h
+
+	mov eax, PAGING_PML4_START
+	mov cr3, eax
 
 	; enable long mode
 	; see https://wiki.osdev.org/CPU_Registers_x86-64#IA32_EFER
@@ -415,19 +424,21 @@ start_32:
 	or eax, 1b << EFER_LM_BIT
 	wrmsr
 
+	; reset segmentation: modify gdt entries and reload gdt register
+	mov byte [data_descr + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
+	mov byte [stack_descr + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
+	mov byte [code_descr + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
+	lgdt [gdtr]
+
+	; set address extension
+	mov eax, cr4
+	or eax, 1b << CR4_ADDREXT ;| 1b << CR4_PAGESIZE
+	mov cr4, eax
+
 	; enable paging
 	mov eax, cr0
 	or eax, 1b << CR0_PAGING_BIT
 	mov cr0, eax
-
-	; reload gdt register
-	;mov edi, data_descr
-	;mov [edi + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
-	;mov edi, stack_descr
-	;mov [edi + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
-	;mov edi, code_descr
-	;mov [edi + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
-	;lgdt [gdtr]
 
 	; go to 64 bit code
 	jmp code_descr-gdt_base_addr : start_64	; automatically sets cs
@@ -519,22 +530,33 @@ exit_32:
 ; code in 64-bit long mode
 ; -----------------------------------------------------------------------------
 [bits 64]
+align 8
 start_64:
+	; data segment
+	mov ax, data_descr-gdt_base_addr
+	mov ds, ax
+	mov es, ax
+
+	; stack segment
+	mov ax, stack_descr-gdt_base_addr
+	mov ss, ax
+	mov rsp, qword STACK_START
+	mov rbp, qword STACK_START
+
 	; clear screen
-	push qword CHAROUT      ; address to write to
-	push qword SCREEN_SIZE  ; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2    ; remove args from stack
+	;push qword CHAROUT      ; address to write to
+	;push qword SCREEN_SIZE  ; number of characters to write
+	;call clear_64
+	;add rsp, WORD_SIZE*2    ; remove args from stack
 
 	push qword CHAROUT + SCREEN_COL_SIZE*4	; address to write to
 	push qword ATTR_BOLD	; attrib
 	push qword str_start_64	; string
 	call write_str_64
 	add rsp, WORD_SIZE*3	; remove args from stack
-	call exit_64
 
 	; load idt register and enable interrupts
-	;lidt [idtr]
+	lidt [idtr]
 	;sti
 
 	[extern entrypoint]
@@ -637,7 +659,8 @@ isr_null:
 
 ; see https://wiki.osdev.org/%228042%22_PS/2_Controller
 isr_keyb:
-	;pushad
+	;push rax
+	;push rbp
 
 	xor rax, rax
 	in al, KEYB_DATA_PORT
@@ -646,17 +669,15 @@ isr_keyb:
 	call keyb_event
 	add rsp, WORD_SIZE
 
-	;popad
+	;pop rbp
+	;pop rax
 	iret
 
 
 isr_timer:
-	;pushad
-
 	[extern timer_event]
 	call timer_event
 
-	;popad
 	iret
 
 
@@ -913,58 +934,29 @@ isr_simd:
 ; data
 ; -----------------------------------------------------------------------------
 
-; page table dir entry
-; see https://wiki.osdev.org/Paging and http://www.lowlevel.eu/wiki/Paging
-
-; for 4MB pages
-struc ptd4_struc
-	ptd4_flags resb 1
-	ptd4_offs32_34_flags8_12 resb 1
-	ptd4_offs35_40_offs22_23 resb 1
-	ptd4_offs24_31 resb 1
-endstruc
-
-; for 2MB pages
-struc ptd2_struc
-	ptd2_flags resb 1
-	ptd2_reserved0_2_flags8_12 resb 1
-	ptd2_reserved3_7_offs0_2 resb 1
-	ptd2_offs3_10 resb 1
-	ptd2_offs4_reserved resd 1
-endstruc
-
-; needs to be aligned!
-;pdt_0: istruc ptd4_struc
-;	at ptd4_flags, db 1000_0111b	;size=1, dirty=0, accessed=0, cache=0, write through=0, supervisor=1, write=1, present=1
-;	at ptd4_offs32_34_flags8_12, db 000_0_000_0b ; addr table=0, global=0
-;	at ptd4_offs35_40_offs22_23, db 000000_00b
-;	at ptd4_offs24_31, db 0000_0000b
-;iend
-
-;pdt_1: times 1023*ptd4_struc_size db 0	; null tables
-
-
-
 ; idt table description
 ; see https://wiki.osdev.org/Interrupt_Descriptor_Table
 struc idtr_struc
 	idt_size resw 1
-	idt_offs resd 1
+	idt_offs resq 1
 endstruc
 
 ; idt table entries
 struc idt_struc
 	idt_offs0_15 resw 1
 	idt_codeseg resw 1
-	idt_reserved resb 1
+	idt_stackoffs resb 1
 	idt_flags resb 1
 	idt_offs16_31 resw 1
+	idt_offs32_63 resd 1
+	idt_reserved resd 1
 endstruc
+
 
 
 idtr: istruc idtr_struc
 	at idt_size, dw idt_struc_size*NUM_IDT_ENTRIES - 1	; size - 1
-	at idt_offs, dd idt_base_addr
+	at idt_offs, dq idt_base_addr
 iend
 
 
@@ -974,161 +966,201 @@ idt_base_addr:
 idt_descr_0: istruc idt_struc
 	at idt_offs0_15, dw isr_div0
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_div0) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_div0) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_1: istruc idt_struc
 	at idt_offs0_15, dw isr_null
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_null) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_2: istruc idt_struc
 	at idt_offs0_15, dw isr_null
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_null) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_3: istruc idt_struc
 	at idt_offs0_15, dw isr_null
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_null) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_4: istruc idt_struc
 	at idt_offs0_15, dw isr_overflow
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_overflow) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_overflow) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_5: istruc idt_struc
 	at idt_offs0_15, dw isr_bounds
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_bounds) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_bounds) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_6: istruc idt_struc
 	at idt_offs0_15, dw isr_instr
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_instr) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_instr) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_7: istruc idt_struc
 	at idt_offs0_15, dw isr_dev
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_dev) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_dev) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_8: istruc idt_struc
 	at idt_offs0_15, dw isr_df
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_df) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_df) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_9: istruc idt_struc
 	at idt_offs0_15, dw isr_overrun
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_overrun) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_overrun) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_10: istruc idt_struc
 	at idt_offs0_15, dw isr_tssfault
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_tssfault) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_tssfault) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_11: istruc idt_struc
 	at idt_offs0_15, dw isr_segfault_notavail
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_segfault_notavail) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_segfault_notavail) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_12: istruc idt_struc
 	at idt_offs0_15, dw isr_segfault_stack
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_segfault_stack) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_segfault_stack) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_13: istruc idt_struc
 	at idt_offs0_15, dw isr_gpf
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_gpf) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_gpf) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_14: istruc idt_struc
 	at idt_offs0_15, dw isr_pagefault
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_pagefault) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_pagefault) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_15: istruc idt_struc
 	at idt_offs0_15, dw isr_null
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_null) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_16: istruc idt_struc
 	at idt_offs0_15, dw isr_fpu
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_fpu) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_fpu) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_17: istruc idt_struc
 	at idt_offs0_15, dw isr_align
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_align) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_align) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_18: istruc idt_struc
 	at idt_offs0_15, dw isr_mce
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_mce) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_mce) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_19: istruc idt_struc
 	at idt_offs0_15, dw isr_simd
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_simd) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_simd) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 ; null descriptors till the beginning of the primary pic interrupts
@@ -1137,17 +1169,21 @@ times (PIC0_INT_OFFS-(19+1))*idt_struc_size db 0
 idt_descr_32: istruc idt_struc
 	at idt_offs0_15, dw isr_timer
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_timer) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_timer) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 idt_descr_33: istruc idt_struc
 	at idt_offs0_15, dw isr_keyb
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_keyb) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_keyb) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 ; null descriptors till the beginning of the secondary pic interrupts
@@ -1156,9 +1192,11 @@ times (PIC1_INT_OFFS-(33+1))*idt_struc_size db 0
 idt_descr_40: istruc idt_struc
 	at idt_offs0_15, dw isr_rtc
 	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
+	at idt_stackoffs, db 00h
 	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
 	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_rtc) >> 10h
+	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_rtc) >> 20h
+	at idt_reserved, dd 00h
 iend
 
 ; null descriptors for the rest of the interrupts
