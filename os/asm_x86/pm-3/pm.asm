@@ -363,9 +363,9 @@ start_32:
 	mov ebp, dword STACK_START
 
 %ifdef USE_PAGING
-	mov eax, (1b << 12) ; page directory start address at 4MB
+	mov eax, (1b << 22) ; page directory start address at 4MB
 	mov edi, eax
-	;mov ecx, 1024      ; number of page directory entries
+	;mov ecx, 1024      ; max. number of page directory entries
 	mov ecx, 2          ; number of page directory entries
 	mov ebx, 0          ; current page frame address
 	ptd_loop:
