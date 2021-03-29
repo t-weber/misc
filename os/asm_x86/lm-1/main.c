@@ -1,5 +1,5 @@
 /**
- * protected mode test
+ * long mode test
  * @author Tobias Weber
  * @date mar-21
  * @license: see 'LICENSE.GPL' file
@@ -14,7 +14,7 @@ static const u8 attr_inv = 0b01110000;
 static const u8 attr_norm = 0b00000111;
 
 
-u32 fact(u32 num)
+u64 fact(u64 num)
 {
 	if(num < 1)
 		return 1;
@@ -25,7 +25,7 @@ u32 fact(u32 num)
 }
 
 
-u32 fibo(u32 num)
+u64 fibo(u64 num)
 {
 	if(num < 2)
 		return 1;
@@ -34,21 +34,21 @@ u32 fibo(u32 num)
 }
 
 
-void calc(u32 num_start, u32 num_end)
+void calc(u64 num_start, u64 num_end)
 {
-	const u32 spacing = 16;
+	const u64 spacing = 16;
 
 	memset(CHAROUT, 0, SCREEN_SIZE*2);
-	write_str("                              Protected Mode Test                               ", attr_inv, CHAROUT);
+	write_str("                                 Long Mode Test                                 ", attr_inv, CHAROUT);
 
 	write_str("Number", attr_bold, CHAROUT + (SCREEN_COL_SIZE*2) * 2);
 	write_str("Factorial", attr_bold, CHAROUT + (SCREEN_COL_SIZE*2 + spacing) * 2);
 	write_str("Fibonacci", attr_bold, CHAROUT + (SCREEN_COL_SIZE*2 + spacing*2) * 2);
 
-	for(u32 num=num_start; num<=num_end; ++num)
+	for(u64 num=num_start; num<=num_end; ++num)
 	{
-		u32 num_fact = fact(num);
-		u32 num_fibo = fibo(num);
+		u64 num_fact = fact(num);
+		u64 num_fibo = fibo(num);
 
 		char buf_num[16], buf_fact[16], buf_fibo[16];
 		int_to_str(num, 10, buf_num);
@@ -62,7 +62,7 @@ void calc(u32 num_start, u32 num_end)
 }
 
 
-void keyb_event(u32 ch)
+void keyb_event(u64 ch)
 {
 	// scan codes
 	switch(ch)
@@ -90,17 +90,17 @@ void keyb_event(u32 ch)
 
 void timer_event()
 {
-	static u32 rtc = 0;
-	static const u32 div_sec = 468;
+	static u64 rtc = 0;
+	static const u64 div_sec = 468;
 
-	static u32 last_val = 0;
-	u32 val = rtc / div_sec;
+	static u64 last_val = 0xffffffff;
+	u64 val = rtc / div_sec;
 
 	if(val != last_val)
 	{
-		char buf_val[32];
+		char buf_val[64];
 		uint_to_str(val, 10, buf_val);
-		u32 buflen = strlen(buf_val);
+		u64 buflen = strlen(buf_val);
 
 		// add decimal point
 		buf_val[buflen] = buf_val[buflen-1];

@@ -1,9 +1,11 @@
 ;
+; long mode test
 ; @author Tobias Weber
 ; @date feb-2021
 ; @license see 'LICENSE.GPL' file
 ;
 ; references:
+;   - https://wiki.osdev.org/Setting_Up_Long_Mode
 ;	- https://wiki.osdev.org/Babystep7
 ;	- https://wiki.osdev.org/Babystep1
 ;	- https://wiki.osdev.org/Global_Descriptor_Table
@@ -11,8 +13,17 @@
 ;
 
 
-%define WORD_SIZE         4
+%define WORD_SIZE         8
+%define WORD_SIZE_32      4
 %define WORD_SIZE_16      2
+
+; see https://wiki.osdev.org/CPU_Registers_x86-64#IA32_EFER
+%define REG_EFER          0xc000_0080
+%define EFER_LM_BIT       8
+%define CR0_PROTECT_BIT   0
+%define CR0_PAGING_BIT    31
+%define CR4_PAGESIZE      4
+%define CR4_ADDREXT       5
 
 ; see https://jbwyatt.com/253/emu/memory.html
 %define CHAROUT           000b_8000h ; base address for character output
@@ -24,15 +35,15 @@
 ; see https://wiki.osdev.org/Memory_Map_(x86) and https://en.wikipedia.org/wiki/Master_boot_record
 %define BOOTSECT_START    7c00h
 %define STACK_START_16    7fffh      ; some (arbitrary) stack base address
-%define STACK_START       03f_ffffh  ; some (arbitrary) stack base address
+%define STACK_START       3f_ffffh   ; stack base address below 4MB
 
 %define NUM_GDT_ENTRIES   4
 %define NUM_IDT_ENTRIES   256
 
 %define SECTOR_SIZE       200h
 %define MBR_BOOTSIG_ADDR  ($$ + SECTOR_SIZE - 2) ; 510 bytes after section start
-%define NUM_ASM_SECTORS   8          ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
-%define NUM_C_SECTORS     11         ; number of sectors for c code
+%define NUM_ASM_SECTORS   9          ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
+%define NUM_C_SECTORS     19         ; number of sectors for c code
 %define END_ADDR          ($$ + SECTOR_SIZE * NUM_ASM_SECTORS)
 %define FILL_BYTE         0xf4       ; fill with hlt
 
@@ -76,7 +87,6 @@
 	call write_str_16
 	pop ax	; remove args from stack
 	pop ax	; remove args from stack
-	;stop_16: jmp stop_16
 
 	; read all needed sectors
 	; see https://en.wikipedia.org/wiki/INT_13H#INT_13h_AH=02h:_Read_Sectors_From_Drive
@@ -113,7 +123,7 @@
 
 	; set protection enable bit
 	mov eax, cr0
-	or eax, 1b
+	or eax, 1b << CR0_PROTECT_BIT
 	mov cr0, eax
 
 	; go to 32 bit code
@@ -198,6 +208,7 @@ clear_16:
 	ret
 
 
+
 ;
 ; write a string to charout
 ; @param [sp + WORD_SIZE_16] pointer to a string
@@ -275,7 +286,7 @@ strlen_16:
 ; gdt table description
 struc gdtr_struc
 	gdt_size resw 1
-	gdt_offs resd 1
+	gdt_offs resq 1
 endstruc
 
 ; gdt table entries
@@ -291,7 +302,7 @@ endstruc
 ; see https://wiki.osdev.org/Babystep7
 gdtr: istruc gdtr_struc
 	at gdt_size, dw gdt_struc_size*NUM_GDT_ENTRIES - 1	; size - 1
-	at gdt_offs, dd gdt_base_addr
+	at gdt_offs, dq gdt_base_addr
 iend
 
 gdt_base_addr:
@@ -356,34 +367,82 @@ start_32:
 	mov esp, dword STACK_START
 	mov ebp, dword STACK_START
 
-	; load idt register and enable interrupts
-	lidt [idtr]
-	sti
-
-	;push dword CHAROUT	; address to write to
-	;push dword SCREEN_SIZE	; number of characters to write
-	;call clear_32
-	;add esp, WORD_SIZE*2	; remove args from stack
-
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
 	push dword ATTR_BOLD	; attrib
 	push str_start_32	; string
 	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
-	;stop_32: jmp stop_32
+	add esp, WORD_SIZE_32*3	; remove args from stack
+	;call exit_32
 
-	[extern entrypoint]
-	call entrypoint
+	; page directory start at 4MB
+	mov eax, 40_0000h
+	mov edi, eax
 
-	call exit_32
+	; number of page directory entries
+	mov ecx, 1024
+	ptd_loop:
+		; size=1, dirty=0, accessed=0, cache=0, write through=0, supervisor=1, write=1, present=1
+		;mov [edi + ptd2_flags], byte 1000_0111b
+		; addr table=0, global=0
+		;mov [edi + ptd2_reserved0_2_flags8_12], byte 000_0_000_0b
+		;mov [edi + ptd2_reserved3_7_offs0_2], byte 000000_00b
+		;mov [edi + ptd2_offs3_10], byte 00h
+		;mov [edi + ptd2_offs4_reserved], dword 00_00_00_00h ; all pages pointing to the same page frame for the moment...
+
+		; size=1, dirty=0, accessed=0, cache=0, write through=0, supervisor=1, write=1, present=1
+		mov [edi + ptd4_flags], byte 1000_0111b
+		; addr table=0, global=0
+		mov [edi + ptd4_offs32_34_flags8_12], byte 000_0_000_0b
+		mov [edi + ptd4_offs35_40_offs22_23], byte 000000_00b
+		mov [edi + ptd4_offs24_31], byte 0000_0000b ; all pages pointing to the same page frame for the moment...
+
+		add edi, ptd4_struc_size
+		dec ecx
+		cmp ecx, 0
+		jz ptd_loop_end
+		jmp ptd_loop
+	ptd_loop_end:
+
+	;shl eax, 12	; not shifted, instead page directories are aligned on a 2^12 bits boundary!
+	mov cr3, eax
+
+	; set page size extension
+	mov eax, cr4
+	or eax, 1b << CR4_PAGESIZE ;| 1b << CR4_ADDREXT
+	mov cr4, eax
+
+	; enable long mode
+	; see https://wiki.osdev.org/CPU_Registers_x86-64#IA32_EFER
+	mov ecx, REG_EFER
+	rdmsr
+	or eax, 1b << EFER_LM_BIT
+	wrmsr
+
+	; enable paging
+	mov eax, cr0
+	or eax, 1b << CR0_PAGING_BIT
+	mov cr0, eax
+
+	; reload gdt register
+	;mov edi, data_descr
+	;mov [edi + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
+	;mov edi, stack_descr
+	;mov [edi + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
+	;mov edi, code_descr
+	;mov [edi + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
+	;lgdt [gdtr]
+
+	; go to 64 bit code
+	jmp code_descr-gdt_base_addr : start_64	; automatically sets cs
+
 
 
 ;
 ; clear screen
 ;
 clear_32:
-	mov ecx, [esp + WORD_SIZE]		; size
-	mov edi, [esp + WORD_SIZE*2]	; base address
+	mov ecx, [esp + WORD_SIZE_32]		; size
+	mov edi, [esp + WORD_SIZE_32*2]	; base address
 
 	mov ax, word 00_00h
 	rep stosw
@@ -394,22 +453,22 @@ clear_32:
 
 ;
 ; write a string to charout
-; @param [esp + WORD_SIZE] pointer to a string
-; @param [esp + WORD_SIZE*2] attributes
-; @param [esp + WORD_SIZE*3] base address to write to
+; @param [esp + WORD_SIZE_32] pointer to a string
+; @param [esp + WORD_SIZE_32*2] attributes
+; @param [esp + WORD_SIZE_32*3] base address to write to
 ;
 write_str_32:
-	mov eax, [esp + WORD_SIZE]	; argument: char*
+	mov eax, [esp + WORD_SIZE_32]	; argument: char*
 	push eax
 	call strlen_32
 	mov ecx, eax	; string length
-	add esp, WORD_SIZE	; remove arg from stack
+	add esp, WORD_SIZE_32	; remove arg from stack
 
-	mov esi, [esp + WORD_SIZE*1]	; char*
-	mov dh, [esp + WORD_SIZE*2]		; attrib
-	mov edi, [esp + WORD_SIZE*3]	; base address
+	mov esi, [esp + WORD_SIZE_32*1]	; char*
+	mov dh, [esp + WORD_SIZE_32*2]		; attrib
+	mov edi, [esp + WORD_SIZE_32*3]	; base address
 
-	write_loop:
+	write_loop_32:
 		mov dl, byte [esi]	; dereference char*
 		mov [edi], dl	; store char
 		inc edi		; to char attribute index
@@ -418,20 +477,21 @@ write_str_32:
 		dec ecx		; decrement length counter
 		inc esi		; increment char pointer
 		cmp ecx, 0
-		jz write_loop_end
-		jmp write_loop
-	write_loop_end:
+		jz write_loop_end_32
+		jmp write_loop_32
+	write_loop_end_32:
 
 	ret
 
 
+
 ;
 ; strlen
-; @param [esp + WORD_SIZE] pointer to a string
+; @param [esp + WORD_SIZE_32] pointer to a string
 ; @returns length in eax
 ;
 strlen_32:
-	mov esi, [esp + WORD_SIZE*1]	; argument: char*
+	mov esi, [esp + WORD_SIZE_32*1]	; argument: char*
 	mov edi, esi	; argument: char*
 
 	mov ecx, 0xffff	; max. string length
@@ -445,14 +505,124 @@ strlen_32:
 	ret
 
 
+
 ;
 ; halt
 ;
 exit_32:
 	;cli
-	hlt_loop: hlt	; loop, because hlt can be interrupted
-	jmp hlt_loop
+	hlt_loop_32: hlt	; loop, because hlt can be interrupted
+	jmp hlt_loop_32
 ; -----------------------------------------------------------------------------
+
+
+
+
+; -----------------------------------------------------------------------------
+; code in 64-bit long mode
+; -----------------------------------------------------------------------------
+[bits 64]
+start_64:
+	; clear screen
+	push qword CHAROUT      ; address to write to
+	push qword SCREEN_SIZE  ; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2    ; remove args from stack
+
+	push qword CHAROUT + SCREEN_COL_SIZE*4	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push qword str_start_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
+	call exit_64
+
+	; load idt register and enable interrupts
+	;lidt [idtr]
+	;sti
+
+	[extern entrypoint]
+	call entrypoint
+
+	call exit_64
+
+
+
+;
+; clear screen
+;
+clear_64:
+	mov rcx, [esp + WORD_SIZE]		; size
+	mov rdi, [esp + WORD_SIZE*2]	; base address
+
+	mov ax, word 00_00h
+	rep stosw
+
+	ret
+
+
+
+;
+; write a string to charout
+; @param [rsp + WORD_SIZE] pointer to a string
+; @param [rsp + WORD_SIZE*2] attributes
+; @param [rsp + WORD_SIZE*3] base address to write to
+;
+write_str_64:
+	mov rax, [rsp + WORD_SIZE]	; argument: char*
+	push rax
+	call strlen_64
+	mov rcx, rax	; string length
+	add rsp, WORD_SIZE	; remove arg from stack
+
+	mov rsi, [rsp + WORD_SIZE*1]	; char*
+	mov dh, [rsp + WORD_SIZE*2]		; attrib
+	mov rdi, [rsp + WORD_SIZE*3]	; base address
+
+	write_loop:
+		mov dl, byte [rsi]	; dereference char*
+		mov [rdi], dl	; store char
+		inc rdi		; to char attribute index
+		mov [rdi], dh	; store char attributes
+		inc rdi		; next output char index
+		dec rcx		; decrement length counter
+		inc rsi		; increment char pointer
+		cmp rcx, 0
+		jz write_loop_end
+		jmp write_loop
+	write_loop_end:
+
+	ret
+
+
+
+;
+; strlen
+; @param [rsp + WORD_SIZE] pointer to a string
+; @returns length in rax
+;
+strlen_64:
+	mov rsi, [rsp + WORD_SIZE*1]	; argument: char*
+	mov rdi, rsi	; argument: char*
+
+	mov rcx, 0xffff	; max. string length
+	xor rax, rax	; look for 0
+	repnz scasb
+
+	mov rax, rdi	; rax = end_ptr
+	sub rax, rsi	; rax -= begin_ptr
+	sub rax, 1
+
+	ret
+
+
+
+;
+; halt
+;
+exit_64:
+	;cli
+	hlt_loop_64: hlt	; loop, because hlt can be interrupted
+	jmp hlt_loop_64
 
 
 
@@ -470,274 +640,274 @@ isr_null:
 
 ; see https://wiki.osdev.org/%228042%22_PS/2_Controller
 isr_keyb:
-	pushad
+	;pushad
 
-	xor eax, eax
+	xor rax, rax
 	in al, KEYB_DATA_PORT
-	push eax
+	push rax
 	[extern keyb_event]
 	call keyb_event
-	add esp, WORD_SIZE
+	add rsp, WORD_SIZE
 
-	popad
+	;popad
 	iret
 
 
 isr_timer:
-	pushad
+	;pushad
 
 	[extern timer_event]
 	call timer_event
 
-	popad
+	;popad
 	iret
 
 
 isr_rtc:
-	pushad
+	;pushad
 
 	[extern rtc_event]
 	call rtc_event
 
-	popad
+	;popad
 	iret
 
 
 isr_div0:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_div0_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_div0_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_overflow:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_overflow_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_overflow_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_bounds:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_bounds_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_bounds_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_instr:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_instr_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_instr_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_dev:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_dev_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_dev_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_tssfault:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_tssfault_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_tssfault_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_segfault_notavail:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_segfault_notavail_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_segfault_notavail_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_segfault_stack:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_segfault_stack_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_segfault_stack_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_pagefault:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_pagefault_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_pagefault_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_df:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_df_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_df_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_overrun:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_overrun_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_overrun_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_gpf:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_gpf_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_gpf_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 
 isr_fpu:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_fpu_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_fpu_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 isr_align:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_align_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_align_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 isr_mce:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_mce_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_mce_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 
 isr_simd:
-	push dword CHAROUT	; address to write to
-	push dword SCREEN_SIZE	; number of characters to write
-	call clear_32
-	add esp, WORD_SIZE*2	; remove args from stack
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
 
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_simd_32	; string
-	call write_str_32
-	add esp, WORD_SIZE*3	; remove args from stack
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push str_simd_64	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
 
-	jmp exit_32
+	jmp exit_64
 ; -----------------------------------------------------------------------------
 
 
@@ -745,8 +915,41 @@ isr_simd:
 ; -----------------------------------------------------------------------------
 ; data
 ; -----------------------------------------------------------------------------
-; see https://wiki.osdev.org/Interrupt_Descriptor_Table
+
+; page table dir entry
+; see https://wiki.osdev.org/Paging and http://www.lowlevel.eu/wiki/Paging
+
+; for 4MB pages
+struc ptd4_struc
+	ptd4_flags resb 1
+	ptd4_offs32_34_flags8_12 resb 1
+	ptd4_offs35_40_offs22_23 resb 1
+	ptd4_offs24_31 resb 1
+endstruc
+
+; for 2MB pages
+struc ptd2_struc
+	ptd2_flags resb 1
+	ptd2_reserved0_2_flags8_12 resb 1
+	ptd2_reserved3_7_offs0_2 resb 1
+	ptd2_offs3_10 resb 1
+	ptd2_offs4_reserved resd 1
+endstruc
+
+; needs to be aligned!
+;pdt_0: istruc ptd4_struc
+;	at ptd4_flags, db 1000_0111b	;size=1, dirty=0, accessed=0, cache=0, write through=0, supervisor=1, write=1, present=1
+;	at ptd4_offs32_34_flags8_12, db 000_0_000_0b ; addr table=0, global=0
+;	at ptd4_offs35_40_offs22_23, db 000000_00b
+;	at ptd4_offs24_31, db 0000_0000b
+;iend
+
+;pdt_1: times 1023*ptd4_struc_size db 0	; null tables
+
+
+
 ; idt table description
+; see https://wiki.osdev.org/Interrupt_Descriptor_Table
 struc idtr_struc
 	idt_size resw 1
 	idt_offs resd 1
@@ -965,24 +1168,26 @@ iend
 times (NUM_IDT_ENTRIES-(40+1))*idt_struc_size db 0
 
 
-str_start_32: db "Starting 32bit...", 00h
 
-str_div0_32: db "*** Exception: Division by Zero ***", 00h
-str_overflow_32: db "*** Exception: Overflow ***", 00h
-str_bounds_32: db "*** Exception: Out of Bounds ***", 00h
-str_instr_32: db "*** Fault: Unknown Instruction ***", 00h
-str_overrun_32: db "*** Fault: Overrun ***", 00h
-str_dev_32: db "*** Fault: No Device ***", 00h
-str_tssfault_32: db "*** Fault: TSS ***", 00h
-str_segfault_notavail_32: db "*** Segmentation Fault: Not Available ***", 00h
-str_segfault_stack_32: db "*** Segmentation Fault: Stack ***", 00h
-str_pagefault_32: db "*** Paging Fault ***", 00h
-str_df_32: db "*** Double Fault ***", 00h
-str_gpf_32: db "*** General Protection Fault ***", 00h
-str_fpu_32: db "*** Fault: FPU ***", 00h
-str_align_32: db "*** Exception: Alignment ***", 00h
-str_mce_32: db "*** Exception: MCE ***", 00h
-str_simd_32: db "*** Exception: SIMD ***", 00h
+str_start_32: db "Starting 32bit...", 00h
+str_start_64: db "Starting 64bit...", 00h
+
+str_div0_64: db "*** Exception: Division by Zero ***", 00h
+str_overflow_64: db "*** Exception: Overflow ***", 00h
+str_bounds_64: db "*** Exception: Out of Bounds ***", 00h
+str_instr_64: db "*** Fault: Unknown Instruction ***", 00h
+str_overrun_64: db "*** Fault: Overrun ***", 00h
+str_dev_64: db "*** Fault: No Device ***", 00h
+str_tssfault_64: db "*** Fault: TSS ***", 00h
+str_segfault_notavail_64: db "*** Segmentation Fault: Not Available ***", 00h
+str_segfault_stack_64: db "*** Segmentation Fault: Stack ***", 00h
+str_pagefault_64: db "*** Paging Fault ***", 00h
+str_df_64: db "*** Double Fault ***", 00h
+str_gpf_64: db "*** General Protection Fault ***", 00h
+str_fpu_64: db "*** Fault: FPU ***", 00h
+str_align_64: db "*** Exception: Alignment ***", 00h
+str_mce_64: db "*** Exception: MCE ***", 00h
+str_simd_64: db "*** Exception: SIMD ***", 00h
 
 
 sector_fill: times END_ADDR - sector_fill db FILL_BYTE
