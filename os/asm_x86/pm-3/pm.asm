@@ -512,7 +512,7 @@ isr_null:
 
 ; see https://wiki.osdev.org/%228042%22_PS/2_Controller
 isr_keyb:
-	pushad
+	;pushad
 
 	xor eax, eax
 	in al, KEYB_DATA_PORT
@@ -521,27 +521,27 @@ isr_keyb:
 	call keyb_event
 	add esp, WORD_SIZE
 
-	popad
+	;popad
 	iret
 
 
 isr_timer:
-	pushad
+	;pushad
 
 	[extern timer_event]
 	call timer_event
 
-	popad
+	;popad
 	iret
 
 
 isr_rtc:
-	pushad
+	;pushad
 
 	[extern rtc_event]
 	call rtc_event
 
-	popad
+	;popad
 	iret
 
 

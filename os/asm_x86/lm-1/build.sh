@@ -37,7 +37,7 @@ for C_FILE in ${C_FILES[@]}; do
 	O_FILE=${C_FILE%.c}.o
 	echo -e "Compiling ${C_FILE} -> ${O_FILE}..."
 
-	if ! ${CC} -m64 -Os -ffreestanding -falign-functions=8 -c -o ${O_FILE} ${C_FILE}; then
+	if ! ${CC} -m64 -ffreestanding -falign-functions=8 -c -o ${O_FILE} ${C_FILE}; then
 		echo -e "Error compiling."
 		exit -1
 	fi

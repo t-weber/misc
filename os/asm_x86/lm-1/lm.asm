@@ -5,7 +5,7 @@
 ; @license see 'LICENSE.GPL' file
 ;
 ; references:
-;   - https://wiki.osdev.org/Setting_Up_Long_Mode
+;	- https://wiki.osdev.org/Setting_Up_Long_Mode
 ;	- https://wiki.osdev.org/Babystep7
 ;	- https://wiki.osdev.org/Babystep1
 ;	- https://wiki.osdev.org/Global_Descriptor_Table
@@ -51,7 +51,7 @@
 %define SECTOR_SIZE       200h
 %define MBR_BOOTSIG_ADDR  ($$ + SECTOR_SIZE - 2) ; 510 bytes after section start
 %define NUM_ASM_SECTORS   13         ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
-%define NUM_C_SECTORS     14         ; number of sectors for c code
+%define NUM_C_SECTORS     15         ; number of sectors for c code
 %define END_ADDR          ($$ + SECTOR_SIZE * NUM_ASM_SECTORS)
 %define FILL_BYTE         0xf4       ; fill with hlt
 
@@ -81,6 +81,7 @@
 ; in boot sector
 ; -----------------------------------------------------------------------------
 [bits 16]
+;align 2
 ;[org BOOTSECT_START]	; not needed, set by linker
 	mov sp, STACK_START_16
 	mov bp, STACK_START_16
@@ -117,7 +118,7 @@
 		call write_str_16
 		pop ax	; remove args from stack
 		pop ax	; remove args from stack
-		call exit_16
+		jmp exit_16
 	load_sectors_succeeded_16:
 
 	; disable interrupts
@@ -209,9 +210,7 @@ clear_16:
 		add di, 2	; next output char index
 		dec cx		; decrement length counter
 		cmp cx, 0
-		jz clear_write_loop_end_16
-		jmp clear_write_loop_16
-	clear_write_loop_end_16:
+		jnz clear_write_loop_16
 
 	ret
 
@@ -250,9 +249,7 @@ write_str_16:
 		dec cx		; decrement length counter
 		inc si		; increment char pointer
 		cmp cx, 0
-		jz write_loop_end_16
-		jmp write_loop_16
-	write_loop_end_16:
+		jnz write_loop_16
 
 	ret
 
@@ -363,6 +360,7 @@ mbr_bootsig: dw 0xaa55	; boot signature at end of boot sector
 ; starting in second 512B sector
 ; -----------------------------------------------------------------------------
 [bits 32]
+align 4
 start_32:
 	; data segment
 	mov ax, data_descr-gdt_base_addr
@@ -375,12 +373,14 @@ start_32:
 	mov esp, dword STACK_START
 	mov ebp, dword STACK_START
 
+	push ebp
+	mov ebp, esp
 	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
 	push dword ATTR_BOLD	; attrib
 	push str_start_32	; string
 	call write_str_32
-	add esp, WORD_SIZE_32*3	; remove args from stack
-	;call exit_32
+	mov esp, ebp
+	pop ebp
 
 	; paging
 	; see https://wiki.osdev.org/Paging and http://www.lowlevel.eu/wiki/Paging
@@ -467,10 +467,14 @@ clear_32:
 ;
 write_str_32:
 	mov eax, [esp + WORD_SIZE_32]	; argument: char*
+
+	push ebp
+	mov ebp, esp
 	push eax
 	call strlen_32
 	mov ecx, eax	; string length
-	add esp, WORD_SIZE_32	; remove arg from stack
+	mov esp, ebp
+	pop ebp
 
 	mov esi, [esp + WORD_SIZE_32*1]	; char*
 	mov dh, [esp + WORD_SIZE_32*2]		; attrib
@@ -485,9 +489,7 @@ write_str_32:
 		dec ecx		; decrement length counter
 		inc esi		; increment char pointer
 		cmp ecx, 0
-		jz write_loop_end_32
-		jmp write_loop_32
-	write_loop_end_32:
+		jnz write_loop_32
 
 	ret
 
@@ -549,20 +551,23 @@ start_64:
 	;call clear_64
 	;add rsp, WORD_SIZE*2    ; remove args from stack
 
+	push rbp
+	mov rbp, rsp
 	push qword CHAROUT + SCREEN_COL_SIZE*4	; address to write to
 	push qword ATTR_BOLD	; attrib
 	push qword str_start_64	; string
 	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
+	mov rsp, rbp
+	pop rbp
 
 	; load idt register and enable interrupts
 	lidt [idtr]
-	;sti
+	sti
 
 	[extern entrypoint]
 	call entrypoint
 
-	call exit_64
+	jmp exit_64
 
 
 
@@ -588,10 +593,14 @@ clear_64:
 ;
 write_str_64:
 	mov rax, [rsp + WORD_SIZE]	; argument: char*
+
+	push rbp
+	mov rbp, rsp
 	push rax
 	call strlen_64
 	mov rcx, rax	; string length
-	add rsp, WORD_SIZE	; remove arg from stack
+	mov rsp, rbp
+	pop rbp
 
 	mov rsi, [rsp + WORD_SIZE*1]	; char*
 	mov dh, [rsp + WORD_SIZE*2]		; attrib
@@ -606,9 +615,7 @@ write_str_64:
 		dec rcx		; decrement length counter
 		inc rsi		; increment char pointer
 		cmp rcx, 0
-		jz write_loop_end
-		jmp write_loop
-	write_loop_end:
+		jnz write_loop
 
 	ret
 
@@ -653,44 +660,43 @@ exit_64:
 ;
 ; dummy isr
 ;
+align 16
 isr_null:
-	iret
+	iretq
 
 
 ; see https://wiki.osdev.org/%228042%22_PS/2_Controller
+align 16
 isr_keyb:
-	;push rax
-	;push rbp
-
 	xor rax, rax
 	in al, KEYB_DATA_PORT
-	push rax
+
+	mov rdi, rax	; calling convention passes arguments in registers, not on stack
+	;push rax
 	[extern keyb_event]
 	call keyb_event
-	add rsp, WORD_SIZE
+	;add rsp, WORD_SIZE
 
-	;pop rbp
-	;pop rax
-	iret
+	iretq
 
 
+align 16
 isr_timer:
 	[extern timer_event]
 	call timer_event
 
-	iret
+	iretq
 
 
+align 16
 isr_rtc:
-	;pushad
-
 	[extern rtc_event]
 	call rtc_event
 
-	;popad
-	iret
+	iretq
 
 
+align 16
 isr_div0:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -706,6 +712,7 @@ isr_div0:
 	jmp exit_64
 
 
+align 16
 isr_overflow:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -721,6 +728,7 @@ isr_overflow:
 	jmp exit_64
 
 
+align 16
 isr_bounds:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -736,6 +744,7 @@ isr_bounds:
 	jmp exit_64
 
 
+align 16
 isr_instr:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -751,6 +760,7 @@ isr_instr:
 	jmp exit_64
 
 
+align 16
 isr_dev:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -766,6 +776,7 @@ isr_dev:
 	jmp exit_64
 
 
+align 16
 isr_tssfault:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -781,6 +792,7 @@ isr_tssfault:
 	jmp exit_64
 
 
+align 16
 isr_segfault_notavail:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -796,6 +808,7 @@ isr_segfault_notavail:
 	jmp exit_64
 
 
+align 16
 isr_segfault_stack:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -811,6 +824,7 @@ isr_segfault_stack:
 	jmp exit_64
 
 
+align 16
 isr_pagefault:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -826,6 +840,7 @@ isr_pagefault:
 	jmp exit_64
 
 
+align 16
 isr_df:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -841,6 +856,7 @@ isr_df:
 	jmp exit_64
 
 
+align 16
 isr_overrun:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -856,6 +872,7 @@ isr_overrun:
 	jmp exit_64
 
 
+align 16
 isr_gpf:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -871,6 +888,7 @@ isr_gpf:
 	jmp exit_64
 
 
+align 16
 isr_fpu:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -885,6 +903,7 @@ isr_fpu:
 
 	jmp exit_64
 
+align 16
 isr_align:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -899,6 +918,7 @@ isr_align:
 
 	jmp exit_64
 
+align 16
 isr_mce:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
@@ -913,6 +933,7 @@ isr_mce:
 
 	jmp exit_64
 
+align 16
 isr_simd:
 	push qword CHAROUT	; address to write to
 	push qword SCREEN_SIZE	; number of characters to write
