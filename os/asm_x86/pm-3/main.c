@@ -62,7 +62,7 @@ void calc(u32 num_start, u32 num_end)
 }
 
 
-void __cdecl keyb_event(u32 ch)
+void __attribute__((__cdecl__)) keyb_event(u32 ch)
 {
 	// scan codes
 	switch(ch)
@@ -88,7 +88,7 @@ void __cdecl keyb_event(u32 ch)
 }
 
 
-void __cdecl timer_event()
+void __attribute__((__cdecl__)) timer_event()
 {
 	static u32 rtc = 0;
 	static const u32 div_sec = 468;
@@ -116,12 +116,12 @@ void __cdecl timer_event()
 }
 
 
-void __cdecl rtc_event()
+void __attribute__((__cdecl__)) rtc_event()
 {
 }
 
 
-void __cdecl entrypoint()
+void __attribute__((__cdecl__)) entrypoint()
 {
 	calc(0, 12);
 }
