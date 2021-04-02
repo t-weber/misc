@@ -25,13 +25,14 @@
 %define CR4_PAGESIZE      4
 %define CR4_ADDREXT       5
 
-%define PAGING_PML4_START     (1b << 23)                       ; PML4 paging table starts at 8 MB
-%define PAGING_PDPT_START     (PAGING_PML4_START + (1b << 12)) ; page dir. pointer table starts at +4kB
-%define PAGING_PTD_START      (PAGING_PDPT_START + (1b << 12)) ; page table dir. starts at +4kB
-%define PAGING_FRAME_START    0b                               ; start address of page frames
-%define PAGING_PTD_ENTRY_SIZE 8
-%define PAGING_PTD_ENTRIES    4                                ; number of page table directory entries, max. 512
-%define PAGING_FRAME_SIZE     (1b << 21)                       ; 2 MB page frames
+%define PAGING_PML4_START      (1b << 23)                       ; PML4 paging table starts at 8 MB
+%define PAGING_PDPT_START      (PAGING_PML4_START + (1b << 12)) ; page dir. pointer table starts at +4kB
+%define PAGING_PTD_START       (PAGING_PDPT_START + (1b << 12)) ; page table dir. starts at +4kB
+%define PAGING_FRAME_START     0b                               ; start address of page frames
+%define PAGING_PTD_ENTRY_SIZE  8
+%define PAGING_PTD_ENTRIES     4                                ; number of present page table directory entries
+%define PAGING_PTD_MAX_ENTRIES 512                              ; number of max. page table directory entries
+%define PAGING_FRAME_SIZE      (1b << 21)                       ; 2 MB page frames
 
 ; see https://jbwyatt.com/253/emu/memory.html
 %define CHAROUT           000b_8000h ; base address for character output
@@ -43,7 +44,8 @@
 ; see https://wiki.osdev.org/Memory_Map_(x86) and https://en.wikipedia.org/wiki/Master_boot_record
 %define BOOTSECT_START    7c00h
 %define STACK_START_16    7fffh      ; some (arbitrary) stack base address
-%define STACK_START       3f_ffffh   ; stack base address below 4MB
+%define STACK_START       003f_ffffh ; stack base address below 4MB
+;%define STACK_START       00ef_ffffh ; stack base address below 16MB
 
 %define NUM_GDT_ENTRIES   4
 %define NUM_IDT_ENTRIES   256
@@ -386,8 +388,9 @@ start_32:
 	; see https://wiki.osdev.org/Paging and http://www.lowlevel.eu/wiki/Paging
 	mov eax, PAGING_FRAME_START ; start address of page frames
 	mov ebx, PAGING_PTD_START   ; page table dir. start address
+
 	mov ecx, PAGING_PTD_ENTRIES ; number of page table directory entries
-	ptd_loop:
+	ptd_loop_avail_pages:
 		; lower dword
 		mov dword [ebx + 0], dword eax
 		; size=1, avail=1, accessed=0, cache flags=00, supervisor=1, write=1, present=1
@@ -400,7 +403,23 @@ start_32:
 
 		dec ecx                        ; next counter
 		cmp ecx, 0
-		jnz ptd_loop                   ; loop if counter > 0
+		jnz ptd_loop_avail_pages       ; loop if counter > 0
+
+	mov ecx, PAGING_PTD_MAX_ENTRIES-PAGING_PTD_ENTRIES ; number of non-present page table directory entries
+	ptd_loop_nonavail_pages:
+		; lower dword
+		mov dword [ebx + 0], dword eax
+		; size=1, avail=0, accessed=0, cache flags=00, supervisor=1, write=1, present=0
+		or byte [ebx + 0], byte 100_00_110b
+		; upper dword
+		mov dword [ebx + 4], dword 00_00_00_00h
+
+		add ebx, PAGING_PTD_ENTRY_SIZE ; next page entry
+		add eax, PAGING_FRAME_SIZE     ; next page frame (2 MB)
+
+		dec ecx                        ; next counter
+		cmp ecx, 0
+		jnz ptd_loop_nonavail_pages    ; loop if counter > 0
 
 	; page dir. pointer table
 	mov dword [PAGING_PDPT_START + 0], dword PAGING_PTD_START  ; page table dir. start address
@@ -532,7 +551,7 @@ exit_32:
 ; code in 64-bit long mode
 ; -----------------------------------------------------------------------------
 [bits 64]
-align 8
+align 16
 start_64:
 	; data segment
 	mov ax, data_descr-gdt_base_addr
@@ -574,6 +593,7 @@ start_64:
 ;
 ; clear screen
 ;
+align 8
 clear_64:
 	mov rcx, [esp + WORD_SIZE]		; size
 	mov rdi, [esp + WORD_SIZE*2]	; base address
@@ -591,6 +611,7 @@ clear_64:
 ; @param [rsp + WORD_SIZE*2] attributes
 ; @param [rsp + WORD_SIZE*3] base address to write to
 ;
+align 8
 write_str_64:
 	mov rax, [rsp + WORD_SIZE]	; argument: char*
 
@@ -626,6 +647,7 @@ write_str_64:
 ; @param [rsp + WORD_SIZE] pointer to a string
 ; @returns length in rax
 ;
+align 8
 strlen_64:
 	mov rsi, [rsp + WORD_SIZE*1]	; argument: char*
 	mov rdi, rsi	; argument: char*
@@ -645,6 +667,7 @@ strlen_64:
 ;
 ; halt
 ;
+align 8
 exit_64:
 	;cli
 	hlt_loop_64: hlt	; loop, because hlt can be interrupted
