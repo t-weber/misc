@@ -405,6 +405,7 @@ start_32:
 		cmp ecx, 0
 		jnz ptd_loop_avail_pages       ; loop if counter > 0
 
+%if PAGING_PTD_MAX_ENTRIES-PAGING_PTD_ENTRIES > 0
 	mov ecx, PAGING_PTD_MAX_ENTRIES-PAGING_PTD_ENTRIES ; number of non-present page table directory entries
 	ptd_loop_nonavail_pages:
 		; lower dword
@@ -420,6 +421,7 @@ start_32:
 		dec ecx                        ; next counter
 		cmp ecx, 0
 		jnz ptd_loop_nonavail_pages    ; loop if counter > 0
+%endif
 
 	; page dir. pointer table
 	mov dword [PAGING_PDPT_START + 0], dword PAGING_PTD_START  ; page table dir. start address
