@@ -44,16 +44,17 @@
 ; see https://wiki.osdev.org/Memory_Map_(x86) and https://en.wikipedia.org/wiki/Master_boot_record
 %define BOOTSECT_START    7c00h
 %define STACK_START_16    7fffh      ; some (arbitrary) stack base address
-%define STACK_START       003f_ffffh ; stack base address below 4MB
-;%define STACK_START       00ef_ffffh ; stack base address below 16MB
+%define STACK_START       0040_0000h ; stack base address at 4MB
+;%define STACK_START       00f0_0000h ; stack base address at 16MB
 
 %define NUM_GDT_ENTRIES   4
 %define NUM_IDT_ENTRIES   256
 
 %define SECTOR_SIZE       200h
 %define MBR_BOOTSIG_ADDR  ($$ + SECTOR_SIZE - 2) ; 510 bytes after section start
-%define NUM_ASM_SECTORS   13         ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
+%define NUM_ASM_SECTORS   12         ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
 %define NUM_C_SECTORS     15         ; number of sectors for c code
+;%define NUM_C_SECTORS     23         ; number of sectors for c code
 %define END_ADDR          ($$ + SECTOR_SIZE * NUM_ASM_SECTORS)
 %define FILL_BYTE         0xf4       ; fill with hlt
 
@@ -368,6 +369,8 @@ start_32:
 	mov ax, data_descr-gdt_base_addr
 	mov ds, ax
 	mov es, ax
+	mov fs, ax
+	mov gs, ax
 
 	; stack segment
 	mov ax, stack_descr-gdt_base_addr
@@ -553,12 +556,14 @@ exit_32:
 ; code in 64-bit long mode
 ; -----------------------------------------------------------------------------
 [bits 64]
-align 16
+align 8
 start_64:
 	; data segment
 	mov ax, data_descr-gdt_base_addr
 	mov ds, ax
 	mov es, ax
+	mov fs, ax
+	mov gs, ax
 
 	; stack segment
 	mov ax, stack_descr-gdt_base_addr
@@ -581,12 +586,12 @@ start_64:
 	mov rsp, rbp
 	pop rbp
 
+	[extern entrypoint]
+	call entrypoint
+
 	; load idt register and enable interrupts
 	lidt [idtr]
 	sti
-
-	[extern entrypoint]
-	call entrypoint
 
 	jmp exit_64
 
@@ -597,13 +602,13 @@ start_64:
 ;
 align 8
 clear_64:
-	mov rcx, [esp + WORD_SIZE]		; size
-	mov rdi, [esp + WORD_SIZE*2]	; base address
+	mov rcx, [rsp + WORD_SIZE]		; size
+	mov rdi, [rsp + WORD_SIZE*2]	; base address
 
 	mov ax, word 00_00h
 	rep stosw
 
-	ret
+	retq
 
 
 
@@ -640,7 +645,7 @@ write_str_64:
 		cmp rcx, 0
 		jnz write_loop
 
-	ret
+	retq
 
 
 
@@ -662,7 +667,7 @@ strlen_64:
 	sub rax, rsi	; rax -= begin_ptr
 	sub rax, 1
 
-	ret
+	retq
 
 
 
@@ -674,6 +679,24 @@ exit_64:
 	;cli
 	hlt_loop_64: hlt	; loop, because hlt can be interrupted
 	jmp hlt_loop_64
+
+
+align 8
+print_exit_64:
+	push rax
+	push qword CHAROUT	; address to write to
+	push qword SCREEN_SIZE	; number of characters to write
+	call clear_64
+	add rsp, WORD_SIZE*2	; remove args from stack
+	pop rax
+
+	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	push qword ATTR_BOLD	; attrib
+	push rax	; string
+	call write_str_64
+	add rsp, WORD_SIZE*3	; remove args from stack
+
+	jmp exit_64
 
 
 
@@ -723,255 +746,98 @@ isr_rtc:
 
 align 16
 isr_div0:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_div0_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_div0_64
+	jmp print_exit_64
 
 
 align 16
 isr_overflow:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_overflow_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_overflow_64
+	jmp print_exit_64
 
 
 align 16
 isr_bounds:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_bounds_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_bounds_64
+	jmp print_exit_64
 
 
 align 16
 isr_instr:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_instr_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_instr_64
+	jmp print_exit_64
 
 
 align 16
 isr_dev:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_dev_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_dev_64
+	jmp print_exit_64
 
 
 align 16
 isr_tssfault:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_tssfault_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_tssfault_64
+	jmp print_exit_64
 
 
 align 16
 isr_segfault_notavail:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_segfault_notavail_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_segfault_notavail_64
+	jmp print_exit_64
 
 
 align 16
 isr_segfault_stack:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_segfault_stack_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_segfault_stack_64
+	jmp print_exit_64
 
 
 align 16
 isr_pagefault:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_pagefault_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_pagefault_64
+	jmp print_exit_64
 
 
 align 16
 isr_df:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_df_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_df_64
+	jmp print_exit_64
 
 
 align 16
 isr_overrun:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_overrun_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_overrun_64
+	jmp print_exit_64
 
 
 align 16
 isr_gpf:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_gpf_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_gpf_64
+	jmp print_exit_64
 
 
 align 16
 isr_fpu:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
+	mov rax, str_fpu_64
+	jmp print_exit_64
 
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_fpu_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
 
 align 16
 isr_align:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
+	mov rax, str_align_64
+	jmp print_exit_64
 
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_align_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
 
 align 16
 isr_mce:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
+	mov rax, str_mce_64
+	jmp print_exit_64
 
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_mce_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
 
 align 16
 isr_simd:
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
-	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
-
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push str_simd_64	; string
-	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
-
-	jmp exit_64
+	mov rax, str_simd_64
+	jmp print_exit_64
 ; -----------------------------------------------------------------------------
 
 
@@ -1007,6 +873,7 @@ iend
 
 
 ; see https://wiki.osdev.org/Interrupt_Vector_Table
+align 16, db 0
 idt_base_addr:
 
 idt_descr_0: istruc idt_struc
@@ -1249,7 +1116,7 @@ iend
 times (NUM_IDT_ENTRIES-(40+1))*idt_struc_size db 0
 
 
-
+align 8, db 0
 str_start_32: db "Starting 32bit...", 00h
 str_start_64: db "Starting 64bit...", 00h
 

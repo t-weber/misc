@@ -398,10 +398,6 @@ start_32:
 	mov cr0, eax        ; enable paging
 %endif
 
-	; load idt register and enable interrupts
-	lidt [idtr]
-	sti
-
 	;push dword CHAROUT	; address to write to
 	;push dword SCREEN_SIZE	; number of characters to write
 	;call clear_32
@@ -416,6 +412,10 @@ start_32:
 
 	[extern entrypoint]
 	call entrypoint
+
+	; load idt register and enable interrupts
+	lidt [idtr]
+	sti
 
 	call exit_32
 
