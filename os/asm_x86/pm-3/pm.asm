@@ -8,6 +8,7 @@
 ;	- https://wiki.osdev.org/Babystep1
 ;	- https://wiki.osdev.org/Global_Descriptor_Table
 ;	- "Writing a simple operating system -- from scratch" by N. Blundell, 2010
+;	- https://en.wikipedia.org/wiki/X86_calling_conventions
 ;
 
 
@@ -41,6 +42,7 @@
 %define NUM_C_SECTORS     11         ; number of sectors for c code
 %define END_ADDR          ($$ + SECTOR_SIZE * NUM_ASM_SECTORS)
 %define FILL_BYTE         0xf4       ; fill with hlt
+%define USE_STRING_OPS               ; use optimised string functions
 
 ; see https://en.wikipedia.org/wiki/INT_13H
 %define BIOS_FLOPPY0      0x00
@@ -80,8 +82,7 @@
 	push word ATTR_BOLD	; attrib
 	push word str_start_16	; string
 	call write_str_16
-	pop ax	; remove args from stack
-	pop ax	; remove args from stack
+	add sp, WORD_SIZE_16*2	; remove arg from stack
 	;stop_16: jmp stop_16
 
 	; read all needed sectors
@@ -209,64 +210,63 @@ clear_16:
 ; @param [sp + WORD_SIZE_16] pointer to a string
 ;
 write_str_16:
+	push bp
 	mov bp, sp
 
-	mov ax, [bp + WORD_SIZE_16]	; argument: char*
-	push ax
+	push word [bp + WORD_SIZE_16*2] ; argument: char*
 	call strlen_16
-	mov cx, ax	; string length
-	pop ax		; remove arg from stack
-
-	mov bp, sp
+	add sp, WORD_SIZE_16         ; remove arg from stack
 
 	xor ax, ax
-	mov ds, ax	; data segment for char*
-	mov si, [bp + WORD_SIZE_16*1]	; char*
-	mov dh, [bp + WORD_SIZE_16*2]	; attrib
+	mov ds, ax                   ; data segment for char*
+	mov si, [bp + WORD_SIZE_16*2] ; char*
+	mov dh, [bp + WORD_SIZE_16*3] ; attrib
 
-	mov ax, CHAROUT / 16	; base address segment
+	mov ax, CHAROUT / 16         ; base address segment
 	mov es, ax
-	mov di, word 00h	; base address
+	mov di, word 00h             ; base address
 
 	write_loop_16:
-		mov dl, byte [ds:si]	; dereference char*
-		mov [es:di], dl	; store char
-		inc di		; to char attribute index
-		mov [es:di], dh	; store char attributes
-		inc di		; next output char index
-		dec cx		; decrement length counter
-		inc si		; increment char pointer
+		mov dl, byte [ds:si]     ; dereference char*
+		mov [es:di], dl          ; store char
+		inc di                   ; to char attribute index
+		mov [es:di], dh          ; store char attributes
+		inc di                   ; next output char index
+		dec cx                   ; decrement length counter
+		inc si                   ; increment char pointer
 		cmp cx, 0
-		jz write_loop_end_16
-		jmp write_loop_16
-	write_loop_end_16:
+		jnz write_loop_16
 
+	mov sp, bp
+	pop bp
 	ret
 
 
 ;
 ; strlen_16
 ; @param [sp + WORD_SIZE_16] pointer to a string
-; @returns length in eax
+; @returns length in cx
 ;
 strlen_16:
+	push bp
 	mov bp, sp
 
 	xor ax, ax
-	mov ds, ax	; data segment for char*
-	mov si, word [bp + WORD_SIZE_16*1]	; argument: char*
+	mov ds, ax                   ; data segment for char*
+	mov si, word [bp + WORD_SIZE_16*2] ; argument: char*
 
 	xor cx, cx
 	count_chars_16:
-		mov dl, byte [ds:si]	; dl = *str_ptr
+		mov dl, byte [ds:si]     ; dl = *str_ptr
 		cmp dl, 0
 		jz count_chars_end_16
-		inc cx		; ++counter
-		inc si		; ++str_ptr
+		inc cx                   ; ++counter
+		inc si                   ; ++str_ptr
 		jmp count_chars_16
 	count_chars_end_16:
 
-	mov ax, cx
+	mov sp, bp
+	pop bp
 	ret
 ; -----------------------------------------------------------------------------
 
@@ -420,16 +420,34 @@ start_32:
 	call exit_32
 
 
+
 ;
 ; clear screen
 ;
 clear_32:
-	mov ecx, [esp + WORD_SIZE]		; size
-	mov edi, [esp + WORD_SIZE*2]	; base address
+	push ebp
+	mov ebp, esp
 
+	mov ecx, [ebp + WORD_SIZE*2]  ; size
+	mov edi, [ebp + WORD_SIZE*3]  ; base address
+
+%ifdef USE_STRING_OPS
 	mov ax, word 00_00h
 	rep stosw
 
+%else
+	clear_write_loop:
+		mov [edi], word 00_00h    ; store char
+		add edi, 2                ; next output char index
+		dec ecx                   ; decrement length counter
+		cmp ecx, 0
+		jz clear_write_loop_end
+		jmp clear_write_loop
+	clear_write_loop_end:
+%endif
+
+	mov esp, ebp
+	pop ebp
 	ret
 
 
@@ -441,15 +459,18 @@ clear_32:
 ; @param [esp + WORD_SIZE*3] base address to write to
 ;
 write_str_32:
-	mov eax, [esp + WORD_SIZE]	; argument: char*
+	push ebp
+	mov ebp, esp
+
+	mov eax, [ebp + WORD_SIZE*2]	; argument: char*
 	push eax
 	call strlen_32
 	mov ecx, eax	; string length
 	add esp, WORD_SIZE	; remove arg from stack
 
-	mov esi, [esp + WORD_SIZE*1]	; char*
-	mov dh, [esp + WORD_SIZE*2]		; attrib
-	mov edi, [esp + WORD_SIZE*3]	; base address
+	mov esi, [ebp + WORD_SIZE*2]	; char*
+	mov dh, [ebp + WORD_SIZE*3]		; attrib
+	mov edi, [ebp + WORD_SIZE*4]	; base address
 
 	write_loop:
 		mov dl, byte [esi]	; dereference char*
@@ -464,7 +485,10 @@ write_str_32:
 		jmp write_loop
 	write_loop_end:
 
+	mov esp, ebp
+	pop ebp
 	ret
+
 
 
 ;
@@ -473,18 +497,40 @@ write_str_32:
 ; @returns length in eax
 ;
 strlen_32:
-	mov esi, [esp + WORD_SIZE*1]	; argument: char*
-	mov edi, esi	; argument: char*
+	push ebp
+	mov ebp, esp
 
-	mov ecx, 0xffff	; max. string length
-	xor eax, eax	; look for 0
+	mov esi, [ebp + WORD_SIZE*2]  ; argument: char*
+
+%ifdef USE_STRING_OPS
+	mov edi, esi                  ; argument: char*
+
+	mov ecx, 0xffff               ; max. string length
+	xor eax, eax                  ; look for 0
 	repnz scasb
 
-	mov eax, edi	; eax = end_ptr
-	sub eax, esi	; eax -= begin_ptr
+	mov eax, edi                  ; eax = end_ptr
+	sub eax, esi                  ; eax -= begin_ptr
 	sub eax, 1
 
+%else
+	xor ecx, ecx
+	count_chars:
+		mov dl, byte [esi]        ; dl = *string_ptr
+		cmp dl, 0
+		jz count_chars_end
+		inc ecx                   ; ++counter
+		inc esi                   ; ++str_ptr
+		jmp count_chars
+	count_chars_end:
+
+	mov eax, ecx
+%endif
+
+	mov esp, ebp
+	pop ebp
 	ret
+
 
 
 ;
