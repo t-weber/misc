@@ -572,19 +572,14 @@ start_64:
 	mov rbp, qword STACK_START
 
 	; clear screen
-	;push qword CHAROUT      ; address to write to
-	;push qword SCREEN_SIZE  ; number of characters to write
+	;mov rdi, CHAROUT      ; address to write to
+	;mov rcx, SCREEN_SIZE  ; number of characters to write
 	;call clear_64
-	;add rsp, WORD_SIZE*2    ; remove args from stack
 
-	push rbp
-	mov rbp, rsp
-	push qword CHAROUT + SCREEN_COL_SIZE*4	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push qword str_start_64	; string
+	mov rsi, str_start_64	; string
+	mov rdi, CHAROUT + SCREEN_COL_SIZE*4	; address to write to
+	mov dl, ATTR_BOLD	; attrib
 	call write_str_64
-	mov rsp, rbp
-	pop rbp
 
 	[extern entrypoint]
 	call entrypoint
@@ -602,9 +597,6 @@ start_64:
 ;
 align 8
 clear_64:
-	mov rcx, [rsp + WORD_SIZE]		; size
-	mov rdi, [rsp + WORD_SIZE*2]	; base address
-
 	mov ax, word 00_00h
 	rep stosw
 
@@ -614,31 +606,21 @@ clear_64:
 
 ;
 ; write a string to charout
-; @param [rsp + WORD_SIZE] pointer to a string
-; @param [rsp + WORD_SIZE*2] attributes
-; @param [rsp + WORD_SIZE*3] base address to write to
+; @param rsi pointer to a string
+; @param rdi base address to write to
+; @param dl attributes
 ;
 align 8
 write_str_64:
-	mov rax, [rsp + WORD_SIZE]	; argument: char*
-
-	push rbp
-	mov rbp, rsp
-	push rax
+	push rsi
 	call strlen_64
-	mov rcx, rax	; string length
-	mov rsp, rbp
-	pop rbp
-
-	mov rsi, [rsp + WORD_SIZE*1]	; char*
-	mov dh, [rsp + WORD_SIZE*2]		; attrib
-	mov rdi, [rsp + WORD_SIZE*3]	; base address
+	pop rsi
 
 	write_loop:
-		mov dl, byte [rsi]	; dereference char*
-		mov [rdi], dl	; store char
+		mov dh, byte [rsi]	; dereference char*
+		mov byte [rdi], dh	; store char
 		inc rdi		; to char attribute index
-		mov [rdi], dh	; store char attributes
+		mov byte [rdi], dl	; store char attributes
 		inc rdi		; next output char index
 		dec rcx		; decrement length counter
 		inc rsi		; increment char pointer
@@ -651,21 +633,20 @@ write_str_64:
 
 ;
 ; strlen
-; @param [rsp + WORD_SIZE] pointer to a string
-; @returns length in rax
+; @param rsi pointer to a string
+; @returns length in rcx
 ;
 align 8
 strlen_64:
-	mov rsi, [rsp + WORD_SIZE*1]	; argument: char*
-	mov rdi, rsi	; argument: char*
-
-	mov rcx, 0xffff	; max. string length
-	xor rax, rax	; look for 0
-	repnz scasb
-
-	mov rax, rdi	; rax = end_ptr
-	sub rax, rsi	; rax -= begin_ptr
-	sub rax, 1
+	xor rcx, rcx
+	count_chars_64:
+		mov al, byte [rsi]	; dl = *str_ptr
+		cmp al, 0
+		jz count_chars_end_64
+		inc rcx		; ++counter
+		inc rsi		; ++str_ptr
+		jmp count_chars_64
+	count_chars_end_64:
 
 	retq
 
@@ -681,20 +662,19 @@ exit_64:
 	jmp hlt_loop_64
 
 
+
 align 8
 print_exit_64:
 	push rax
-	push qword CHAROUT	; address to write to
-	push qword SCREEN_SIZE	; number of characters to write
+	mov rdi, CHAROUT	; address to write to
+	mov rcx, SCREEN_SIZE	; number of characters to write
 	call clear_64
-	add rsp, WORD_SIZE*2	; remove args from stack
 	pop rax
 
-	push qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push qword ATTR_BOLD	; attrib
-	push rax	; string
+	mov rsi, rax	; string
+	mov rdi, qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
+	mov dl, ATTR_BOLD	; attrib
 	call write_str_64
-	add rsp, WORD_SIZE*3	; remove args from stack
 
 	jmp exit_64
 
