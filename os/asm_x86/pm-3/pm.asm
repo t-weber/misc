@@ -198,9 +198,7 @@ clear_16:
 		add di, 2	; next output char index
 		dec cx		; decrement length counter
 		cmp cx, 0
-		jz clear_write_loop_end_16
-		jmp clear_write_loop_16
-	clear_write_loop_end_16:
+		jnz clear_write_loop_16
 
 	ret
 
@@ -481,9 +479,7 @@ write_str_32:
 		dec ecx		; decrement length counter
 		inc esi		; increment char pointer
 		cmp ecx, 0
-		jz write_loop_end
-		jmp write_loop
-	write_loop_end:
+		jnz write_loop
 
 	mov esp, ebp
 	pop ebp

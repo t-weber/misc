@@ -50,13 +50,13 @@
 %define NUM_GDT_ENTRIES   4
 %define NUM_IDT_ENTRIES   256
 
+%define NUM_ASM_SECTORS   12                     ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
+%define NUM_C_SECTORS     15                     ; number of sectors for c code
+;%define NUM_C_SECTORS     23                    ; number of sectors for c code
 %define SECTOR_SIZE       200h
 %define MBR_BOOTSIG_ADDR  ($$ + SECTOR_SIZE - 2) ; 510 bytes after section start
-%define NUM_ASM_SECTORS   12         ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
-%define NUM_C_SECTORS     15         ; number of sectors for c code
-;%define NUM_C_SECTORS     23         ; number of sectors for c code
 %define END_ADDR          ($$ + SECTOR_SIZE * NUM_ASM_SECTORS)
-%define FILL_BYTE         0xf4       ; fill with hlt
+%define FILL_BYTE         0xf4                   ; fill with hlt
 
 ; see https://en.wikipedia.org/wiki/INT_13H
 %define BIOS_FLOPPY0      0x00
@@ -85,7 +85,7 @@
 ; -----------------------------------------------------------------------------
 [bits 16]
 ;align 2
-;[org BOOTSECT_START]	; not needed, set by linker
+;[org BOOTSECT_START]       ; not needed, set by linker
 	mov sp, STACK_START_16
 	mov bp, STACK_START_16
 	push dx
@@ -94,11 +94,10 @@
 	call clear_16
 
 	; write start message
-	push word ATTR_BOLD	; attrib
-	push word str_start_16	; string
+	push word ATTR_BOLD     ; attrib
+	push word str_start_16  ; string
 	call write_str_16
-	pop ax	; remove args from stack
-	pop ax	; remove args from stack
+	add sp, WORD_SIZE_16*2  ; remove args from stack
 
 	; read all needed sectors
 	; see https://en.wikipedia.org/wiki/INT_13H#INT_13h_AH=02h:_Read_Sectors_From_Drive
@@ -106,40 +105,33 @@
 	;xor ax, ax
 	mov ax, cs
 	mov es, ax
-	mov ah, 02h       ; func
+	mov ah, 02h             ; func
 	mov al, byte (NUM_ASM_SECTORS + NUM_C_SECTORS - 1) ; sector count (boot sector already loaded)
-	mov bx, word start_32 ; destination address es:bx
-	mov cx, 00_02h    ; C = 0, S = 2
-	mov dh, 00h       ; H = 0
-	;mov dl, BIOS_HDD0 ; drive
+	mov bx, word start_32   ; destination address es:bx
+	mov cx, 00_02h          ; C = 0, S = 2
+	mov dh, 00h             ; H = 0
+	;mov dl, BIOS_HDD0      ; drive
 	clc
 	int 13h	; sets carry flag on failure
 	jnc load_sectors_succeeded_16
 		; write error message on failure
-		push word ATTR_BOLD	; attrib
-		push word str_load_error_16	; string
+		push word ATTR_BOLD	        ; attrib
+		push word str_load_error_16 ; string
 		call write_str_16
-		pop ax	; remove args from stack
-		pop ax	; remove args from stack
+		add sp, WORD_SIZE_16*2      ; remove args from stack
 		jmp exit_16
 	load_sectors_succeeded_16:
 
-	; disable interrupts
-	cli
+	cli                             ; disable interrupts
+	call config_pics_16             ; configure pics
+	lgdt [gdtr]                     ; load gdt register
 
-	; configure pics
-	call config_pics_16
-
-	; load gdt register
-	lgdt [gdtr]
-
-	; set protection enable bit
 	mov eax, cr0
-	or eax, 1b << CR0_PROTECT_BIT
+	or eax, 1b << CR0_PROTECT_BIT   ; set protection enable bit
 	mov cr0, eax
 
 	; go to 32 bit code
-	jmp code_descr-gdt_base_addr : start_32	; automatically sets cs
+	jmp code_descr-gdt_base_addr : start_32 ; automatically sets cs
 
 
 
@@ -202,16 +194,16 @@ exit_16:
 ; clear screen
 ;
 clear_16:
-	mov ax, word CHAROUT / 16	; base address segment
+	mov ax, word CHAROUT / 16  ; base address segment
 	mov es, ax
-	mov di, word 00h	; base address
+	mov di, word 00h           ; base address
 
 	mov cx, SCREEN_ROW_SIZE*SCREEN_COL_SIZE*2
 
 	clear_write_loop_16:
-		mov [es:di], word 00_00h	; store char
-		add di, 2	; next output char index
-		dec cx		; decrement length counter
+		mov [es:di], word 00_00h ; store char
+		add di, 2                ; next output char index
+		dec cx                   ; decrement length counter
 		cmp cx, 0
 		jnz clear_write_loop_16
 
@@ -224,62 +216,64 @@ clear_16:
 ; @param [sp + WORD_SIZE_16] pointer to a string
 ;
 write_str_16:
+	push bp
 	mov bp, sp
 
-	mov ax, [bp + WORD_SIZE_16]	; argument: char*
-	push ax
+	push word [bp + WORD_SIZE_16*2] ; argument: char*
 	call strlen_16
-	mov cx, ax	; string length
-	pop ax		; remove arg from stack
-
-	mov bp, sp
+	add sp, WORD_SIZE_16            ; remove arg from stack
 
 	xor ax, ax
-	mov ds, ax	; data segment for char*
-	mov si, [bp + WORD_SIZE_16*1]	; char*
-	mov dh, [bp + WORD_SIZE_16*2]	; attrib
+	mov ds, ax                    ; data segment for char*
+	mov si, [bp + WORD_SIZE_16*2] ; char*
+	mov dh, [bp + WORD_SIZE_16*3] ; attrib
 
-	mov ax, CHAROUT / 16	; base address segment
+	mov ax, CHAROUT / 16         ; base address segment
 	mov es, ax
-	mov di, word 00h	; base address
+	mov di, word 00h             ; base address
 
 	write_loop_16:
-		mov dl, byte [ds:si]	; dereference char*
-		mov [es:di], dl	; store char
-		inc di		; to char attribute index
-		mov [es:di], dh	; store char attributes
-		inc di		; next output char index
-		dec cx		; decrement length counter
-		inc si		; increment char pointer
+		mov dl, byte [ds:si]     ; dereference char*
+		mov [es:di], dl          ; store char
+		inc di                   ; to char attribute index
+		mov [es:di], dh          ; store char attributes
+		inc di                   ; next output char index
+		dec cx                   ; decrement length counter
+		inc si                   ; increment char pointer
 		cmp cx, 0
 		jnz write_loop_16
 
+	mov sp, bp
+	pop bp
 	ret
+
 
 
 ;
 ; strlen_16
 ; @param [sp + WORD_SIZE_16] pointer to a string
-; @returns length in eax
+; @returns length in cx
 ;
 strlen_16:
+	push bp
 	mov bp, sp
 
 	xor ax, ax
-	mov ds, ax	; data segment for char*
-	mov si, word [bp + WORD_SIZE_16*1]	; argument: char*
+	mov ds, ax                         ; data segment for char*
+	mov si, word [bp + WORD_SIZE_16*2] ; argument: char*
 
 	xor cx, cx
 	count_chars_16:
-		mov dl, byte [ds:si]	; dl = *str_ptr
+		mov dl, byte [ds:si]     ; dl = *str_ptr
 		cmp dl, 0
 		jz count_chars_end_16
-		inc cx		; ++counter
-		inc si		; ++str_ptr
+		inc cx                   ; ++counter
+		inc si                   ; ++str_ptr
 		jmp count_chars_16
 	count_chars_end_16:
 
-	mov ax, cx
+	mov sp, bp
+	pop bp
 	ret
 ; -----------------------------------------------------------------------------
 
@@ -378,21 +372,18 @@ start_32:
 	mov esp, dword STACK_START
 	mov ebp, dword STACK_START
 
-	push ebp
-	mov ebp, esp
-	push dword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	push dword ATTR_BOLD	; attrib
-	push str_start_32	; string
+	push dword CHAROUT + SCREEN_COL_SIZE*2 ; address to write to
+	push dword ATTR_BOLD                   ; attrib
+	push str_start_32                      ; string
 	call write_str_32
-	mov esp, ebp
-	pop ebp
+	add esp, WORD_SIZE_32*3                ; remove args from stack
 
 	; paging
 	; see https://wiki.osdev.org/Paging and http://www.lowlevel.eu/wiki/Paging
-	mov eax, PAGING_FRAME_START ; start address of page frames
-	mov ebx, PAGING_PTD_START   ; page table dir. start address
+	mov eax, PAGING_FRAME_START            ; start address of page frames
+	mov ebx, PAGING_PTD_START              ; page table dir. start address
 
-	mov ecx, PAGING_PTD_ENTRIES ; number of page table directory entries
+	mov ecx, PAGING_PTD_ENTRIES            ; number of page table directory entries
 	ptd_loop_avail_pages:
 		; lower dword
 		mov dword [ebx + 0], dword eax
@@ -473,12 +464,17 @@ start_32:
 ; clear screen
 ;
 clear_32:
-	mov ecx, [esp + WORD_SIZE_32]		; size
-	mov edi, [esp + WORD_SIZE_32*2]	; base address
+	push ebp
+	mov ebp, esp
+
+	mov ecx, [ebp + WORD_SIZE_32*2]  ; size
+	mov edi, [ebp + WORD_SIZE_32*3]  ; base address
 
 	mov ax, word 00_00h
 	rep stosw
 
+	mov esp, ebp
+	pop ebp
 	ret
 
 
@@ -490,31 +486,32 @@ clear_32:
 ; @param [esp + WORD_SIZE_32*3] base address to write to
 ;
 write_str_32:
-	mov eax, [esp + WORD_SIZE_32]	; argument: char*
-
 	push ebp
 	mov ebp, esp
+
+	mov eax, [ebp + WORD_SIZE_32*2]   ; argument: char*
 	push eax
 	call strlen_32
-	mov ecx, eax	; string length
-	mov esp, ebp
-	pop ebp
+	mov ecx, eax                      ; string length
+	add esp, WORD_SIZE_32             ; remove arg from stack
 
-	mov esi, [esp + WORD_SIZE_32*1]	; char*
-	mov dh, [esp + WORD_SIZE_32*2]		; attrib
-	mov edi, [esp + WORD_SIZE_32*3]	; base address
+	mov esi, [ebp + WORD_SIZE_32*2]   ; char*
+	mov dh, [ebp + WORD_SIZE_32*3]    ; attrib
+	mov edi, [ebp + WORD_SIZE_32*4]   ; base address
 
 	write_loop_32:
-		mov dl, byte [esi]	; dereference char*
-		mov [edi], dl	; store char
-		inc edi		; to char attribute index
-		mov [edi], dh	; store char attributes
-		inc edi		; next output char index
-		dec ecx		; decrement length counter
-		inc esi		; increment char pointer
+		mov dl, byte [esi]            ; dereference char*
+		mov [edi], dl                 ; store char
+		inc edi                       ; to char attribute index
+		mov [edi], dh                 ; store char attributes
+		inc edi                       ; next output char index
+		dec ecx                       ; decrement length counter
+		inc esi                       ; increment char pointer
 		cmp ecx, 0
 		jnz write_loop_32
 
+	mov esp, ebp
+	pop ebp
 	ret
 
 
@@ -525,17 +522,22 @@ write_str_32:
 ; @returns length in eax
 ;
 strlen_32:
-	mov esi, [esp + WORD_SIZE_32*1]	; argument: char*
-	mov edi, esi	; argument: char*
+	push ebp
+	mov ebp, esp
 
-	mov ecx, 0xffff	; max. string length
-	xor eax, eax	; look for 0
+	mov esi, [ebp + WORD_SIZE_32*2]   ; argument: char*
+	mov edi, esi                      ; argument: char*
+
+	mov ecx, 0xffff                   ; max. string length
+	xor eax, eax                      ; look for 0
 	repnz scasb
 
-	mov eax, edi	; eax = end_ptr
-	sub eax, esi	; eax -= begin_ptr
+	mov eax, edi                      ; eax = end_ptr
+	sub eax, esi                      ; eax -= begin_ptr
 	sub eax, 1
 
+	mov esp, ebp
+	pop ebp
 	ret
 
 
@@ -545,7 +547,7 @@ strlen_32:
 ;
 exit_32:
 	;cli
-	hlt_loop_32: hlt	; loop, because hlt can be interrupted
+	hlt_loop_32: hlt     ; loop, because hlt can be interrupted
 	jmp hlt_loop_32
 ; -----------------------------------------------------------------------------
 
@@ -576,17 +578,16 @@ start_64:
 	;mov rcx, SCREEN_SIZE  ; number of characters to write
 	;call clear_64
 
-	mov rsi, str_start_64	; string
-	mov rdi, CHAROUT + SCREEN_COL_SIZE*4	; address to write to
-	mov dl, ATTR_BOLD	; attrib
+	mov rsi, str_start_64                ; string
+	mov rdi, CHAROUT + SCREEN_COL_SIZE*4 ; address to write to
+	mov dl, ATTR_BOLD                    ; attrib
 	call write_str_64
 
 	[extern entrypoint]
 	call entrypoint
 
-	; load idt register and enable interrupts
-	lidt [idtr]
-	sti
+	lidt [idtr]    ; load idt register
+	sti            ; enable interrupts
 
 	jmp exit_64
 
@@ -617,13 +618,13 @@ write_str_64:
 	pop rsi
 
 	write_loop:
-		mov dh, byte [rsi]	; dereference char*
-		mov byte [rdi], dh	; store char
-		inc rdi		; to char attribute index
-		mov byte [rdi], dl	; store char attributes
-		inc rdi		; next output char index
-		dec rcx		; decrement length counter
-		inc rsi		; increment char pointer
+		mov dh, byte [rsi]  ; dereference char*
+		mov byte [rdi], dh  ; store char
+		inc rdi             ; to char attribute index
+		mov byte [rdi], dl  ; store char attributes
+		inc rdi             ; next output char index
+		dec rcx             ; decrement length counter
+		inc rsi             ; increment char pointer
 		cmp rcx, 0
 		jnz write_loop
 
@@ -640,11 +641,11 @@ align 8
 strlen_64:
 	xor rcx, rcx
 	count_chars_64:
-		mov al, byte [rsi]	; dl = *str_ptr
+		mov al, byte [rsi]  ; dl = *str_ptr
 		cmp al, 0
 		jz count_chars_end_64
-		inc rcx		; ++counter
-		inc rsi		; ++str_ptr
+		inc rcx             ; ++counter
+		inc rsi             ; ++str_ptr
 		jmp count_chars_64
 	count_chars_end_64:
 
@@ -658,7 +659,7 @@ strlen_64:
 align 8
 exit_64:
 	;cli
-	hlt_loop_64: hlt	; loop, because hlt can be interrupted
+	hlt_loop_64: hlt        ; loop, because hlt can be interrupted
 	jmp hlt_loop_64
 
 
@@ -666,14 +667,14 @@ exit_64:
 align 8
 print_exit_64:
 	push rax
-	mov rdi, CHAROUT	; address to write to
-	mov rcx, SCREEN_SIZE	; number of characters to write
+	mov rdi, CHAROUT        ; address to write to
+	mov rcx, SCREEN_SIZE    ; number of characters to write
 	call clear_64
 	pop rax
 
-	mov rsi, rax	; string
-	mov rdi, qword CHAROUT + SCREEN_COL_SIZE*2	; address to write to
-	mov dl, ATTR_BOLD	; attrib
+	mov rsi, rax            ; string
+	mov rdi, qword CHAROUT + SCREEN_COL_SIZE*2  ; address to write to
+	mov dl, ATTR_BOLD       ; attrib
 	call write_str_64
 
 	jmp exit_64
@@ -699,7 +700,7 @@ isr_keyb:
 	xor rax, rax
 	in al, KEYB_DATA_PORT
 
-	mov rdi, rax	; calling convention passes arguments in registers, not on stack
+	mov rdi, rax         ; calling convention passes arguments in registers, not on stack
 	;push rax
 	[extern keyb_event]
 	call keyb_event
