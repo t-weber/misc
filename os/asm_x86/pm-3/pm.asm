@@ -278,52 +278,50 @@ strlen_16:
 
 ; gdt table description
 struc gdtr_struc
-	gdt_size resw 1
-	gdt_offs resd 1
+	.size resw 1
+	.offs resd 1
 endstruc
 
 ; gdt table entries
 struc gdt_struc
-	gdt_limit0_15 resb 2
-	gdt_base0_23 resb 3
-	gdt_access resb 1
-	gdt_sizes_limit16_19 resb 1
-	gdt_base24_31 resb 1
+	.limit0_15 resw 1
+	.base0_15 resw 1
+	.base16_23 resb 1
+	.access resb 1
+	.sizes_limit16_19 resb 1
+	.base24_31 resb 1
 endstruc
-
 
 ; see https://wiki.osdev.org/Babystep7
 gdtr: istruc gdtr_struc
-	at gdt_size, dw gdt_struc_size*NUM_GDT_ENTRIES - 1	; size - 1
-	at gdt_offs, dd gdt_base_addr
+	at gdtr_struc.size, dw gdt_struc_size*NUM_GDT_ENTRIES - 1	; size - 1
+	at gdtr_struc.offs, dd gdt_base_addr
 iend
 
-gdt_base_addr:
-	times gdt_struc_size db 0	; null descriptor
+%define GDT_PRESENT     (1b << 7)
+%define GDT_CODEDATA    (1b << 4)
+%define GDT_EXEC        (1b << 3)
+%define GDT_EXPAND_DOWN (1b << 2)
+%define GDT_WRITABLE    (1b << 1)
+%define GDT_READABLE    (1b << 1)
+%define GDT_GRANULARITY (1b << 7)
+%define GDT_32BIT       (1b << 6)
 
-data_descr: istruc gdt_struc
-	at gdt_limit0_15, db 0xff, 0xff
-	at gdt_base0_23, db 00h, 00h, 00h
-	at gdt_access, db 1_00_1_0_0_1_0b        ; present=1, ring=0, code/data=1, exec=0, expand-down=0, writable=1, accessed=0
-	at gdt_sizes_limit16_19, db 1_1_00_1111b ; granularity=1, 32bit=1
-	at gdt_base24_31, db 00h
-iend
+%macro gdt_descr 5 ; args: limit, base, flags, flags 2, ring
+	istruc gdt_struc
+		at gdt_struc.limit0_15, dw (%1 & 0xffff)
+		at gdt_struc.base0_15, dw (%2 & 0xffff)
+		at gdt_struc.base16_23, db (%2>>16)
+		at gdt_struc.access, db %3 | (%5 << 5)
+		at gdt_struc.sizes_limit16_19, db %4 | (%1>>16 & 0xf)
+		at gdt_struc.base24_31, db (%2>>24 & 0xff)
+	iend
+%endmacro
 
-stack_descr: istruc gdt_struc
-	at gdt_limit0_15, db 0x00, 0x00
-	at gdt_base0_23, db 00h, 00h, 00h
-	at gdt_access, db 1_00_1_0_1_1_0b        ; present=1, ring=0, code/data=1, exec=0, expand-down=1, writable=1, accessed=0
-	at gdt_sizes_limit16_19, db 1_1_00_0000b ; granularity=1, 32bit=1
-	at gdt_base24_31, db 00h
-iend
-
-code_descr: istruc gdt_struc
-	at gdt_limit0_15, db 0xff, 0xff
-	at gdt_base0_23, db 00h, 00h, 00h
-	at gdt_access, db 1_00_1_1_0_1_0b        ; present=1, ring=0, code/data=1, exec=1, conform=0, readable=1, accessed=0
-	at gdt_sizes_limit16_19, db 1_1_00_1111b ; granularity=1, 32bit=1
-	at gdt_base24_31, db 00h
-iend
+gdt_base_addr: times gdt_struc_size db 0	; null descriptor
+data_descr: gdt_descr 0xffffff, 0x0, GDT_PRESENT|GDT_CODEDATA|GDT_WRITABLE, GDT_GRANULARITY|GDT_32BIT, 0
+stack_descr: gdt_descr 0x0, 0x0, GDT_PRESENT|GDT_CODEDATA|GDT_WRITABLE|GDT_EXPAND_DOWN, GDT_GRANULARITY|GDT_32BIT, 0
+code_descr: gdt_descr 0xffffff, 0x0, GDT_PRESENT|GDT_CODEDATA|GDT_READABLE|GDT_EXEC, GDT_GRANULARITY|GDT_32BIT, 0
 
 
 str_start_16: db "Starting 16bit...", 00h
@@ -844,218 +842,72 @@ endstruc
 ; see https://wiki.osdev.org/Interrupt_Descriptor_Table
 ; idt table description
 struc idtr_struc
-	idt_size resw 1
-	idt_offs resd 1
+	.size resw 1
+	.offs resd 1
 endstruc
 
 ; idt table entries
 struc idt_struc
-	idt_offs0_15 resw 1
-	idt_codeseg resw 1
-	idt_reserved resb 1
-	idt_flags resb 1
-	idt_offs16_31 resw 1
+	.offs0_15 resw 1
+	.codeseg resw 1
+	.reserved resb 1
+	.flags resb 1
+	.offs16_31 resw 1
 endstruc
 
 
 idtr: istruc idtr_struc
-	at idt_size, dw idt_struc_size*NUM_IDT_ENTRIES - 1	; size - 1
-	at idt_offs, dd idt_base_addr
+	at idtr_struc.size, dw idt_struc_size*NUM_IDT_ENTRIES - 1	; size - 1
+	at idtr_struc.offs, dd idt_base_addr
 iend
 
 
 ; see https://wiki.osdev.org/Interrupt_Vector_Table
+; interrupt descriptor
+%macro idt_descr 1
+	istruc idt_struc
+		at idt_struc.offs0_15, dw %1
+		at idt_struc.codeseg, dw code_descr-gdt_base_addr
+		at idt_struc.reserved, db 00h
+		at idt_struc.flags, db 1_00_0_1110b  ; used=1, ring=0, trap/int=0, int. gate
+		at idt_struc.offs16_31, dw (BOOTSECT_START-$$ + %1) >> 10h
+	iend
+%endmacro
+
+align 8, db 0
 idt_base_addr:
 
-idt_descr_0: istruc idt_struc
-	at idt_offs0_15, dw isr_div0
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_div0) >> 10h
-iend
-
-idt_descr_1: istruc idt_struc
-	at idt_offs0_15, dw isr_null
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
-iend
-
-idt_descr_2: istruc idt_struc
-	at idt_offs0_15, dw isr_null
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
-iend
-
-idt_descr_3: istruc idt_struc
-	at idt_offs0_15, dw isr_null
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
-iend
-
-idt_descr_4: istruc idt_struc
-	at idt_offs0_15, dw isr_overflow
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_overflow) >> 10h
-iend
-
-idt_descr_5: istruc idt_struc
-	at idt_offs0_15, dw isr_bounds
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_bounds) >> 10h
-iend
-
-idt_descr_6: istruc idt_struc
-	at idt_offs0_15, dw isr_instr
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_instr) >> 10h
-iend
-
-idt_descr_7: istruc idt_struc
-	at idt_offs0_15, dw isr_dev
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_dev) >> 10h
-iend
-
-idt_descr_8: istruc idt_struc
-	at idt_offs0_15, dw isr_df
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_df) >> 10h
-iend
-
-idt_descr_9: istruc idt_struc
-	at idt_offs0_15, dw isr_overrun
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_overrun) >> 10h
-iend
-
-idt_descr_10: istruc idt_struc
-	at idt_offs0_15, dw isr_tssfault
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_tssfault) >> 10h
-iend
-
-idt_descr_11: istruc idt_struc
-	at idt_offs0_15, dw isr_segfault_notavail
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_segfault_notavail) >> 10h
-iend
-
-idt_descr_12: istruc idt_struc
-	at idt_offs0_15, dw isr_segfault_stack
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_segfault_stack) >> 10h
-iend
-
-idt_descr_13: istruc idt_struc
-	at idt_offs0_15, dw isr_gpf
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_gpf) >> 10h
-iend
-
-idt_descr_14: istruc idt_struc
-	at idt_offs0_15, dw isr_pagefault
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_pagefault) >> 10h
-iend
-
-idt_descr_15: istruc idt_struc
-	at idt_offs0_15, dw isr_null
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
-iend
-
-idt_descr_16: istruc idt_struc
-	at idt_offs0_15, dw isr_fpu
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_fpu) >> 10h
-iend
-
-idt_descr_17: istruc idt_struc
-	at idt_offs0_15, dw isr_align
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_align) >> 10h
-iend
-
-idt_descr_18: istruc idt_struc
-	at idt_offs0_15, dw isr_mce
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_mce) >> 10h
-iend
-
-idt_descr_19: istruc idt_struc
-	at idt_offs0_15, dw isr_simd
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_simd) >> 10h
-iend
+idt_descr_0: idt_descr isr_div0
+idt_descr_1: idt_descr isr_null
+idt_descr_2: idt_descr isr_null
+idt_descr_3: idt_descr isr_null
+idt_descr_4: idt_descr isr_overflow
+idt_descr_5: idt_descr isr_bounds
+idt_descr_6: idt_descr isr_instr
+idt_descr_7: idt_descr isr_dev
+idt_descr_8: idt_descr isr_df
+idt_descr_9: idt_descr isr_overrun
+idt_descr_10: idt_descr isr_tssfault
+idt_descr_11: idt_descr isr_segfault_notavail
+idt_descr_12: idt_descr isr_segfault_stack
+idt_descr_13: idt_descr isr_gpf
+idt_descr_14: idt_descr isr_pagefault
+idt_descr_15: idt_descr isr_null
+idt_descr_16: idt_descr isr_fpu
+idt_descr_17: idt_descr isr_align
+idt_descr_18: idt_descr isr_mce
+idt_descr_19: idt_descr isr_simd
 
 ; null descriptors till the beginning of the primary pic interrupts
 times (PIC0_INT_OFFS-(19+1))*idt_struc_size db 0
 
-idt_descr_32: istruc idt_struc
-	at idt_offs0_15, dw isr_timer
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_timer) >> 10h
-iend
-
-idt_descr_33: istruc idt_struc
-	at idt_offs0_15, dw isr_keyb
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_keyb) >> 10h
-iend
+idt_descr_32: idt_descr isr_timer
+idt_descr_33: idt_descr isr_keyb
 
 ; null descriptors till the beginning of the secondary pic interrupts
 times (PIC1_INT_OFFS-(33+1))*idt_struc_size db 0
 
-idt_descr_40: istruc idt_struc
-	at idt_offs0_15, dw isr_rtc
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_reserved, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_rtc) >> 10h
-iend
+idt_descr_40: idt_descr isr_rtc
 
 ; null descriptors for the rest of the interrupts
 times (NUM_IDT_ENTRIES-(40+1))*idt_struc_size db 0

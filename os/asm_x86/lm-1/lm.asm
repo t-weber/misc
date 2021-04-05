@@ -12,18 +12,17 @@
 ;	- "Writing a simple operating system -- from scratch" by N. Blundell, 2010
 ;
 
-
 %define WORD_SIZE         8
 %define WORD_SIZE_32      4
 %define WORD_SIZE_16      2
 
 ; see https://wiki.osdev.org/CPU_Registers_x86-64#IA32_EFER
 %define REG_EFER          0xc000_0080
-%define EFER_LM_BIT       8
-%define CR0_PROTECT_BIT   0
-%define CR0_PAGING_BIT    31
-%define CR4_PAGESIZE      4
-%define CR4_ADDREXT       5
+%define EFER_LM           (1b << 8)
+%define CR0_PM            (1b << 0)
+%define CR0_PAGING        (1b << 31)
+%define CR4_PAGESIZE      (1b << 4)
+%define CR4_ADDREXT       (1b << 5)
 
 %define PAGING_PML4_START      (1b << 23)                       ; PML4 paging table starts at 8 MB
 %define PAGING_PDPT_START      (PAGING_PML4_START + (1b << 12)) ; page dir. pointer table starts at +4kB
@@ -33,6 +32,22 @@
 %define PAGING_PTD_ENTRIES     4                                ; number of present page table directory entries
 %define PAGING_PTD_MAX_ENTRIES 512                              ; number of max. page table directory entries
 %define PAGING_FRAME_SIZE      (1b << 21)                       ; 2 MB page frames
+
+%define PTD_SIZE          (1b << 7)
+%define PTD_AVAIL         (1b << 6)
+%define PTD_SUPERVISOR    (1b << 2)
+%define PTD_WRITE         (1b << 1)
+%define PTD_PRESENT       (1b << 0)
+
+%define PDPT_AVAIL        (1b << 6)
+%define PDPT_SUPERVISOR   (1b << 2)
+%define PDPT_WRITE        (1b << 1)
+%define PDPT_PRESENT      (1b << 0)
+
+%define PML4_AVAIL        (1b << 6)
+%define PML4_SUPERVISOR   (1b << 2)
+%define PML4_WRITE        (1b << 1)
+%define PML4_PRESENT      (1b << 0)
 
 ; see https://jbwyatt.com/253/emu/memory.html
 %define CHAROUT           000b_8000h ; base address for character output
@@ -49,6 +64,16 @@
 
 %define NUM_GDT_ENTRIES   4
 %define NUM_IDT_ENTRIES   256
+
+%define GDT_PRESENT       (1b << 7)
+%define GDT_CODEDATA      (1b << 4)
+%define GDT_EXEC          (1b << 3)
+%define GDT_EXPAND_DOWN   (1b << 2)
+%define GDT_WRITABLE      (1b << 1)
+%define GDT_READABLE      (1b << 1)
+%define GDT_GRANULARITY   (1b << 7)
+%define GDT_32BIT         (1b << 6)
+%define GDT_64BIT         (1b << 5)
 
 %define NUM_ASM_SECTORS   12                     ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
 %define NUM_C_SECTORS     15                     ; number of sectors for c code
@@ -127,7 +152,7 @@
 	lgdt [gdtr]                     ; load gdt register
 
 	mov eax, cr0
-	or eax, 1b << CR0_PROTECT_BIT   ; set protection enable bit
+	or eax, CR0_PM                  ; set protection enable bit
 	mov cr0, eax
 
 	; go to 32 bit code
@@ -287,53 +312,44 @@ strlen_16:
 
 ; gdt table description
 struc gdtr_struc
-	gdt_size resw 1
-	gdt_offs resq 1
+	.size resw 1
+	.offs resq 1
 endstruc
 
 ; gdt table entries
 struc gdt_struc
-	gdt_limit0_15 resb 2
-	gdt_base0_23 resb 3
-	gdt_access resb 1
-	gdt_sizes_limit16_19 resb 1
-	gdt_base24_31 resb 1
+	.limit0_15 resw 1
+	.base0_15 resw 1
+	.base16_23 resb 1
+	.access resb 1
+	.sizes_limit16_19 resb 1
+	.base24_31 resb 1
 endstruc
 
-
+align 4, db 0
 ; see https://wiki.osdev.org/Babystep7
 gdtr: istruc gdtr_struc
-	at gdt_size, dw gdt_struc_size*NUM_GDT_ENTRIES - 1	; size - 1
-	at gdt_offs, dq gdt_base_addr
+	at gdtr_struc.size, dw gdt_struc_size*NUM_GDT_ENTRIES - 1	; size - 1
+	at gdtr_struc.offs, dq gdt_base_addr
 iend
 
-gdt_base_addr:
-	times gdt_struc_size db 0	; null descriptor
+%macro gdt_descr 5 ; args: limit, base, flags, flags 2, ring
+	istruc gdt_struc
+		at gdt_struc.limit0_15, dw (%1 & 0xffff)
+		at gdt_struc.base0_15, dw (%2 & 0xffff)
+		at gdt_struc.base16_23, db (%2>>16)
+		at gdt_struc.access, db %3 | (%5 << 5)
+		at gdt_struc.sizes_limit16_19, db %4 | (%1>>16 & 0xf)
+		at gdt_struc.base24_31, db (%2>>24 & 0xff)
+	iend
+%endmacro
 
-data_descr: istruc gdt_struc
-	at gdt_limit0_15, db 0xff, 0xff
-	at gdt_base0_23, db 00h, 00h, 00h
-	at gdt_access, db 1_00_1_0_0_1_0b        ; present=1, ring=0, code/data=1, exec=0, expand-down=0, writable=1, accessed=0
-	at gdt_sizes_limit16_19, db 1_1_00_1111b ; granularity=1, 32bit=1
-	at gdt_base24_31, db 00h
-iend
+align 4, db 0
+gdt_base_addr: times gdt_struc_size db 0	; null descriptor
 
-stack_descr: istruc gdt_struc
-	at gdt_limit0_15, db 0x00, 0x00
-	at gdt_base0_23, db 00h, 00h, 00h
-	at gdt_access, db 1_00_1_0_1_1_0b        ; present=1, ring=0, code/data=1, exec=0, expand-down=1, writable=1, accessed=0
-	at gdt_sizes_limit16_19, db 1_1_00_0000b ; granularity=1, 32bit=1
-	at gdt_base24_31, db 00h
-iend
-
-code_descr: istruc gdt_struc
-	at gdt_limit0_15, db 0xff, 0xff
-	at gdt_base0_23, db 00h, 00h, 00h
-	at gdt_access, db 1_00_1_1_0_1_0b        ; present=1, ring=0, code/data=1, exec=1, conform=0, readable=1, accessed=0
-	at gdt_sizes_limit16_19, db 1_1_00_1111b ; granularity=1, 32bit=1
-	at gdt_base24_31, db 00h
-iend
-
+data_descr: gdt_descr 0xffffff, 0x0, GDT_PRESENT|GDT_CODEDATA|GDT_WRITABLE, GDT_GRANULARITY|GDT_32BIT, 0
+stack_descr: gdt_descr 0x0, 0x0, GDT_PRESENT|GDT_CODEDATA|GDT_WRITABLE|GDT_EXPAND_DOWN, GDT_GRANULARITY|GDT_32BIT, 0
+code_descr: gdt_descr 0xffffff, 0x0, GDT_PRESENT|GDT_CODEDATA|GDT_READABLE|GDT_EXEC, GDT_GRANULARITY|GDT_32BIT, 0
 
 str_start_16: db "Starting 16bit...", 00h
 str_load_error_16: db "Error loading sectors.", 00h
@@ -387,8 +403,7 @@ start_32:
 	ptd_loop_avail_pages:
 		; lower dword
 		mov dword [ebx + 0], dword eax
-		; size=1, avail=1, accessed=0, cache flags=00, supervisor=1, write=1, present=1
-		or byte [ebx + 0], byte 110_00_111b
+		or byte [ebx + 0], byte PTD_SIZE|PTD_AVAIL|PTD_SUPERVISOR|PTD_WRITE|PTD_PRESENT
 		; upper dword
 		mov dword [ebx + 4], dword 00_00_00_00h
 
@@ -405,7 +420,7 @@ start_32:
 		; lower dword
 		mov dword [ebx + 0], dword eax
 		; size=1, avail=0, accessed=0, cache flags=00, supervisor=1, write=1, present=0
-		or byte [ebx + 0], byte 100_00_110b
+		or byte [ebx + 0], byte PTD_SIZE|PTD_SUPERVISOR|PTD_WRITE
 		; upper dword
 		mov dword [ebx + 4], dword 00_00_00_00h
 
@@ -419,14 +434,13 @@ start_32:
 
 	; page dir. pointer table
 	mov dword [PAGING_PDPT_START + 0], dword PAGING_PTD_START  ; page table dir. start address
-	; avail=1, accessed=0, cache flags=00, supervisor=1, write=1, present=1
-	or byte [PAGING_PDPT_START + 0], byte 010_00_111b
+	or byte [PAGING_PDPT_START + 0], byte PDPT_AVAIL|PDPT_SUPERVISOR|PDPT_WRITE|PDPT_PRESENT
 	mov dword [PAGING_PDPT_START + 4], dword 00_00_00_00h
 
 	; pml4 table
 	mov dword [PAGING_PML4_START + 0], dword PAGING_PDPT_START ; page dir. pointer table start address
 	; avail=1, accessed=0, cache flags=00, supervisor=1, write=1, present=1
-	or byte [PAGING_PML4_START + 0], byte 010_00_111b
+	or byte [PAGING_PML4_START + 0], byte PML4_AVAIL|PML4_SUPERVISOR|PML4_WRITE|PML4_PRESENT
 	mov dword [PAGING_PML4_START + 4], dword 00_00_00_00h
 
 	mov eax, PAGING_PML4_START
@@ -436,23 +450,23 @@ start_32:
 	; see https://wiki.osdev.org/CPU_Registers_x86-64#IA32_EFER
 	mov ecx, REG_EFER
 	rdmsr
-	or eax, 1b << EFER_LM_BIT
+	or eax, EFER_LM
 	wrmsr
 
 	; reset segmentation: modify gdt entries and reload gdt register
-	mov byte [data_descr + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
-	mov byte [stack_descr + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
-	mov byte [code_descr + gdt_sizes_limit16_19], byte 1_0_1_0_1111b ; granularity=1, 32bit=0, 64bit=1
+	mov byte [data_descr + gdt_struc.sizes_limit16_19], byte GDT_GRANULARITY|GDT_64BIT|0xf
+	mov byte [stack_descr + gdt_struc.sizes_limit16_19], byte GDT_GRANULARITY|GDT_64BIT|0xf
+	mov byte [code_descr + gdt_struc.sizes_limit16_19], byte GDT_GRANULARITY|GDT_64BIT|0xf
 	lgdt [gdtr]
 
 	; set address extension
 	mov eax, cr4
-	or eax, 1b << CR4_ADDREXT ;| 1b << CR4_PAGESIZE
+	or eax, CR4_ADDREXT ;| CR4_PAGESIZE
 	mov cr4, eax
 
 	; enable paging
 	mov eax, cr0
-	or eax, 1b << CR0_PAGING_BIT
+	or eax, CR0_PAGING
 	mov cr0, eax
 
 	; go to 64 bit code
@@ -689,13 +703,13 @@ print_exit_64:
 ;
 ; dummy isr
 ;
-align 16
+align 8
 isr_null:
 	iretq
 
 
 ; see https://wiki.osdev.org/%228042%22_PS/2_Controller
-align 16
+align 8
 isr_keyb:
 	xor rax, rax
 	in al, KEYB_DATA_PORT
@@ -709,7 +723,7 @@ isr_keyb:
 	iretq
 
 
-align 16
+align 8
 isr_timer:
 	[extern timer_event]
 	call timer_event
@@ -717,7 +731,7 @@ isr_timer:
 	iretq
 
 
-align 16
+align 8
 isr_rtc:
 	[extern rtc_event]
 	call rtc_event
@@ -725,97 +739,97 @@ isr_rtc:
 	iretq
 
 
-align 16
+align 8
 isr_div0:
 	mov rax, str_div0_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_overflow:
 	mov rax, str_overflow_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_bounds:
 	mov rax, str_bounds_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_instr:
 	mov rax, str_instr_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_dev:
 	mov rax, str_dev_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_tssfault:
 	mov rax, str_tssfault_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_segfault_notavail:
 	mov rax, str_segfault_notavail_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_segfault_stack:
 	mov rax, str_segfault_stack_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_pagefault:
 	mov rax, str_pagefault_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_df:
 	mov rax, str_df_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_overrun:
 	mov rax, str_overrun_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_gpf:
 	mov rax, str_gpf_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_fpu:
 	mov rax, str_fpu_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_align:
 	mov rax, str_align_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_mce:
 	mov rax, str_mce_64
 	jmp print_exit_64
 
 
-align 16
+align 8
 isr_simd:
 	mov rax, str_simd_64
 	jmp print_exit_64
@@ -830,268 +844,77 @@ isr_simd:
 ; idt table description
 ; see https://wiki.osdev.org/Interrupt_Descriptor_Table
 struc idtr_struc
-	idt_size resw 1
-	idt_offs resq 1
+	.size resw 1
+	.offs resq 1
 endstruc
 
 ; idt table entries
 struc idt_struc
-	idt_offs0_15 resw 1
-	idt_codeseg resw 1
-	idt_stackoffs resb 1
-	idt_flags resb 1
-	idt_offs16_31 resw 1
-	idt_offs32_63 resd 1
-	idt_reserved resd 1
+	.offs0_15 resw 1
+	.codeseg resw 1
+	.stackoffs resb 1
+	.flags resb 1
+	.offs16_31 resw 1
+	.offs32_63 resd 1
+	.reserved resd 1
 endstruc
 
 
-
+align 8, db 0
 idtr: istruc idtr_struc
-	at idt_size, dw idt_struc_size*NUM_IDT_ENTRIES - 1	; size - 1
-	at idt_offs, dq idt_base_addr
+	at idtr_struc.size, dw idt_struc_size*NUM_IDT_ENTRIES - 1	; size - 1
+	at idtr_struc.offs, dq idt_base_addr
 iend
 
 
 ; see https://wiki.osdev.org/Interrupt_Vector_Table
-align 16, db 0
+; interrupt descriptor
+%macro idt_descr 1
+	istruc idt_struc
+		at idt_struc.offs0_15, dw %1
+		at idt_struc.codeseg, dw code_descr-gdt_base_addr
+		at idt_struc.stackoffs, db 00h
+		at idt_struc.flags, db 1_00_0_1110b  ; used=1, ring=0, trap/int=0, int. gate
+		at idt_struc.offs16_31, dw (BOOTSECT_START-$$ + %1) >> 10h
+		at idt_struc.offs32_63, dd (BOOTSECT_START-$$ + %1) >> 20h
+		at idt_struc.reserved, dd 00h
+	iend
+%endmacro
+
+align 8, db 0
 idt_base_addr:
 
-idt_descr_0: istruc idt_struc
-	at idt_offs0_15, dw isr_div0
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_div0) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_div0) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_1: istruc idt_struc
-	at idt_offs0_15, dw isr_null
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_null) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_2: istruc idt_struc
-	at idt_offs0_15, dw isr_null
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_null) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_3: istruc idt_struc
-	at idt_offs0_15, dw isr_null
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_null) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_4: istruc idt_struc
-	at idt_offs0_15, dw isr_overflow
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_overflow) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_overflow) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_5: istruc idt_struc
-	at idt_offs0_15, dw isr_bounds
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_bounds) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_bounds) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_6: istruc idt_struc
-	at idt_offs0_15, dw isr_instr
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_instr) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_instr) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_7: istruc idt_struc
-	at idt_offs0_15, dw isr_dev
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_dev) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_dev) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_8: istruc idt_struc
-	at idt_offs0_15, dw isr_df
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_df) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_df) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_9: istruc idt_struc
-	at idt_offs0_15, dw isr_overrun
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_overrun) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_overrun) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_10: istruc idt_struc
-	at idt_offs0_15, dw isr_tssfault
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_tssfault) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_tssfault) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_11: istruc idt_struc
-	at idt_offs0_15, dw isr_segfault_notavail
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_segfault_notavail) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_segfault_notavail) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_12: istruc idt_struc
-	at idt_offs0_15, dw isr_segfault_stack
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_segfault_stack) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_segfault_stack) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_13: istruc idt_struc
-	at idt_offs0_15, dw isr_gpf
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_gpf) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_gpf) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_14: istruc idt_struc
-	at idt_offs0_15, dw isr_pagefault
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_pagefault) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_pagefault) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_15: istruc idt_struc
-	at idt_offs0_15, dw isr_null
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_null) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_null) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_16: istruc idt_struc
-	at idt_offs0_15, dw isr_fpu
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_fpu) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_fpu) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_17: istruc idt_struc
-	at idt_offs0_15, dw isr_align
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_align) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_align) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_18: istruc idt_struc
-	at idt_offs0_15, dw isr_mce
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_mce) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_mce) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_19: istruc idt_struc
-	at idt_offs0_15, dw isr_simd
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_simd) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_simd) >> 20h
-	at idt_reserved, dd 00h
-iend
+idt_descr_0: idt_descr isr_div0
+idt_descr_1: idt_descr isr_null
+idt_descr_2: idt_descr isr_null
+idt_descr_3: idt_descr isr_null
+idt_descr_4: idt_descr isr_overflow
+idt_descr_5: idt_descr isr_bounds
+idt_descr_6: idt_descr isr_instr
+idt_descr_7: idt_descr isr_dev
+idt_descr_8: idt_descr isr_df
+idt_descr_9: idt_descr isr_overrun
+idt_descr_10: idt_descr isr_tssfault
+idt_descr_11: idt_descr isr_segfault_notavail
+idt_descr_12: idt_descr isr_segfault_stack
+idt_descr_13: idt_descr isr_gpf
+idt_descr_14: idt_descr isr_pagefault
+idt_descr_15: idt_descr isr_null
+idt_descr_16: idt_descr isr_fpu
+idt_descr_17: idt_descr isr_align
+idt_descr_18: idt_descr isr_mce
+idt_descr_19: idt_descr isr_simd
 
 ; null descriptors till the beginning of the primary pic interrupts
 times (PIC0_INT_OFFS-(19+1))*idt_struc_size db 0
 
-idt_descr_32: istruc idt_struc
-	at idt_offs0_15, dw isr_timer
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_timer) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_timer) >> 20h
-	at idt_reserved, dd 00h
-iend
-
-idt_descr_33: istruc idt_struc
-	at idt_offs0_15, dw isr_keyb
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_keyb) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_keyb) >> 20h
-	at idt_reserved, dd 00h
-iend
+idt_descr_32: idt_descr isr_timer
+idt_descr_33: idt_descr isr_keyb
 
 ; null descriptors till the beginning of the secondary pic interrupts
 times (PIC1_INT_OFFS-(33+1))*idt_struc_size db 0
 
-idt_descr_40: istruc idt_struc
-	at idt_offs0_15, dw isr_rtc
-	at idt_codeseg, dw code_descr-gdt_base_addr
-	at idt_stackoffs, db 00h
-	at idt_flags, db 1_00_0_1110b	; used=1, ring=0, trap/int=0, int. gate
-	at idt_offs16_31, dw (BOOTSECT_START-$$ + isr_rtc) >> 10h
-	at idt_offs32_63, dd (BOOTSECT_START-$$ + isr_rtc) >> 20h
-	at idt_reserved, dd 00h
-iend
+idt_descr_40: idt_descr isr_rtc
 
 ; null descriptors for the rest of the interrupts
 times (NUM_IDT_ENTRIES-(40+1))*idt_struc_size db 0
