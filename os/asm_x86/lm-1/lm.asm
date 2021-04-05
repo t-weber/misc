@@ -16,6 +16,9 @@
 %define WORD_SIZE_32      4
 %define WORD_SIZE_16      2
 
+; -----------------------------------------------------------------------------
+; paging
+; -----------------------------------------------------------------------------
 ; see https://wiki.osdev.org/CPU_Registers_x86-64#IA32_EFER
 %define REG_EFER          0xc000_0080
 %define EFER_LM           (1b << 8)
@@ -48,7 +51,11 @@
 %define PML4_SUPERVISOR   (1b << 2)
 %define PML4_WRITE        (1b << 1)
 %define PML4_PRESENT      (1b << 0)
+; -----------------------------------------------------------------------------
 
+; -----------------------------------------------------------------------------
+; addresses
+; -----------------------------------------------------------------------------
 ; see https://jbwyatt.com/253/emu/memory.html
 %define CHAROUT           000b_8000h ; base address for character output
 %define SCREEN_ROW_SIZE   25
@@ -61,7 +68,11 @@
 %define STACK_START_16    7fffh      ; some (arbitrary) stack base address
 %define STACK_START       0040_0000h ; stack base address at 4MB
 ;%define STACK_START       00f0_0000h ; stack base address at 16MB
+; -----------------------------------------------------------------------------
 
+; -----------------------------------------------------------------------------
+; segmentation
+; -----------------------------------------------------------------------------
 %define NUM_GDT_ENTRIES   4
 %define NUM_IDT_ENTRIES   256
 
@@ -75,6 +86,15 @@
 %define GDT_32BIT         (1b << 6)
 %define GDT_64BIT         (1b << 5)
 
+%define SEG_DATA_START    0
+%define SEG_DATA_LEN      0xffffff
+%define SEG_STACK_START   0
+%define SEG_STACK_LEN     0
+%define SEG_CODE_START    0
+%define SEG_CODE_LEN      0xffffff
+; -----------------------------------------------------------------------------
+
+; -----------------------------------------------------------------------------
 %define NUM_ASM_SECTORS   12                     ; total number of sectors  ceil("pm.x86" file size / SECTOR_SIZE)
 %define NUM_C_SECTORS     15                     ; number of sectors for c code
 ;%define NUM_C_SECTORS     23                    ; number of sectors for c code
@@ -102,6 +122,7 @@
 
 ; https://wiki.osdev.org/%228042%22_PS/2_Controller
 %define KEYB_DATA_PORT    0x60
+; -----------------------------------------------------------------------------
 
 
 ; -----------------------------------------------------------------------------
@@ -347,9 +368,12 @@ iend
 align 4, db 0
 gdt_base_addr: times gdt_struc_size db 0	; null descriptor
 
-data_descr: gdt_descr 0xffffff, 0x0, GDT_PRESENT|GDT_CODEDATA|GDT_WRITABLE, GDT_GRANULARITY|GDT_32BIT, 0
-stack_descr: gdt_descr 0x0, 0x0, GDT_PRESENT|GDT_CODEDATA|GDT_WRITABLE|GDT_EXPAND_DOWN, GDT_GRANULARITY|GDT_32BIT, 0
-code_descr: gdt_descr 0xffffff, 0x0, GDT_PRESENT|GDT_CODEDATA|GDT_READABLE|GDT_EXEC, GDT_GRANULARITY|GDT_32BIT, 0
+data_descr: gdt_descr SEG_DATA_LEN, SEG_DATA_START, \
+	GDT_PRESENT|GDT_CODEDATA|GDT_WRITABLE, GDT_GRANULARITY|GDT_32BIT, 0
+stack_descr: gdt_descr SEG_STACK_LEN, SEG_STACK_START, \
+	GDT_PRESENT|GDT_CODEDATA|GDT_WRITABLE|GDT_EXPAND_DOWN, GDT_GRANULARITY|GDT_32BIT, 0
+code_descr: gdt_descr SEG_CODE_LEN, SEG_CODE_START, \
+	GDT_PRESENT|GDT_CODEDATA|GDT_READABLE|GDT_EXEC, GDT_GRANULARITY|GDT_32BIT, 0
 
 str_start_16: db "Starting 16bit...", 00h
 str_load_error_16: db "Error loading sectors.", 00h
@@ -454,9 +478,9 @@ start_32:
 	wrmsr
 
 	; reset segmentation: modify gdt entries and reload gdt register
-	mov byte [data_descr + gdt_struc.sizes_limit16_19], byte GDT_GRANULARITY|GDT_64BIT|0xf
-	mov byte [stack_descr + gdt_struc.sizes_limit16_19], byte GDT_GRANULARITY|GDT_64BIT|0xf
-	mov byte [code_descr + gdt_struc.sizes_limit16_19], byte GDT_GRANULARITY|GDT_64BIT|0xf
+	mov byte [data_descr + gdt_struc.sizes_limit16_19], byte GDT_GRANULARITY|GDT_64BIT | (SEG_DATA_LEN & 0xf)
+	mov byte [stack_descr + gdt_struc.sizes_limit16_19], byte GDT_GRANULARITY|GDT_64BIT | (SEG_STACK_LEN & 0xf)
+	mov byte [code_descr + gdt_struc.sizes_limit16_19], byte GDT_GRANULARITY|GDT_64BIT | (SEG_CODE_LEN & 0xf)
 	lgdt [gdtr]
 
 	; set address extension
