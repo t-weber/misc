@@ -136,17 +136,25 @@ void float_info(t_float f)
 
 int main()
 {
+	std::cout << "123.456f:\n";
 	float_info(123.456f);
 	std::cout << "\n" << std::endl;
 
+	std::cout << "123.456:\n";
 	float_info(123.456);
 	std::cout << "\n" << std::endl;
 
 
+	std::cout << "-4561.23f:\n";
 	float_info(-4561.23f);
 	std::cout << "\n" << std::endl;
 
+	std::cout << "-4561.23:\n";
 	float_info(-4561.23);
+	std::cout << "\n" << std::endl;
+
+	std::cout << "1.0:\n";
+	float_info(1.);
 	std::cout << "\n" << std::endl;
 
 	return 0;

@@ -12,10 +12,10 @@ ASM=nasm
 CC=gcc
 
 
-declare -a ASM_FILES=("fact.asm")
-declare -a C_FILES=("main.c")
+declare -a ASM_FILES=("fact32.asm")
+declare -a C_FILES=("main32.c")
 declare -a O_FILES=()
-OUT_FILE="tst"
+OUT_FILE="tst32"
 
 
 for ASM_FILE in ${ASM_FILES[@]}; do
