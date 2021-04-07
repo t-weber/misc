@@ -6,12 +6,12 @@
 # @license: see 'LICENSE.GPL' file
 #
 
-
 ASM=nasm
 #CC=clang
 CC=gcc
 
-
+OBJ_FMT=elf64
+#OBJ_FMT=macho64
 declare -a ASM_FILES=("fact64.asm")
 declare -a C_FILES=("main64.c")
 declare -a O_FILES=()
@@ -22,14 +22,13 @@ for ASM_FILE in ${ASM_FILES[@]}; do
 	O_FILE=${ASM_FILE%.asm}.o
 	echo -e "Assembling ${ASM_FILE} -> ${O_FILE}..."
 
-	if ! ${ASM} -f elf64 -w+all -o ${O_FILE} ${ASM_FILE}; then
+	if ! ${ASM} -f ${OBJ_FMT} -w+all -o ${O_FILE} ${ASM_FILE}; then
 		echo -e "Error assembling."
 		exit -1
 	fi
 
 	O_FILES+=(${O_FILE})
 done
-
 
 
 for C_FILE in ${C_FILES[@]}; do

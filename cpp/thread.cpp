@@ -4,7 +4,7 @@
  * @date jan-19
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -std=c++17 -o thread thread.cpp -lpthread
+ * g++ -std=c++20 -o thread thread.cpp -lpthread
  */
 
 #include <thread>
@@ -35,6 +35,24 @@ int main()
 		}
 
 		thread0.join();
+	}
+
+
+	// joining threads
+	{
+		auto func0 = [](std::mutex *mtx)
+		{
+			std::lock_guard lock0{*mtx};
+			std::cout << "In thread " << std::hex << std::this_thread::get_id() << std::endl;
+		};
+
+		std::mutex mtx;
+		std::jthread thread0{func0, &mtx};
+
+		{
+			std::lock_guard lock0{mtx};
+			std::cout << "In main thread " << std::hex << std::this_thread::get_id() << std::endl;
+		}
 	}
 
 

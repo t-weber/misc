@@ -10,6 +10,7 @@
 %define FLOAT_SIZE 16
 
 section .text
+default rel  ; default abs
 
 global fact_sysv_asm
 global fact_sysv_float_asm
