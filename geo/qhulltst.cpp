@@ -9,13 +9,14 @@
  *	- https://github.com/qhull/qhull/tree/master/src/libqhullcpp
  *	- https://github.com/qhull/qhull/blob/master/src/qhulltest/Qhull_test.cpp
  *
- * g++ -o qhulltst qhulltst.cpp -lqhull_r -lqhullcpp
+ * g++ -std=c++20 -o qhulltst qhulltst.cpp -lqhull_r -lqhullcpp
  */
 
 
 #include <iostream>
 #include <iomanip>
 #include <vector>
+#include <ranges>
 #include <libqhullcpp/Qhull.h>
 #include <libqhullcpp/QhullFacet.h>
 #include <libqhullcpp/QhullFacetList.h>
@@ -63,7 +64,7 @@ static void print_facetinfo(const t_facetiter& iterFacet)
 
 static void hull(int dim, const std::vector<t_real>& vec)
 {
-	qh::Qhull qh{"test", dim, int(vec.size()/dim), vec.data(), "Qt" /*see: man qhull*/ };
+	qh::Qhull qh{"test", dim, int(vec.size()/dim), std::ranges::data(vec), "Qt" /*see: man qhull*/ };
 
 	std::cout << "Vertices:" << std::endl;
 	qh::QhullVertexList vertices{qh.vertexList()};
@@ -90,7 +91,7 @@ static void hull(int dim, const std::vector<t_real>& vec)
 
 static void voronoi(int dim, const std::vector<t_real>& vec)
 {
-	qh::Qhull qh{"test", dim, int(vec.size()/dim), vec.data(), "v" /*see: man qhull*/ };
+	qh::Qhull qh{"test", dim, int(vec.size()/dim), std::ranges::data(vec), "v" /*see: man qhull*/ };
 
 	std::cout << "Vertices:" << std::endl;
 	qh::QhullVertexList vertices{qh.vertexList()};

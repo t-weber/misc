@@ -21,6 +21,7 @@
 #include <locale>
 #include <iostream>
 #include <random>
+#include <ranges>
 #include <fstream>
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -203,7 +204,7 @@ std::vector<VkPipelineShaderStageCreateInfo> VkRenderer::CreateShaders()
 
 		std::vector<std::byte> bin;	// shader binary data
 		bin.resize(size);
-		if(std::ifstream ifstr{file}; !ifstr.read(reinterpret_cast<char*>(bin.data()), size))
+		if(std::ifstream ifstr{file}; !ifstr.read(reinterpret_cast<char*>(std::ranges::data(bin)), size))
 		{
 			std::cerr << "Error loading shader " << file << "." << std::endl;
 			continue;
@@ -216,7 +217,7 @@ std::vector<VkPipelineShaderStageCreateInfo> VkRenderer::CreateShaders()
 			.pNext = nullptr,
 			.flags = 0, // unused
 			.codeSize = size,
-			.pCode = reinterpret_cast<decltype(VkShaderModuleCreateInfo::pCode)>(bin.data())
+			.pCode = reinterpret_cast<decltype(VkShaderModuleCreateInfo::pCode)>(std::ranges::cdata(bin))
 		};
 
 		// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkCreateShaderModule.html

@@ -21,6 +21,7 @@
 #include <functional>
 #include <tuple>
 #include <utility>
+#include <numeric>
 #include <unordered_map>
 #include <experimental/algorithm>
 #include <experimental/functional>
@@ -300,6 +301,16 @@ int main()
 		var2 = "345";
 		std::swap(var, var2);
 		std::cout << std::get<int>(var2) << std::endl;
+	}
+	// --------------------------------------------------------------------
+
+
+
+	// --------------------------------------------------------------------
+	// numeric
+	{
+		std::cout << "gcd(10, 5) = " << std::gcd(10, 5) << std::endl;
+		std::cout << "lcm(7, 5) = " << std::lcm(7, 5) << std::endl;
 	}
 	// --------------------------------------------------------------------
 
