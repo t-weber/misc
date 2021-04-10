@@ -97,11 +97,11 @@ int main()
 		// range view
 		auto view_ops =
 			  std::ranges::views::transform(
-				[]<class t_val>(const t_val& val) -> t_val { return val - 10; })
+				[]<class T>(const T& val) -> T { return val - 10; })
 			| std::ranges::views::filter(
-				[]<class t_val>(const t_val& val) -> bool { return val <= 10 && val >= 0; })
+				[]<class T>(const T& val) -> bool { return val <= 10 && val >= 0; })
 			| std::ranges::views::transform(
-				[]<class t_val>(const t_val& val) -> t_val { return val + 10; })
+				[]<class T>(const T& val) -> T { return val + 10; })
 			;
 
 		//auto range_sorted = std::experimental::ranges::sort(range);
