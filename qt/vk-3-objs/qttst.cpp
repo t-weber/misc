@@ -15,6 +15,7 @@
 #include "qttst.h"
 
 #include <QApplication>
+#include <QMainWindow>
 #include <QLoggingCategory>
 
 #include <cstddef>
@@ -96,7 +97,9 @@ const t_vec3& PolyObject::GetUV(std::size_t i) const
 }
 
 
-void PolyObject::CreatePlaneGeometry(const t_vec3& norm, t_real size)
+void PolyObject::CreatePlaneGeometry(
+	const t_vec3& norm, t_real size,
+	t_real r, t_real g, t_real b)
 {
 	// flatten vertex array into raw float array
 	auto to_float_array = [](const std::vector<t_vec3>& verts, int iRepeat=1,
@@ -126,13 +129,13 @@ void PolyObject::CreatePlaneGeometry(const t_vec3& norm, t_real size)
 	m_vecCols.reserve(4*m_triangles.size());
 	for(std::size_t iVert=0; iVert<m_triangles.size(); ++iVert)
 	{
-		m_vecCols.push_back(0); m_vecCols.push_back(0);
-		m_vecCols.push_back(1); m_vecCols.push_back(1);
+		m_vecCols.push_back(r); m_vecCols.push_back(g);
+		m_vecCols.push_back(b); m_vecCols.push_back(1);
 	}
 }
 
 
-void PolyObject::CreateCubeGeometry(t_real size)
+void PolyObject::CreateCubeGeometry(t_real size, t_real r, t_real g, t_real b)
 {
 	// flatten vertex array into raw float array
 	auto to_float_array = [](const std::vector<t_vec3>& verts, int iRepeat=1,
@@ -162,8 +165,8 @@ void PolyObject::CreateCubeGeometry(t_real size)
 	m_vecCols.reserve(4*m_triangles.size());
 	for(std::size_t iVert=0; iVert<m_triangles.size(); ++iVert)
 	{
-		m_vecCols.push_back(0); m_vecCols.push_back(0);
-		m_vecCols.push_back(1); m_vecCols.push_back(1);
+		m_vecCols.push_back(r); m_vecCols.push_back(g);
+		m_vecCols.push_back(b); m_vecCols.push_back(1);
 	}
 }
 
@@ -224,6 +227,23 @@ const t_mat& PolyObject::GetMatrix() const
 {
 	return m_mat;
 }
+
+
+void PolyObject::SetRotating(bool b)
+{
+	m_rotating = b;
+}
+
+
+void PolyObject::tick(const std::chrono::milliseconds& ms)
+{
+	if(m_rotating)
+	{
+		t_real delta = t_real(ms.count()) * 0.1;
+		t_mat rot = m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0,0}), delta, 1);
+		m_mat *= rot;
+	}
+}
 // ----------------------------------------------------------------------------
 
 
@@ -236,6 +256,21 @@ VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd)
 	: m_vkinst{vk}, m_vkwnd{wnd}
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
+
+	// create some objects
+	{
+		PolyObject plane;
+		plane.CreatePlaneGeometry(m::create<t_vec3>({0, 1, 0}), 5., 0., 0., 1.);
+		plane.SetMatrix(m::hom_translation<t_mat, t_real>(0, -1, 0));
+		plane.SetRotating(false);
+		m_objs.emplace_back(std::move(plane));
+
+		PolyObject box;
+		box.CreateCubeGeometry(1., 1., 0., 0.);
+		box.SetMatrix(m::hom_translation<t_mat, t_real>(0, 5, 0));
+		box.SetRotating(true);
+		m_objs.emplace_back(std::move(box));
+	}
 
 	m_cam.SetTranslation(0., 0., -3.);
 	m_cam.Update();
@@ -268,11 +303,8 @@ QPointF VkRenderer::VkToScreenCoords(const t_vec& vec4, bool *pVisible)
 
 void VkRenderer::tick(const std::chrono::milliseconds& ms)
 {
-	//static t_real fAngle = 0.f;
-	//fAngle += t_real(ms.count() / 50.f);
-
-	constexpr const t_real moveDelta = 0.1;
-	constexpr const t_real rotateDelta = 0.015*m::pi<t_real>;
+	const t_real moveDelta = 0.015 * ms.count();
+	const t_real rotateDelta = 0.001 * ms.count() * m::pi<t_real>;
 
 	m_cam.Translate(0, m_moving[0]*moveDelta);
 	m_cam.Translate(1, m_moving[1]*moveDelta);
@@ -284,9 +316,8 @@ void VkRenderer::tick(const std::chrono::milliseconds& ms)
 
 	m_cam.Update();
 
-	//using namespace m_ops;
-	//std::cout << m_cam.GetMatrix() << std::endl;
-	//std::cout << m_cam.GetMatrixInv() << std::endl;
+	for(auto& obj : m_objs)
+		obj.tick(ms);
 
 	UpdatePicker();
 
@@ -304,7 +335,7 @@ void VkRenderer::SetMousePos(const QPointF& pt)
 
 t_vec3 hom_trafo(const t_mat& mat, const t_vec3& vec3, bool is_pos=1)
 {
-	t_vec vec4 = m::create<t_vec>({ vec3[0], vec3[1], vec3[2], is_pos ? 1. : 0. });
+	t_vec vec4 = m::create<t_vec>({ vec3[0], vec3[1], vec3[2], is_pos ? 1.f : 0.f });
 	vec4 = mat * vec4;
 
 	return m::create<t_vec3>({ vec4[0], vec4[1], vec4[2] });
@@ -730,20 +761,6 @@ VkRenderer::CreatePipelineStages() const
 void VkRenderer::initResources()
 {
 	std::cout << __PRETTY_FUNCTION__ << std::endl;
-
-	// create some objects
-	{
-		PolyObject plane;
-		plane.CreatePlaneGeometry(m::create<t_vec3>({0, 1, 0}), 5.);
-		plane.SetMatrix(m::hom_translation<t_mat>(0, -1, 0));
-		m_objs.emplace_back(std::move(plane));
-
-		PolyObject box;
-		box.CreateCubeGeometry(1.);
-		box.SetMatrix(m::hom_translation<t_mat>(0, 5, 0));
-		m_objs.emplace_back(std::move(box));
-	}
-
 
 	m_vkdev = m_vkwnd->device();
 	m_vkfuncs = m_vkinst->deviceFunctions(m_vkdev);
@@ -1332,7 +1349,7 @@ void VkRenderer::startNextFrame()
 		const auto& obj = m_objs[i];
 
 		// offsets into uniform buffer for each draw command (for VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
-		std::uint32_t dynOffs[] = { i*GetUniformBufferSize(true) };
+		std::uint32_t dynOffs[] = { std::uint32_t(i*GetUniformBufferSize(true)) };
 		std::uint32_t numDescrSets = 1;
 		m_vkfuncs->vkCmdBindDescriptorSets(m_vkwnd->currentCommandBuffer(), bindpoint, m_layout,
 			0, numDescrSets, &m_descrset[m_vkwnd->currentFrame()],
@@ -1363,14 +1380,27 @@ VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent)
 {
 	setVulkanInstance(m_vkinst.get());
 
+	std::chrono::milliseconds ticks{1000 / 60};
 	connect(&m_timer, &QTimer::timeout,
-		[this]() -> void
+		[this, ticks]() -> void
 		{
-			if(m_vkrenderer)
-				m_vkrenderer->tick(std::chrono::milliseconds(1000 / 60));
+			if(!m_vkrenderer)
+				return;
+
+			m_vkrenderer->tick(ticks);
+			m_runningtime += ticks;
+
+			t_vec pos = m_vkrenderer->GetCamera().GetPosition();
+
+			auto status = QString{"Running time: %1 s, camera: %2, %3, %4"}
+				.arg(m_runningtime.count()/1000, 0)
+				.arg(pos[0], 0, 'f', 1)
+				.arg(pos[1], 0, 'f', 1)
+				.arg(pos[2], 0, 'f', 1);
+			emit EmitStatusMsg(status);
 		});
 
-	m_timer.start(std::chrono::milliseconds(1000 / 60));
+	m_timer.start(ticks);
 }
 
 
@@ -1456,6 +1486,47 @@ void VkWnd::keyReleaseEvent(QKeyEvent *pEvt)
 		m_vkrenderer->SetRotating(2, 0.);
 
 	QVulkanWindow::keyReleaseEvent(pEvt);
+}
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
+// main window
+// ----------------------------------------------------------------------------
+Wnd::Wnd(VkWnd *vkwnd, QWidget* parent) : QMainWindow(parent), m_vkwnd{vkwnd}
+{
+	// set the vk window as central widget
+	m_vkwidget = QWidget::createWindowContainer(m_vkwnd);
+	m_vkwidget->setFocusPolicy(Qt::StrongFocus);
+	//setFocusProxy(m_vkwidget);
+	setCentralWidget(m_vkwidget);
+
+	m_statusbar = new QStatusBar(this);
+	m_statuslabel = new QLabel(m_statusbar);
+	m_statusbar->addPermanentWidget(m_statuslabel, 0);
+	setStatusBar(m_statusbar);
+
+	connect(m_vkwnd, &VkWnd::EmitStatusMsg,
+		[this](const QString& str)->void
+		{
+			if(!m_statuslabel)
+				return;
+
+			m_statuslabel->setText(str);
+		});
+}
+
+
+Wnd::~Wnd()
+{
+}
+
+
+void Wnd::resizeEvent(QResizeEvent *evt)
+{
+	QMainWindow::resizeEvent(evt);
+	//m_vkwidget->setFocus();
 }
 // ----------------------------------------------------------------------------
 
@@ -1554,8 +1625,9 @@ int main(int argc, char** argv)
 			<< ", version " << vkext.version << "." << std::endl;
 	}
 
-	// create vk window
-	auto wnd = std::make_unique<VkWnd>(vk);
+	// create main and vk window
+	auto vkwnd = new VkWnd(vk);
+	auto wnd = std::make_unique<Wnd>(vkwnd);
 	wnd->resize(800, 600);
 	wnd->show();
 

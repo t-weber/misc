@@ -220,7 +220,7 @@ template<class t_vec, class t_mat>
 t_vec convert(const t_mat& mat)
 requires is_mat<t_mat> && is_basic_vec<t_vec>
 {
-	using T_src = typename t_mat::value_type;
+	//using T_src = typename t_mat::value_type;
 	using T_dst = typename t_vec::value_type;
 	using t_idx = decltype(mat.size1());
 
@@ -241,7 +241,7 @@ template<class t_mat_dst, class t_mat_src>
 t_mat_dst convert(const t_mat_src& mat)
 requires is_mat<t_mat_dst> && is_mat<t_mat_src>
 {
-	using T_src = typename t_mat_src::value_type;
+	//using T_src = typename t_mat_src::value_type;
 	using T_dst = typename t_mat_dst::value_type;
 	using t_idx = decltype(mat.size1());
 
@@ -262,7 +262,7 @@ template<class t_vec_dst, class t_vec_src>
 t_vec_dst convert(const t_vec_src& vec)
 requires is_vec<t_vec_dst> && is_vec<t_vec_src>
 {
-	using T_src = typename t_vec_src::value_type;
+	//using T_src = typename t_vec_src::value_type;
 	using T_dst = typename t_vec_dst::value_type;
 	using t_idx = decltype(vec.size());
 
@@ -1174,7 +1174,7 @@ t_mat orthonorm(const t_mat& mat)
 requires is_mat<t_mat> && is_vec<t_vec>
 {
 	using t_size = decltype(mat.size1());
-	using t_real = typename t_mat::value_type;
+	//using t_real = typename t_mat::value_type;
 
 	t_mat matOut = mat;
 

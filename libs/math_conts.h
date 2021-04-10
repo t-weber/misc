@@ -461,9 +461,9 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 	using t_size = decltype(t_mat{}.size1());
 
 	if constexpr(m::is_dyn_mat<t_mat>)
-		assert((mat.size2() == vec.size()));
+		assert((mat.size2() == t_size(vec.size())));
 	else
-		static_assert(mat.size2() == vec.size());
+		static_assert(mat.size2() == t_size(vec.size()));
 
 
 	t_vec vecRet(mat.size1());

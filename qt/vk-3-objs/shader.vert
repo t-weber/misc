@@ -33,11 +33,12 @@ layout(binding = 0) uniform Trafos
 
 
 vec3 light_dir = vec3(2, 2, -1);
+float col_offs = 0.25;
 
 
 float lighting(vec3 lightdir)
 {
-	float I = dot(vec3(cam*normal), normalize(lightdir));
+	float I = dot(vec3(obj*normal), normalize(lightdir));
 	if(I < 0) I = 0;
 	return I;
 }
@@ -48,7 +49,7 @@ void main()
 	gl_Position = proj * cam * obj * vertex;
 
 	float I = lighting(light_dir);
-	fragcolor = vertexcolor * I;
+	fragcolor = vertexcolor * (I + col_offs);
 	fragcolor[3] = 1;
 
 	fragtexcoords = texcoords;

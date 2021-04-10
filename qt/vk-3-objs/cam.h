@@ -80,6 +80,12 @@ public:
 	}
 
 
+	t_vec GetPosition() const
+	{
+		return m::create<t_vec>({ -m_matTrans(0,3), -m_matTrans(1,3), -m_matTrans(2,3) });
+	}
+
+
 private:
 	t_mat m_mat = m::unit<t_mat>(4);
 	t_mat m_mat_inv = m::unit<t_mat>(4);

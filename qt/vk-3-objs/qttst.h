@@ -8,6 +8,9 @@
 #ifndef __QTVKTST_H__
 #define __QTVKTST_H__
 
+#include <QMainWindow>
+#include <QStatusBar>
+#include <QLabel>
 #include <QVulkanWindow>
 #include <QVulkanWindowRenderer>
 #include <QVulkanDeviceFunctions>
@@ -44,6 +47,7 @@ private:
 	std::vector<t_vec3> m_triangles, m_trianglenorms, m_triangleuvs;
 	t_mat m_mat{m::unit<t_mat>(4)};
 	std::size_t m_mem_offs = 0;
+	bool m_rotating = false;
 
 public:
 	std::size_t GetNumVertexBufferElements() const;
@@ -52,14 +56,20 @@ public:
 	const t_vec3& GetVertex(std::size_t i) const;
 	const t_vec3& GetUV(std::size_t i) const;
 
-	void CreatePlaneGeometry(const t_vec3& norm=m::create<t_vec3>({0,0,-1}), t_real size=1.5);
-	void CreateCubeGeometry(t_real size=1.);
+	void CreatePlaneGeometry(
+		const t_vec3& norm=m::create<t_vec3>({0,0,-1}), t_real size=1.5,
+		t_real r=0, t_real g=0, t_real b=1);
+	void CreateCubeGeometry(t_real size=1., t_real r=0, t_real g=0, t_real b=1);
 
 	std::size_t UpdateVertexBuffers(t_real* pMem, std::size_t mem_offs);
 	std::size_t GetMemOffset() const;
 
 	void SetMatrix(const t_mat& mat);
 	const t_mat& GetMatrix() const;
+
+	void SetRotating(bool b);
+
+	void tick(const std::chrono::milliseconds& ms);
 };
 
 
@@ -152,12 +162,13 @@ public:
 
 
 class VkWnd : public QVulkanWindow
-{
+{ Q_OBJECT
 protected:
 	std::shared_ptr<QVulkanInstance> m_vkinst;
-	VkRenderer* m_vkrenderer = nullptr;
+	VkRenderer *m_vkrenderer = nullptr;
 
 	QTimer m_timer;
+	std::chrono::milliseconds m_runningtime{0};
 
 public:
 	VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent=nullptr);
@@ -168,7 +179,27 @@ public:
 	virtual void mouseMoveEvent(QMouseEvent *pEvt) override;
 	virtual void keyPressEvent(QKeyEvent *pEvt) override;
 	virtual void keyReleaseEvent(QKeyEvent *pEvt) override;
+
+signals:
+	void EmitStatusMsg(const QString& msg);
 };
 
+
+class Wnd : public QMainWindow
+{
+protected:
+	VkWnd *m_vkwnd = nullptr;
+	QWidget *m_vkwidget = nullptr;
+
+	QStatusBar *m_statusbar = nullptr;
+	QLabel *m_statuslabel = nullptr;
+
+protected:
+	virtual void resizeEvent(QResizeEvent *evt) override;
+
+public:
+	Wnd(VkWnd *vkwnd, QWidget *parent=nullptr);
+	virtual ~Wnd();
+};
 
 #endif
