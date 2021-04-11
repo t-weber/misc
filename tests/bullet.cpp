@@ -41,14 +41,14 @@ std::vector<RigidBody> get_objects()
 		btScalar z{0};
 
 		RigidBody cube;
-		btScalar cube_mass{1.f};
-		btVector3 cube_inertia{0, 0, 0};
+		btScalar mass{1.f};
+		btVector3 com{0,0,0};
 		cube.shape = std::make_shared<btBoxShape>(btVector3{0.5, 0.5, 0.5});
-		cube.shape->calculateLocalInertia(cube_mass, cube_inertia);
+		cube.shape->calculateLocalInertia(mass, com);
 		cube.state = std::make_shared<btDefaultMotionState>(
 			btTransform{btMatrix3x3::getIdentity(), {x,y,z}});
 		cube.rigid_body = std::make_shared<btRigidBody>(
-			btRigidBody::btRigidBodyConstructionInfo{cube_mass, cube.state.get(), cube.shape.get(), cube_inertia});
+			btRigidBody::btRigidBodyConstructionInfo{mass, cube.state.get(), cube.shape.get(), com});
 		objs.emplace_back(std::move(cube));
 	}
 
