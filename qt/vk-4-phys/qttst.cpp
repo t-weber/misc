@@ -467,7 +467,7 @@ std::vector<VkPipelineShaderStageCreateInfo> VkRenderer::CreateShaders()
 	// load shaders
 	using t_shader = std::tuple<const std::string, VkShaderModule*>;
 
-	for(const t_shader& shader : {
+	for(const t_shader shader : {
 		std::make_tuple("vert.spv", &m_vertexShader),
 		std::make_tuple("frag.spv", &m_fragShader) })
 	{
@@ -1071,7 +1071,7 @@ void VkRenderer::initResources()
 	};
 
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDynamicState.html
-	VkDynamicState dynstate[] = {{ VK_DYNAMIC_STATE_VIEWPORT }, { VK_DYNAMIC_STATE_SCISSOR} };
+	VkDynamicState dynstate[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
 	// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineDynamicStateCreateInfo.html
 	VkPipelineDynamicStateCreateInfo dynamicstate
@@ -1651,7 +1651,6 @@ int main(int argc, char** argv)
 	// ------------------------------------------------------------------------
 
 
-
 	// ------------------------------------------------------------------------
 	// bullet
 	// ------------------------------------------------------------------------
@@ -1663,7 +1662,6 @@ int main(int argc, char** argv)
 
 	world->setGravity({0, -9.81, 0});
 	// ------------------------------------------------------------------------
-
 
 
 	// ------------------------------------------------------------------------

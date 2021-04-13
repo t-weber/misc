@@ -109,7 +109,7 @@ protected:
 	VkPipeline m_pipeline{VK_NULL_HANDLE};
 	VkPipelineLayout m_layout{VK_NULL_HANDLE};
 	VkPipelineCache m_cache{VK_NULL_HANDLE};
-	VkDescriptorSetLayout m_setlayouts[1] {{ VK_NULL_HANDLE }};
+	VkDescriptorSetLayout m_setlayouts[1] { VK_NULL_HANDLE };
 	VkDescriptorPool m_descrpool{VK_NULL_HANDLE};
 	std::shared_ptr<VkDescriptorSet[]> m_descrset;
 	std::shared_ptr<VkDescriptorBufferInfo[]> m_descrbufferinfo;
