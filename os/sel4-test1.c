@@ -7,6 +7,7 @@
  * References:
  *   - https://github.com/seL4/sel4-tutorials/blob/master/tutorials/mapping/mapping.md
  *   - https://github.com/seL4/sel4-tutorials/blob/master/tutorials/untyped/untyped.md
+ *   - https://github.com/seL4/sel4-tutorials/blob/master/tutorials/threads/threads.md
  *   - https://github.com/seL4/sel4-tutorials/blob/master/libsel4tutorials/src/alloc.c
  *   - https://docs.sel4.systems/projects/sel4/api-doc.html
  */
@@ -36,6 +37,8 @@ typedef seL4_Word   word_t;
 #define SCREEN_COL_SIZE  80
 #define SCREEN_SIZE      (SCREEN_ROW_SIZE * SCREEN_COL_SIZE)
 
+//#define PAGE_TYPE      seL4_X86_LargePageObject
+#define PAGE_TYPE        seL4_X86_4K
 #define PAGE_SIZE        4096
 #define CHAROUT_PHYS     0x000b8000  /* see https://jbwyatt.com/253/emu/memory.html */
 
@@ -184,6 +187,7 @@ u64 fibo(u64 num)
 
 void calc(u64 num_start, u64 num_end, i8 *charout)
 {
+	printf("Start of calc() thread.\n");
 	const u64 spacing = 16;
 
 	my_memset(charout, 0, SCREEN_SIZE*2);
@@ -207,6 +211,9 @@ void calc(u64 num_start, u64 num_end, i8 *charout)
 		write_str(buf_fact, ATTR_NORM, charout + ((SCREEN_COL_SIZE*(num-num_start+3)) + spacing)*2);
 		write_str(buf_fibo, ATTR_NORM, charout + ((SCREEN_COL_SIZE*(num-num_start+3)) + spacing*2)*2);
 	}
+
+	printf("End of calc() thread.\n");
+	while(1) seL4_Yield();
 }
 
 
@@ -262,34 +269,16 @@ seL4_SlotPos find_devicemem(seL4_SlotPos untyped_start, seL4_SlotPos untyped_end
 }
 
 
-i64 main()
+seL4_SlotPos map_page(seL4_SlotPos untyped_start, seL4_SlotPos untyped_end,
+	const seL4_UntypedDesc* untyped_list, seL4_SlotPos* cur_slot,
+	word_t virt_addr)
 {
-	printf("--------------------------------------------------------------------------------\n");
-
-	// initial thread and boot infos
 	const seL4_SlotPos cnode = seL4_CapInitThreadCNode;
 	const seL4_SlotPos vspace = seL4_CapInitThreadVSpace;
-	const seL4_BootInfo *bootinfo = platsupport_get_bootinfo();
+	seL4_X86_VMAttributes vmattr = seL4_X86_Default_VMAttributes;
 
-	const seL4_SlotRegion *empty_region = &bootinfo->empty;
-	const seL4_SlotPos empty_start = empty_region->start;
-	const seL4_SlotPos empty_end = empty_region->end;
-	printf("Empty CNodes in region: [%ld .. %ld[.\n", empty_start, empty_end);
-
-	const seL4_UntypedDesc* untyped_list = bootinfo->untypedList;
-	const seL4_SlotRegion *untyped_region = &bootinfo->untyped;
-	const seL4_SlotPos untyped_start = untyped_region->start;
-	const seL4_SlotPos untyped_end = untyped_region->end;
-	printf("Untyped CNodes in region: [%ld .. %ld[.\n", untyped_start, untyped_end);
-
-
-	seL4_SlotPos cur_slot = empty_start;
-	// some (arbitrary) virtual address to map the video/character memory to
-	word_t virt_addr = 0x8000000000;
-
-	//seL4_SlotPos table_slot = 0x183;
-	seL4_SlotPos table_slot = find_untyped(untyped_start, untyped_end,
-		untyped_list, 4*1024*1024);
+	/*seL4_SlotPos table_slot = find_untyped(untyped_start, untyped_end,
+		untyped_list, PAGE_SIZE*1024);
 	if(table_slot < untyped_start)
 		printf("Error: No large enough untyped slot found!\n");
 	printf("Loading tables into untyped slot 0x%lx.\n", table_slot);
@@ -310,11 +299,75 @@ i64 main()
 	};
 
 	seL4_SlotPos pagetable_slots[] = { 0, 0, 0 };
-	seL4_X86_VMAttributes vmattr = seL4_X86_Default_VMAttributes;
 
 	for(i16 level=0; level<sizeof(pagetable_objs)/sizeof(pagetable_objs[0]); ++level)
 	{
-		pagetable_slots[level] = cur_slot++;
+		pagetable_slots[level] = (*cur_slot)++;
+		seL4_Untyped_Retype(table_slot, pagetable_objs[level], 0, cnode,
+			0, 0, pagetable_slots[level], 1);
+		if((*pagetable_map[level])(pagetable_slots[level],
+			vspace, virt_addr, vmattr) != seL4_NoError)
+		{
+			printf("Error mapping page table level %d!\n", level);
+			break;
+		}
+	}*/
+
+
+	seL4_SlotPos base_slot = find_untyped(untyped_start, untyped_end, untyped_list, PAGE_SIZE);
+	printf("Using device memory slot 0x%lx.\n", base_slot);
+
+	seL4_SlotPos page_slot = (*cur_slot)++;
+	seL4_Untyped_Retype(base_slot, PAGE_TYPE, 0, cnode, 0, 0, page_slot, 1);
+
+	if(seL4_X86_Page_Map(page_slot, vspace, virt_addr, /*seL4_ReadWrite*/seL4_AllRights, vmattr)
+		!= seL4_NoError)
+	{
+		printf("Error mapping page!\n");
+	}
+
+	seL4_X86_Page_GetAddress_t addr_info = seL4_X86_Page_GetAddress(page_slot);
+	printf("Mapped virtual address: 0x%lx -> physical address: 0x%lx.\n",
+		virt_addr, addr_info.paddr);
+
+	return page_slot;
+}
+
+
+seL4_SlotPos map_page_phys(seL4_SlotPos untyped_start, seL4_SlotPos untyped_end,
+	const seL4_UntypedDesc* untyped_list, seL4_SlotPos* cur_slot,
+	word_t virt_addr, word_t phys_addr)
+{
+	const seL4_SlotPos cnode = seL4_CapInitThreadCNode;
+	const seL4_SlotPos vspace = seL4_CapInitThreadVSpace;
+	seL4_X86_VMAttributes vmattr = seL4_X86_Default_VMAttributes;
+
+	seL4_SlotPos table_slot = find_untyped(untyped_start, untyped_end,
+		untyped_list, PAGE_SIZE*1024);
+	if(table_slot < untyped_start)
+		printf("Error: No large enough untyped slot found!\n");
+	printf("Loading tables into untyped slot 0x%lx.\n", table_slot);
+
+	// load three levels of page tables
+	const seL4_ArchObjectType pagetable_objs[] =
+	{
+		seL4_X86_PDPTObject,
+		seL4_X86_PageDirectoryObject,
+		seL4_X86_PageTableObject
+	};
+
+	seL4_Error (*pagetable_map[])(word_t, seL4_CPtr, word_t, seL4_X86_VMAttributes) =
+	{
+		&seL4_X86_PDPT_Map,
+		&seL4_X86_PageDirectory_Map,
+		&seL4_X86_PageTable_Map
+	};
+
+	seL4_SlotPos pagetable_slots[] = { 0, 0, 0 };
+
+	for(i16 level=0; level<sizeof(pagetable_objs)/sizeof(pagetable_objs[0]); ++level)
+	{
+		pagetable_slots[level] = (*cur_slot)++;
 		seL4_Untyped_Retype(table_slot, pagetable_objs[level], 0, cnode,
 			0, 0, pagetable_slots[level], 1);
 		if((*pagetable_map[level])(pagetable_slots[level],
@@ -326,41 +379,111 @@ i64 main()
 	}
 
 
-	// find page whose frame contains the vga memory
-	//seL4_SlotPos base_slot = 0x137;
 	seL4_SlotPos base_slot = find_devicemem(untyped_start, untyped_end,
-		untyped_list, (word_t)CHAROUT_PHYS);
+		untyped_list, (word_t)phys_addr);
 	printf("Using device memory slot 0x%lx.\n", base_slot);
 
 	seL4_SlotPos page_slot = 0;
 	// iterate all page frames till we're at the correct one
 	// TODO: find more efficient way to specify an offset
-	for(word_t i=0; i<=CHAROUT_PHYS/PAGE_SIZE; ++i)
+	for(word_t i=0; i<=phys_addr/PAGE_SIZE; ++i)
 	{
-		seL4_SlotPos frame_slot = cur_slot++;
-		seL4_Untyped_Retype(base_slot, seL4_X86_4K, 0, cnode, 0, 0, frame_slot, 1);
+		seL4_SlotPos frame_slot = (*cur_slot)++;
+		seL4_Untyped_Retype(base_slot, PAGE_TYPE, 0, cnode, 0, 0, frame_slot, 1);
 		page_slot = frame_slot;
 	}
+	//seL4_SlotPos frame_slot = (*cur_slot)++;
+	//seL4_Untyped_Retype(base_slot, seL4_X86_LargePageObject, 0, cnode, 0, 0, frame_slot, 1);
+
 	if(seL4_X86_Page_Map(page_slot, vspace, virt_addr, seL4_ReadWrite, vmattr)
 		!= seL4_NoError)
 	{
-		printf("Error mapping Page!\n");
+		printf("Error mapping page!\n");
 	}
 
-	seL4_X86_Page_GetAddress_t phys_addr = seL4_X86_Page_GetAddress(page_slot);
+	seL4_X86_Page_GetAddress_t addr_info = seL4_X86_Page_GetAddress(page_slot);
 	printf("Mapped virtual address: 0x%lx -> physical address: 0x%lx.\n",
-		virt_addr, phys_addr.paddr);
+		virt_addr, addr_info.paddr);
+
+	return page_slot;
+}
 
 
-	// run calculation
-	//printf("fact = %ld\n", fact(5));
-	calc(0, 12, (i8*)virt_addr);
+i64 main()
+{
+	printf("--------------------------------------------------------------------------------\n");
 
+	// initial thread and boot infos
+	const seL4_SlotPos this_cnode = seL4_CapInitThreadCNode;
+	const seL4_SlotPos this_vspace = seL4_CapInitThreadVSpace;
+	const seL4_SlotPos this_tcb = seL4_CapInitThreadTCB;
+	const seL4_BootInfo *bootinfo = platsupport_get_bootinfo();
+
+	const seL4_SlotRegion *empty_region = &bootinfo->empty;
+	const seL4_SlotPos empty_start = empty_region->start;
+	const seL4_SlotPos empty_end = empty_region->end;
+	printf("Empty CNodes in region: [%ld .. %ld[.\n", empty_start, empty_end);
+
+	const seL4_UntypedDesc* untyped_list = bootinfo->untypedList;
+	const seL4_SlotRegion *untyped_region = &bootinfo->untyped;
+	const seL4_SlotPos untyped_start = untyped_region->start;
+	const seL4_SlotPos untyped_end = untyped_region->end;
+	printf("Untyped CNodes in region: [%ld .. %ld[.\n", untyped_start, untyped_end);
+
+	seL4_SlotPos cur_slot = empty_start;
+	seL4_SlotPos cur_untyped_slot = untyped_start;
+
+	// some (arbitrary) virtual address to map the video/character memory to
+	word_t virt_addr_char = 0x8000000000;
+	// find page whose frame contains the vga memory
+	seL4_SlotPos page_slot = map_page_phys(untyped_start, untyped_end,
+		untyped_list, &cur_slot, virt_addr_char, CHAROUT_PHYS);
+
+	// run calculation in another thread
+	// create a page frame for the thread's stack
+	word_t virt_addr_tcb_stack = 0x8000001000;
+	seL4_SlotPos page_slot_tcb_stack = map_page(untyped_start, untyped_end,
+		untyped_list, &cur_slot, virt_addr_tcb_stack);
+
+	seL4_SlotPos tcb_slot = find_untyped(untyped_start, untyped_end,
+		untyped_list, 1<<seL4_TCBBits);
+	seL4_SlotPos tcb = cur_slot++;
+	seL4_Untyped_Retype(tcb_slot, seL4_TCBObject, 0, this_cnode, 0, 0, tcb, 1);
+
+	// the child thread uses the main thread's cnode and vspace
+	if(seL4_TCB_SetSpace(tcb, 0, this_cnode, 0, this_vspace, 0) != seL4_NoError)
+		printf("Error: Cannot set TCB space!\n");
+
+	// doesn't seem to get scheduled otherwise...
+	if(seL4_TCB_SetPriority(tcb, this_tcb, seL4_MaxPrio) != seL4_NoError)
+		printf("Error: Cannot set TCB priority!\n");
+
+	seL4_UserContext tcb_context;
+	i32 num_regs = sizeof(tcb_context)/sizeof(tcb_context.rax);
+	seL4_TCB_ReadRegisters(tcb, 0, 0, num_regs, &tcb_context);
+
+	// pass instruction pointer, stack pointer and arguments in registers
+	// according to sysv calling convention
+	tcb_context.rip = (word_t)&calc;          // entry point
+	tcb_context.rsp = (word_t)(virt_addr_tcb_stack + PAGE_SIZE);  // stack
+	tcb_context.rbp = (word_t)(virt_addr_tcb_stack + PAGE_SIZE);  // stack
+	tcb_context.rdi = 0;                      // arg 1
+	tcb_context.rsi = 12;                     // arg 2
+	tcb_context.rdx = (word_t)virt_addr_char; // arg 3
+
+	printf("rip = %lx, rsp = %lx, rflags = %lx, rdi = %lx, rsi = %lx, rdx = %lx\n",
+		tcb_context.rip, tcb_context.rsp, tcb_context.rflags,
+		tcb_context.rdi, tcb_context.rsi, tcb_context.rdx);
+
+	// write registers and start thread
+	if(seL4_TCB_WriteRegisters(tcb, 1, 0, num_regs, &tcb_context) != seL4_NoError)
+		printf("Error writing TCB registers!\n");
 
 	// end program
+	//seL4_CNode_Revoke(cnode, tcb_slot, seL4_TCBBits);
 	//seL4_CNode_Revoke(cnode, page_slot, seL4_WordBits);
-	seL4_CNode_Revoke(cnode, base_slot, seL4_WordBits);
-	seL4_CNode_Revoke(cnode, table_slot, seL4_WordBits);
+	//seL4_CNode_Revoke(cnode, base_slot, seL4_WordBits);
+	//seL4_CNode_Revoke(cnode, table_slot, seL4_WordBits);
 
 	printf("--------------------------------------------------------------------------------\n");
 	while(1) seL4_Yield();
