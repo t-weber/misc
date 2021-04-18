@@ -18,6 +18,7 @@
 #include <bit>
 #include <algorithm>
 #include <vector>
+#include <list>
 #include <tuple>
 #include <unordered_map>
 //#include <source_location>
@@ -116,6 +117,24 @@ int main()
 		std::cout << "infinite view: ";
 		for(auto i : infinite_view | std::ranges::views::take(50))
 			std::cout << i << ", ";
+		std::cout << "\n" << std::endl;
+
+
+		// join view
+		std::list<std::vector<std::pair<std::string, int>>> tojoin
+		{
+			{
+				std::make_pair("Test 1", 123),
+				std::make_pair("Test 2", 987),
+			},
+			{
+				std::make_pair("Test A", 555),
+				std::make_pair("Test B", 444),
+			}
+		};
+		std::cout << "join view: ";
+		for(const auto& pair : std::ranges::views::join(tojoin))
+			std::cout << "(" << std::get<0>(pair) << " " << std::get<1>(pair) << "), ";
 		std::cout << "\n" << std::endl;
 
 

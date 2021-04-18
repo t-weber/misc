@@ -40,11 +40,16 @@ typedef seL4_Word        word_t;
 //#define PAGE_TYPE      seL4_X86_LargePageObject
 #define PAGE_TYPE        seL4_X86_4K
 #define PAGE_SIZE        4096
-#define CHAROUT_PHYS     0x000b8000  /* see https://jbwyatt.com/253/emu/memory.html */
+#define CHAROUT_PHYS     0x000b8000  // see https://jbwyatt.com/253/emu/memory.html
 
 #define ATTR_BOLD        0b00001111
 #define ATTR_INV         0b01110000
 #define ATTR_NORM        0b00000111
+
+#define KEYB_DATA_PORT   0x60        // see https://wiki.osdev.org/%228042%22_PS/2_Controller
+#define KEYB_PIC         0           // on which PIC is the keyboard?
+#define KEYB_IRQ         1           // on which IRQ pin of the PIC is the keyboard?
+#define KEYB_INT         33          // cpu interrupt to map to
 
 
 // ----------------------------------------------------------------------------
@@ -187,12 +192,15 @@ u64 fibo(u64 num)
 
 void calc(u64 num_end, i8 *charout, seL4_SlotPos notify)
 {
-	printf("Start of calc() thread.\n");
+	if(notify)
+	{
+		printf("Start of calc() thread.\n");
+	}
 	const u64 num_start = 0;
 	const u64 spacing = 16;
 
 	my_memset(charout, 0, SCREEN_SIZE*2);
-	write_str("                                 Long Mode Test                                 ", ATTR_INV, charout);
+	write_str("                                seL4 Kernel Test                                ", ATTR_INV, charout);
 
 	write_str("Number", ATTR_BOLD, charout + (SCREEN_COL_SIZE*2) * 2);
 	write_str("Factorial", ATTR_BOLD, charout + (SCREEN_COL_SIZE*2 + spacing) * 2);
@@ -213,10 +221,13 @@ void calc(u64 num_end, i8 *charout, seL4_SlotPos notify)
 		write_str(buf_fibo, ATTR_NORM, charout + ((SCREEN_COL_SIZE*(num-num_start+3)) + spacing*2)*2);
 	}
 
-	printf("End of calc() thread.\n");
+	if(notify)
+	{
+		printf("End of calc() thread.\n");
 
-	seL4_Signal(notify);
-	while(1) seL4_Yield();
+		seL4_Signal(notify);
+		while(1) seL4_Yield();
+	}
 }
 
 
@@ -404,6 +415,8 @@ i64 main()
 	const seL4_SlotPos this_cnode = seL4_CapInitThreadCNode;
 	const seL4_SlotPos this_vspace = seL4_CapInitThreadVSpace;
 	const seL4_SlotPos this_tcb = seL4_CapInitThreadTCB;
+	const seL4_SlotPos this_irqctrl = seL4_CapIRQControl;
+	const seL4_SlotPos this_ioctrl = seL4_CapIOPortControl;
 	const seL4_BootInfo *bootinfo = platsupport_get_bootinfo();
 
 	const seL4_SlotRegion *empty_region = &bootinfo->empty;
@@ -478,6 +491,46 @@ i64 main()
 	// write registers and start thread
 	if(seL4_TCB_WriteRegisters(tcb, 1, 0, num_regs, &tcb_context) != seL4_NoError)
 		printf("Error writing TCB registers!\n");
+
+	// keyboard interrupt
+	seL4_SlotPos keyb_slot = cur_slot++;
+	if(seL4_X86_IOPortControl_Issue(this_ioctrl, KEYB_DATA_PORT, KEYB_DATA_PORT, 
+		this_cnode, keyb_slot, seL4_WordBits) != seL4_NoError)
+		printf("Error getting keyboard IO control!\n");
+
+	seL4_SlotPos irq_slot = cur_slot++;
+	//seL4_IRQControl_Get(this_irqctrl, KEYB_IRQ, this_cnode, irq_slot, seL4_WordBits);
+	if(seL4_IRQControl_GetIOAPIC(this_irqctrl, this_cnode, irq_slot, 
+		seL4_WordBits, KEYB_PIC, KEYB_IRQ, 0, 1, KEYB_INT) != seL4_NoError)
+		printf("Error getting keyboard interrupt control!\n");
+
+	seL4_SlotPos irq_notify = get_slot(seL4_NotificationObject, 1<<seL4_NotificationBits, 
+		untyped_start, untyped_end, untyped_list, &cur_slot, this_cnode);
+	if(seL4_IRQHandler_SetNotification(irq_slot, irq_notify) != seL4_NoError)
+		printf("Error setting keyboard interrupt notification!\n");
+
+	while(1)
+	{
+		seL4_Wait(irq_notify, 0);
+		seL4_X86_IOPort_In8_t key = seL4_X86_IOPort_In8(keyb_slot, 0x60);
+		if(key.error != seL4_NoError)
+		{
+			printf("Error reading keyboard port!\n");
+		}
+		else
+		{
+			printf("Key pressed: 0x%x.\n", key.result);
+			seL4_IRQHandler_Ack(irq_slot);
+
+			u64 num = key.result - 0x01;
+			if(num >= 1 && num <= 10)
+				calc(num, (i8*)virt_addr_char, 0);
+
+			// esc
+			if(key.result == 0x01)
+				break;
+		}
+	}
 
 	printf("Waiting for thread to end.");
 	seL4_Wait(notify2, 0);
