@@ -8,6 +8,7 @@
  *   - https://github.com/seL4/sel4-tutorials/blob/master/tutorials/mapping/mapping.md
  *   - https://github.com/seL4/sel4-tutorials/blob/master/tutorials/untyped/untyped.md
  *   - https://github.com/seL4/sel4-tutorials/blob/master/tutorials/threads/threads.md
+ *   - https://github.com/seL4/sel4-tutorials/blob/master/tutorials/interrupts/interrupts.md
  *   - https://github.com/seL4/sel4-tutorials/blob/master/libsel4tutorials/src/alloc.c
  *   - https://docs.sel4.systems/projects/sel4/api-doc.html
  */
