@@ -67,10 +67,10 @@ requires requires(const t_str& str, std::size_t idx)
 	{
 		if(pattern[str_pos-start_pos] == str[str_pos])
 		{
-			++str_pos;
-
-			if(str_pos-start_pos == len_pattern)
+			if(str_pos-start_pos+1 == len_pattern)
 				return start_pos;
+			else
+				++str_pos;
 		}
 		else
 		{

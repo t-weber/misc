@@ -7,9 +7,10 @@
  * References:
  *  * http://www.boost.org/doc/libs/1_65_1/libs/geometry/doc/html/index.html
  *  * http://www.boost.org/doc/libs/1_65_1/libs/geometry/doc/html/geometry/spatial_indexes/rtree_examples.html
+ *  * https://www.boost.org/doc/libs/1_76_0/libs/geometry/doc/html/geometry/reference/algorithms/buffer/buffer_7_with_strategies.html
  *  * https://github.com/boostorg/geometry/tree/develop/example
  *
- * gcc -o geo geo.cpp -std=c++17 -lstdc++ -lm
+ * g++ -o geo geo.cpp -std=c++17
  */
 
 #include <iostream>
@@ -24,6 +25,7 @@
 namespace geo = boost::geometry;
 namespace trafo = geo::strategy::transform;
 namespace geoidx = geo::index;
+namespace strat = geo::strategy::buffer;
 
 
 using t_real = double;
@@ -34,8 +36,12 @@ using t_vertex = geo::model::point<T, 2, geo::cs::cartesian>;
 template<class T = t_real>
 constexpr std::size_t g_iDim = geo::traits::dimension<t_vertex<T>>::value;
 
-template<class T = t_real> using t_lines = geo::model::linestring<t_vertex<T>>;
-template<class T = t_real> using t_poly = geo::model::polygon<t_vertex<T>, true /*cw*/, false /*closed*/>;
+template<class T = t_real> using t_lines = geo::model::linestring<t_vertex<T>, std::vector>;
+template<class T = t_real> using t_poly = geo::model::polygon<t_vertex<T>, true /*cw*/, false /*closed*/, std::vector>;
+template<class T = t_real> using t_polys = geo::model::multi_polygon<t_poly<T>, std::vector>;
+template<class T = t_real> using t_box = geo::model::box<t_vertex<T>>;
+template<class T = t_real> using t_ring = geo::model::ring<t_vertex<T>, true /*cw*/, false /*closed*/, std::vector>;
+
 template<class T = t_real> using t_svg = geo::svg_mapper<t_vertex<T>>;
 template<class T = t_real> using t_trafo = trafo::matrix_transformer<T, g_iDim<T>, g_iDim<T>>;
 
@@ -52,6 +58,14 @@ int main()
 	t_vertex<t_real> pt4{10., 8.};
 	t_vertex<t_real> pt5{10., 3.};
 	std::cout << geo::distance(pt1, pt2) << "\n";
+
+
+	// circle (via buffer)
+	t_polys<t_real> circle0;
+	geo::buffer(t_vertex<t_real>{-2, -2}, circle0,
+		strat::distance_symmetric<t_real>{1.5},
+		strat::side_straight{}, strat::join_round{},
+		strat::end_round{}, strat::point_circle{});
 
 
 	// lines
@@ -73,6 +87,19 @@ int main()
 	poly0.outer().push_back(pt5);
 
 
+	// box
+	t_box<t_real> box0;
+	box0.min_corner() = t_vertex<t_real>{-1, -1};
+	box0.max_corner() = t_vertex<t_real>{1, 1};
+
+
+	// ring
+	t_ring<t_real> ring0;
+	ring0.emplace_back(t_vertex<t_real>{-2, -2});
+	ring0.emplace_back(t_vertex<t_real>{1, -2});
+	ring0.emplace_back(t_vertex<t_real>{1, 2});
+
+
 	// convex hull
 	t_poly<t_real> poly1;
 	geo::convex_hull(l1, poly1);
@@ -88,6 +115,9 @@ int main()
 	l2.push_back(t_vertex<t_real>(10., 10.));
 	std::vector<t_vertex<t_real>> vecPts;
 	geo::intersection(poly1, l2, vecPts);
+
+	std::vector<t_vertex<t_real>> vecPts2;
+	geo::intersection(ring0, circle0, vecPts2);
 
 
 	// trafos
@@ -114,8 +144,24 @@ int main()
 	svg1.add(l3);
 	svg1.map(l3, "stroke:#000000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
 
+	svg1.add(box0);
+	svg1.map(box0, "stroke:#000000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
+
+	svg1.add(ring0);
+	svg1.map(ring0, "stroke:#ff0000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
+
+	svg1.add(circle0);
+	svg1.map(circle0, "stroke:#007700; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
 
 	for(const auto& vert : vecPts)
+	{
+		svg1.add(vert);
+		svg1.map(vert, "stroke:#0000ff; stroke-width:1px; fill:#0000ff;", 1.);
+
+		svg1.text(vert, "intersection", "font-family:\'DejaVu Sans\'; font-size:6pt", 2.,2., 8.);
+	}
+
+	for(const auto& vert : vecPts2)
 	{
 		svg1.add(vert);
 		svg1.map(vert, "stroke:#0000ff; stroke-width:1px; fill:#0000ff;", 1.);
