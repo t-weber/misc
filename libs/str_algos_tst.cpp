@@ -24,5 +24,15 @@ int main()
 	hufftree->print(std::cout);
 	std::cout << std::endl;
 
+	auto mapping = huffman_mapping<std::string>(hufftree);
+	for(const auto& pair : mapping)
+	{
+		std::string bits;
+		boost::to_string(std::get<1>(pair), bits);
+		std::string bits_rev{bits.rbegin(), bits.rend()};
+		std::cout << std::get<0>(pair) << ": " << bits_rev << "\n";
+	}
+	std::cout << std::endl;
+
 	return 0;
 }

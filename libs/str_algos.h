@@ -19,6 +19,7 @@
 #include <optional>
 #include <memory>
 #include <iostream>
+#include <boost/dynamic_bitset.hpp>
 
 
 /**
@@ -190,5 +191,45 @@ std::shared_ptr<HuffmanNode<typename t_str::value_type>> huffman(const t_str& st
 	return queue.top();
 }
 
+
+/**
+ * get huffman bit encoding for characters from huffman tree
+ * @see (FUH 2021), Kurseinheit 2, p. 27
+ * @see https://en.wikipedia.org/wiki/Huffman_coding
+ */
+template<class t_str, class t_bits=boost::dynamic_bitset<unsigned long>>
+std::unordered_map<typename t_str::value_type, t_bits>
+huffman_mapping(const std::shared_ptr<HuffmanNode<typename t_str::value_type>>& tree)
+{
+	std::unordered_map<typename t_str::value_type, t_bits> map;
+
+	std::function<void(decltype(tree), const t_bits&)> traverse;
+	traverse = [&traverse, &map](
+		const std::shared_ptr<HuffmanNode<typename t_str::value_type>>& node,
+		const t_bits& pathbits) -> void
+	{
+		if(node->left)
+		{
+			auto leftpathbits = pathbits;
+			leftpathbits.push_back(1);
+			traverse(node->left, leftpathbits);
+		}
+		if(node->right)
+		{
+			auto rightpathbits = pathbits;
+			rightpathbits.push_back(0);
+			traverse(node->right, rightpathbits);
+		}
+
+		if(node->ch)
+		{
+			map.emplace(std::make_pair(*node->ch, pathbits));
+		}
+	};
+
+	traverse(tree, t_bits{});
+
+	return map;
+}
 
 #endif
