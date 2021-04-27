@@ -18,6 +18,11 @@ int main()
 	std::cout << find_pattern<std::string>("abcdefghijkl", "def") << std::endl;
 	std::cout << find_pattern<std::string>("abcdefghijkl", "jkl") << std::endl;
 	std::cout << find_pattern<std::string>("abcdefghijkl", "defx") << std::endl;
+	std::cout << std::endl;
+
+	auto hufftree = huffman<std::string>("abbcccdddd");
+	hufftree->print(std::cout);
+	std::cout << std::endl;
 
 	return 0;
 }

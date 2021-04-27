@@ -14,6 +14,11 @@
 
 
 #include <vector>
+#include <unordered_map>
+#include <queue>
+#include <optional>
+#include <memory>
+#include <iostream>
 
 
 /**
@@ -88,6 +93,101 @@ requires requires(const t_str& str, std::size_t idx)
 
 	// pattern not found
 	return len_str;
+}
+
+
+
+template<class t_char>
+struct HuffmanNode
+{
+	std::size_t freq{};
+	std::optional<t_char> ch{std::nullopt};
+
+	std::shared_ptr<HuffmanNode> left{}, right{};
+
+	void print(std::ostream& ostr, std::size_t depth=0) const
+	{
+		for(std::size_t i=0; i<depth; ++i)
+			std::cout << "\t";
+
+		if(ch)
+			ostr << "char = " << *ch << ", ";
+		ostr << "freq = " << freq << "\n";
+
+		if(left)
+			left->print(ostr, depth+1);
+		if(right)
+			right->print(ostr, depth+1);
+	}
+};
+
+
+/**
+ * huffman code
+ * @see (FUH 2021), Kurseinheit 2, p. 27
+ * @see https://en.wikipedia.org/wiki/Huffman_coding
+ */
+template<class t_str>
+std::shared_ptr<HuffmanNode<typename t_str::value_type>> huffman(const t_str& str)
+{
+	using t_char = typename t_str::value_type;
+	using t_nodeptr = std::shared_ptr<HuffmanNode<t_char>>;
+
+
+	// find frequency of characters
+	std::unordered_map<t_char, std::size_t> freqs;
+	for(const t_char& c : str)
+	{
+		auto iter = freqs.find(c);
+		if(iter == freqs.end())
+			std::tie(iter, std::ignore) = freqs.insert(std::make_pair(c, 0));
+
+		++iter->second;
+	}
+
+
+	// insert characters and frequencies in priority queue
+	auto queue_ordering =
+		[](const t_nodeptr& node1, const t_nodeptr& node2) -> bool
+		{
+			return node1->freq > node2->freq;
+		};
+
+	std::priority_queue<t_nodeptr, std::vector<t_nodeptr>, decltype(queue_ordering)>
+		queue(queue_ordering);
+
+	for(const auto& pair : freqs)
+	{
+		t_nodeptr node = std::make_shared<HuffmanNode<t_char>>();
+		node->ch = pair.first;
+		node->freq = pair.second;
+
+		queue.push(node);
+	}
+
+
+	// build huffman tree
+	while(1)
+	{
+		if(queue.size() <= 1)
+			break;
+
+		t_nodeptr node1{std::move(queue.top())};
+		queue.pop();
+		t_nodeptr node2{std::move(queue.top())};
+		queue.pop();
+
+		t_nodeptr node = std::make_shared<HuffmanNode<t_char>>();
+		node->left = node1;
+		node->right = node2;
+		node->freq = node1->freq + node2->freq;
+
+		queue.push(node);
+	}
+
+	if(queue.size() == 0)
+		return nullptr;
+	return queue.top();
 }
 
 
