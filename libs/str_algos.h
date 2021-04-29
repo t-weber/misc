@@ -18,8 +18,24 @@
 #include <queue>
 #include <optional>
 #include <memory>
+#include <concepts>
 #include <iostream>
 #include <boost/dynamic_bitset.hpp>
+
+
+/**
+ * requirements for an iterable container
+ */
+template<class T>
+concept is_iterable = requires(const T& a)
+{
+	a.begin();
+	a.end();
+
+	{ a.begin() == a.end() } -> std::same_as<bool>;
+	{ a.begin() != a.end() } -> std::same_as<bool>;
+};
+
 
 
 /**
@@ -128,7 +144,7 @@ struct HuffmanNode
  * @see (FUH 2021), Kurseinheit 2, p. 27
  * @see https://en.wikipedia.org/wiki/Huffman_coding
  */
-template<class t_str>
+template<class t_str> requires is_iterable<t_str>
 std::shared_ptr<HuffmanNode<typename t_str::value_type>> huffman(const t_str& str)
 {
 	using t_char = typename t_str::value_type;
