@@ -239,8 +239,16 @@ void PolyObject::tick(const std::chrono::milliseconds& ms)
 {
 	if(m_rotating)
 	{
-		t_real delta = t_real(ms.count()) * 0.1;
-		t_mat rot = m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0,0}), delta, 1);
+		t_real delta = t_real(ms.count()) * 0.0025;
+		t_mat3 rot33 = m::rotation<t_mat3, t_vec3>(m::create<t_vec3>({-1,-1,1}), delta, 0);
+
+		//using namespace m_ops;
+		//std::cout << rot33 << std::endl;
+		//std::cout << m::det<t_mat3, t_vec3>(rot33) << std::endl;
+
+		t_mat rot;
+		m::convert<t_mat, t_mat3>(rot, rot33);
+
 		m_mat *= rot;
 	}
 }
@@ -260,7 +268,7 @@ VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd)
 	// create some objects
 	{
 		PolyObject plane;
-		plane.CreatePlaneGeometry(m::create<t_vec3>({0, 1, 0}), 5., 0., 0., 1.);
+		plane.CreatePlaneGeometry(m::create<t_vec3>({0, -1, 0}), 5., 0., 0., 1.);
 		plane.SetMatrix(m::hom_translation<t_mat, t_real>(0, -1, 0));
 		plane.SetRotating(false);
 		m_objs.emplace_back(std::move(plane));
@@ -694,7 +702,7 @@ VkRenderer::CreatePipelineStages() const
 		.depthClampEnable = 0,
 		.rasterizerDiscardEnable = 0,
 		.polygonMode = VK_POLYGON_MODE_FILL,
-		.cullMode = /*VK_CULL_MODE_BACK_BIT*/ VK_CULL_MODE_NONE,
+		.cullMode = VK_CULL_MODE_BACK_BIT /*VK_CULL_MODE_NONE*/,
 		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		.depthBiasEnable = 0,
 		.depthBiasConstantFactor = 0.f,

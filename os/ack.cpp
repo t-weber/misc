@@ -1,5 +1,4 @@
 /**
- * (m)fm coding test
  * @author Tobias Weber
  * @date apr-20
  * @license: see 'LICENSE.EUPL' file

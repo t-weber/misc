@@ -1,6 +1,6 @@
 /**
  * container-agnostic math algorithms
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date dec-17
  * @license see 'LICENSE.EUPL' file
  *
@@ -31,6 +31,8 @@
 
 #define MATH_USE_FLAT_DET 0
 
+
+// math
 namespace m {
 
 
@@ -252,6 +254,24 @@ requires is_mat<t_mat_dst> && is_mat<t_mat_src>
 			matdst(iRow, iCol) = T_dst(mat(iRow, iCol));
 
 	return matdst;
+}
+
+
+/**
+ * converts matrix containers of different value types and possibly sizes
+ */
+template<class t_mat_dst, class t_mat_src>
+void convert(t_mat_dst& mat_dst, const t_mat_src& mat_src)
+requires is_mat<t_mat_dst> && is_mat<t_mat_src>
+{
+	using T_dst = typename t_mat_dst::value_type;
+	using t_idx = decltype(mat_src.size1());
+
+	mat_dst = unit<t_mat_dst>(mat_dst.size1(), mat_dst.size2());
+
+	for(t_idx iRow=0; iRow<std::min(mat_src.size1(), mat_dst.size1()); ++iRow)
+		for(t_idx iCol=0; iCol<std::min(mat_src.size2(), mat_dst.size2()); ++iCol)
+			mat_dst(iRow, iCol) = T_dst(mat_src(iRow, iCol));
 }
 
 
@@ -721,7 +741,7 @@ requires is_basic_vec<t_vec>
 
 
 /**
- * outer product
+ * outer product |v1><v2|
  */
 template<class t_mat, class t_vec>
 t_mat outer(const t_vec& vec1, const t_vec& vec2)
@@ -854,10 +874,10 @@ requires is_basic_mat<t_mat> && is_basic_vec<t_vec>
  * @see (Arens15), p. 814
  */
 template<class t_mat, class t_vec>
-t_mat projector(const t_vec& vec, bool bIsNormalised = true)
+t_mat projector(const t_vec& vec, bool is_normalised = true)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
-	if(bIsNormalised)
+	if(is_normalised)
 	{
 		return outer<t_mat, t_vec>(vec, vec);
 	}
@@ -875,10 +895,10 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * @see (Arens15), p. 814
  */
 template<class t_vec>
-t_vec project(const t_vec& vec, const t_vec& vecProj, bool bIsNormalised = true)
+t_vec project(const t_vec& vec, const t_vec& vecProj, bool is_normalised = true)
 requires is_vec<t_vec>
 {
-	if(bIsNormalised)
+	if(is_normalised)
 	{
 		return inner<t_vec>(vec, vecProj) * vecProj;
 	}
@@ -898,10 +918,10 @@ requires is_vec<t_vec>
  */
 template<class t_vec>
 typename t_vec::value_type
-project_scalar(const t_vec& vec, const t_vec& vecProj, bool bIsNormalised = true)
+project_scalar(const t_vec& vec, const t_vec& vecProj, bool is_normalised = true)
 requires is_vec<t_vec>
 {
-	if(bIsNormalised)
+	if(is_normalised)
 	{
 		return inner<t_vec>(vec, vecProj);
 	}
@@ -922,11 +942,11 @@ requires is_vec<t_vec>
 template<class t_vec>
 std::tuple<t_vec, typename t_vec::value_type>
 project_line(const t_vec& vec,
-	const t_vec& lineOrigin, const t_vec& lineDir, bool bIsNormalised = true)
+	const t_vec& lineOrigin, const t_vec& lineDir, bool is_normalised = true)
 requires is_vec<t_vec>
 {
 	const t_vec ptShifted = vec - lineOrigin;
-	const t_vec ptProj = project<t_vec>(ptShifted, lineDir, bIsNormalised);
+	const t_vec ptProj = project<t_vec>(ptShifted, lineDir, is_normalised);
 	const t_vec ptNearest = lineOrigin + ptProj;
 
 	const typename t_vec::value_type dist = norm<t_vec>(vec - ptNearest);
@@ -987,14 +1007,14 @@ requires is_vec<t_vec>
  * @see (Arens15), p. 814
  */
 template<class t_mat, class t_vec>
-t_mat ortho_projector(const t_vec& vec, bool bIsNormalised = true)
+t_mat ortho_projector(const t_vec& vec, bool is_normalised = true)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	using t_size = decltype(vec.size());
 
 	const t_size iSize = vec.size();
 	return unit<t_mat>(iSize) -
-		projector<t_mat, t_vec>(vec, bIsNormalised);
+		projector<t_mat, t_vec>(vec, is_normalised);
 }
 
 
@@ -1004,7 +1024,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * @see (Arens15), p. 710
  */
 template<class t_mat, class t_vec>
-t_mat ortho_mirror_op(const t_vec& vec, bool bIsNormalised = true)
+t_mat ortho_mirror_op(const t_vec& vec, bool is_normalised = true)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	using t_size = decltype(vec.size());
@@ -1013,7 +1033,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	const t_size iSize = vec.size();
 
 	return unit<t_mat>(iSize) -
-		T(2)*projector<t_mat, t_vec>(vec, bIsNormalised);
+		T(2)*projector<t_mat, t_vec>(vec, is_normalised);
 }
 
 
@@ -1090,11 +1110,11 @@ requires is_mat<t_mat> && is_vec<t_vec>
  * (e.g. used to calculate magnetic interaction vector M_perp)
  */
 template<class t_vec>
-t_vec ortho_project(const t_vec& vec, const t_vec& vecNorm, bool bIsNormalised = true)
+t_vec ortho_project(const t_vec& vec, const t_vec& vecNorm, bool is_normalised = true)
 requires is_vec<t_vec>
 {
 	//const std::size_t iSize = vec.size();
-	return vec - project<t_vec>(vec, vecNorm, bIsNormalised);
+	return vec - project<t_vec>(vec, vecNorm, is_normalised);
 }
 
 
@@ -1558,7 +1578,7 @@ requires is_vec<t_vec>
 
 
 /**
- * intersection of a sphere  and a line |org> + lam*|dir>
+ * intersection of a sphere and a line |org> + lam*|dir>
  * @returns vector of intersections
  * insert |x> = |org> + lam*|dir> in sphere equation <x-mid | x-mid> = r^2
  *
@@ -1567,28 +1587,147 @@ requires is_vec<t_vec>
 template<class t_vec, template<class...> class t_cont = std::vector>
 t_cont<t_vec>
 intersect_line_sphere(
-	const t_vec& lineOrg, const t_vec& lineDir,
+	const t_vec& lineOrg, const t_vec& _lineDir,
 	const t_vec& sphereOrg, typename t_vec::value_type sphereRad,
-	bool bLineDirIsNormalised = false)
+	bool linedir_normalised = false, bool only_segment = false,
+	typename t_vec::value_type eps = std::numeric_limits<typename t_vec::value_type>::epsilon())
 requires is_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
 
-	auto vecDiff = sphereOrg-lineOrg;
-	auto proj = project_scalar<t_vec>(vecDiff, lineDir, bLineDirIsNormalised);
+	t_vec lineDir = _lineDir;
+	T lenDir = linedir_normalised ? T(1) : norm<t_vec>(lineDir);
+
+	if(!linedir_normalised)
+		lineDir /= lenDir;
+
+	auto vecDiff = sphereOrg - lineOrg;
+	auto proj = project_scalar<t_vec>(vecDiff, lineDir, true);
 	auto rt = proj*proj + sphereRad*sphereRad - inner<t_vec>(vecDiff, vecDiff);
 
 	// no intersection
-	if(rt < T(0)) return t_cont<t_vec>{};
+	if(rt < T(0))
+		return t_cont<t_vec>{};
 
 	// one intersection
-	if(equals(rt, T(0))) return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
+	if(equals(rt, T(0), eps))
+	{
+		T lam = proj/lenDir;
+		if(!only_segment || (only_segment && lam >= T(0) && lam < T(1)))
+			return t_cont<t_vec>{{ lineOrg + proj*lineDir }};
+		return t_cont<t_vec>{};
+	}
 
 	// two intersections
 	auto val = std::sqrt(rt);
-	auto lam1 = proj + val;
-	auto lam2 = proj - val;
-	return t_cont<t_vec>{{ lineOrg + lam1*lineDir, lineOrg + lam2*lineDir }};
+	t_cont<t_vec> inters;
+
+	T lam1 = (proj + val)/lenDir;
+	T lam2 = (proj - val)/lenDir;
+	//std::cout << lam1 << "  " << lam2 << std::endl;
+
+	if(!only_segment || (only_segment && lam1 >= T(0) && lam1 < T(1)))
+		inters.emplace_back(lineOrg + (proj + val)*lineDir);
+	if(!only_segment || (only_segment && lam2 >= T(0) && lam2 < T(1)))
+		inters.emplace_back(lineOrg + (proj - val)*lineDir);
+
+	// sort intersections by x
+	std::sort(inters.begin(), inters.end(), [](const t_vec& vec1, const t_vec& vec2) -> bool
+	{
+		return vec1[0] < vec2[0];
+	});
+
+	return inters;
+}
+
+
+/**
+ * intersection of two circles
+ * <x-mid_{1,2} | x-mid_{1,2}> = r_{1,2}^2
+ *
+ * circle 1:
+ * trafo to mid_1 = (0,0)
+ * x^2 + y^2 = r_1^2  ->  y = +-sqrt(r_1^2 - x^2)
+ *
+ * circle 2:
+ * (x-m_1)^2 + (y-m_2)^2 = r_2^2
+ * (x-m_1)^2 + (+-sqrt(r_1^2 - x^2)-m_2)^2 = r_2^2
+ *
+ * @see https://mathworld.wolfram.com/Circle-CircleIntersection.html
+ */
+template<class t_vec, template<class...> class t_cont = std::vector>
+t_cont<t_vec>
+intersect_circle_circle(
+	const t_vec& org1, typename t_vec::value_type r1,
+	const t_vec& org2, typename t_vec::value_type r2,
+	typename t_vec::value_type eps = std::sqrt(std::numeric_limits<typename t_vec::value_type>::epsilon()))
+requires is_vec<t_vec>
+{
+	using T = typename t_vec::value_type;
+
+	auto is_on_circle = [](const t_vec& org, T rad, const t_vec& pos, T eps) -> bool
+	{
+		T val = inner<t_vec>(org-pos, org-pos);
+		return equals<T>(val, rad*rad, eps);
+	};
+
+	T m1 = org2[0] - org1[0];
+	T m2 = org2[1] - org1[1];
+
+	T r1_2 = r1*r1;
+	T r2_2 = r2*r2;
+	T m1_2 = m1*m1;
+	T m2_2 = m2*m2;
+	T m2_4 = m2_2*m2_2;
+
+	T rt =
+		+ T(2)*m2_2 * (r1_2*r2_2 + m1_2*(r1_2 + r2_2) + m2_2*(r1_2 + r2_2))
+		- m2_2 * (r1_2*r1_2 + r2_2*r2_2)
+		- (T(2)*m1_2*m2_4 + m1_2*m1_2*m2_2 + m2_4*m2_2);
+
+	t_cont<t_vec> inters;
+	if(rt < T(0))
+		return inters;
+
+	rt = std::sqrt(rt);
+	T factors = m1*(r1_2 - r2_2) + m1*m1_2 + m1*m2_2;
+	T div = T(2)*(m1_2 + m2_2);
+
+	// first intersection
+	T x1 = (factors - rt) / div;
+	T y1a = std::sqrt(r1_2 - x1*x1);
+	T y1b = -std::sqrt(r1_2 - x1*x1);
+
+	t_vec pos1a = m::create<t_vec>({x1, y1a}) + org1;
+	t_vec pos1b = m::create<t_vec>({x1, y1b}) + org1;
+
+	if(is_on_circle(org1, r1, pos1a, eps) && is_on_circle(org2, r2, pos1a, eps))
+		inters.emplace_back(std::move(pos1a));
+	if(!equals<t_vec>(pos1a, pos1b, eps) && is_on_circle(org1, r1, pos1b, eps) && is_on_circle(org2, r2, pos1b, eps))
+		inters.emplace_back(std::move(pos1b));
+
+	// second intersection
+	if(!equals<T>(rt, T(0), eps))
+	{
+		T x2 = (factors + rt) / div;
+		T y2a = std::sqrt(r1_2 - x2*x2);
+		T y2b = -std::sqrt(r1_2 - x2*x2);
+
+		t_vec pos2a = m::create<t_vec>({x2, y2a}) + org1;
+		t_vec pos2b = m::create<t_vec>({x2, y2b}) + org1;
+
+		if(is_on_circle(org1, r1, pos2a, eps) && is_on_circle(org2, r2, pos2a, eps))
+			inters.emplace_back(std::move(pos2a));
+		if(!equals<t_vec>(pos2a, pos2b, eps) && is_on_circle(org1, r1, pos2b, eps) && is_on_circle(org2, r2, pos2b, eps))
+			inters.emplace_back(std::move(pos2b));
+	}
+
+	// sort intersections by x
+	std::sort(inters.begin(), inters.end(), [](const t_vec& vec1, const t_vec& vec2) -> bool
+	{
+		return vec1[0] < vec2[0];
+	});
+	return inters;
 }
 
 
@@ -1712,11 +1851,11 @@ template<class t_vec>
 std::tuple<t_vec, t_vec, bool, typename t_vec::value_type, typename t_vec::value_type, typename t_vec::value_type>
 intersect_line_line(
 	const t_vec& line1Org, const t_vec& line1Dir,
-	const t_vec& line2Org, const t_vec& line2Dir)
+	const t_vec& line2Org, const t_vec& line2Dir,
+	typename t_vec::value_type eps = std::numeric_limits<typename t_vec::value_type>::epsilon())
 requires is_vec<t_vec>
 {
 	using T = typename t_vec::value_type;
-	//const std::size_t N = line1Dir.size();
 
 	const t_vec orgdiff = line1Org - line2Org;
 
@@ -1728,7 +1867,7 @@ requires is_vec<t_vec>
 	const T d_det = d11*d22 - d12*d12;
 
 	// check if matrix is invertible
-	if(equals<T>(d_det, 0))
+	if(equals<T>(d_det, 0, eps))
 		return std::make_tuple(t_vec(), t_vec(), false, 0, 0, 0);
 
 	// inverse (symmetric)
@@ -1949,7 +2088,7 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
  * @see (Merziger06), p. 208
  */
 template<class t_mat, class t_vec>
-t_mat rotation(const t_vec& axis, const typename t_vec::value_type angle, bool bIsNormalised=1)
+t_mat rotation(const t_vec& axis, const typename t_vec::value_type angle, bool is_normalised=1)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	using t_real = typename t_vec::value_type;
@@ -1958,7 +2097,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	const t_real s = std::sin(angle);
 
 	t_real len = 1;
-	if(!bIsNormalised)
+	if(!is_normalised)
 		len = norm<t_vec>(axis);
 
 	// ----------------------------------------------------
@@ -1973,10 +2112,10 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	// ----------------------------------------------------
 	// general case
 	// project along rotation axis using |v><v|
-	t_mat matProj1 = projector<t_mat, t_vec>(axis, bIsNormalised);
+	t_mat matProj1 = projector<t_mat, t_vec>(axis/len, 1);
 
 	// project along axis 2 in plane perpendicular to rotation axis using 1-|v><v|
-	t_mat matProj2 = ortho_projector<t_mat, t_vec>(axis, bIsNormalised) * c;
+	t_mat matProj2 = ortho_projector<t_mat, t_vec>(axis/len, 1) * c;
 
 	// project along axis 3 in plane perpendicular to rotation axis and axis 2 using v_cross matrix
 	t_mat matProj3 = skewsymmetric<t_mat, t_vec>(axis/len) * s;
@@ -1985,7 +2124,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	// rotation in the orthogonal plane is done above by axis2*cos + axis3*sin
 	t_mat matProj = matProj1 + matProj2 + matProj3;
 
-	// if matrix is larger than 3x3 (e.g. for homogeneous cooridnates), fill up with identity
+	// if matrix is larger than 3x3 (e.g. for homogeneous coordinates), fill up with identity
 	unit<t_mat>(matProj, 3,3, matProj.size1(), matProj.size2());
 	return matProj;
 }
@@ -2401,10 +2540,10 @@ requires is_vec<t_vec>
 
 	t_cont<t_cont<t_vec>> uvs =
 	{{
-		create<t_vec>({0,0}),
-		create<t_vec>({1,0}),
-		create<t_vec>({1,1}),
-		create<t_vec>({0,1}),
+		create<t_vec>({ 0, 0 }),
+		create<t_vec>({ 1, 0 }),
+		create<t_vec>({ 1, 1 }),
+		create<t_vec>({ 0, 1 }),
 	}};
 
 	return std::make_tuple(vertices, faces, normals, uvs);
@@ -3103,6 +3242,33 @@ requires is_mat<t_mat>
 	});
 }
 
+
+template<class t_mat, class t_vec>
+t_mat hom_rotation(const t_vec& axis, const typename t_vec::value_type angle, bool is_normalised=1)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	t_mat rot = rotation<t_mat, t_vec>(axis, angle, is_normalised);
+
+	t_mat rot_hom = unit<t_mat>(4,4);
+	m::convert<t_mat, t_mat>(rot_hom, rot);
+
+	return rot_hom;
+}
+
+
+/**
+ * shear matrix
+ * @see https://en.wikipedia.org/wiki/Shear_matrix
+ */
+template<class t_mat, class t_real = typename t_mat::value_type>
+t_mat shear(std::size_t ROWS, std::size_t COLS, std::size_t i, std::size_t j, t_real s)
+requires is_mat<t_mat>
+{
+	t_mat mat = unit<t_mat>(ROWS, COLS);
+	mat(i,j) = s;
+	return mat;
+}
+
 // ----------------------------------------------------------------------------
 
 
@@ -3164,11 +3330,11 @@ requires is_basic_vec<t_vec> && is_mat<typename t_vec::value_type>
  * proj = <sigma|vec>
  */
 template<class t_vec, class t_mat>
-t_mat proj_su2(const t_vec& vec, bool bIsNormalised=1)
+t_mat proj_su2(const t_vec& vec, bool is_normalised=1)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
 	typename t_vec::value_type len = 1;
-	if(!bIsNormalised)
+	if(!is_normalised)
 		len = norm<t_vec>(vec);
 
 	const auto sigma = su2_matrices<std::vector<t_mat>>(false);
