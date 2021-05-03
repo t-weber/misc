@@ -63,25 +63,25 @@ int main()
 {
 	using t_algos = BinTreeNodeTraits<TreeNode<int>>::t_avltreealgos;
 
-	TreeNode<int> root;
-	t_algos::init_header(&root);
+	TreeNode<int> tree;
+	t_algos::init_header(&tree);
 
-	t_algos::insert_equal(&root, t_algos::root_node(&root), new TreeNode<int>{123}, &TreeNode<int>::compare);
-	t_algos::insert_equal(&root, t_algos::root_node(&root), new TreeNode<int>{456}, &TreeNode<int>::compare);
-	t_algos::insert_equal(&root, t_algos::root_node(&root), new TreeNode<int>{789}, &TreeNode<int>::compare);
-	t_algos::insert_equal(&root, t_algos::root_node(&root), new TreeNode<int>{-321}, &TreeNode<int>::compare);
-	t_algos::insert_equal(&root, t_algos::root_node(&root), new TreeNode<int>{-654}, &TreeNode<int>::compare);
-
+	t_algos::insert_equal(&tree, t_algos::root_node(&tree), new TreeNode<int>{123}, &TreeNode<int>::compare);
+	t_algos::insert_equal(&tree, t_algos::root_node(&tree), new TreeNode<int>{456}, &TreeNode<int>::compare);
+	t_algos::insert_equal(&tree, t_algos::root_node(&tree), new TreeNode<int>{789}, &TreeNode<int>::compare);
+	t_algos::insert_equal(&tree, t_algos::root_node(&tree), new TreeNode<int>{-321}, &TreeNode<int>::compare);
+	t_algos::insert_equal(&tree, t_algos::root_node(&tree), new TreeNode<int>{-654}, &TreeNode<int>::compare);
 
 	std::cout << "// linked leaves: ";
-	for(TreeNode<int>* iter = t_algos::begin_node(&root); iter != t_algos::end_node(&root); iter = t_algos::next_node(iter))
+	for(TreeNode<int>* iter = t_algos::begin_node(&tree); iter != t_algos::end_node(&tree); iter = t_algos::next_node(iter))
 	{
 		std::cout << iter->GetData() << ", ";
 	}
 	std::cout << "\n" << std::endl;
 
+	// write graph diagram
+	write_graph<TreeNode<int>>(std::cout, t_algos::root_node(&tree));
 
-	write_graph<TreeNode<int>>(std::cout, t_algos::root_node(&root));
-
+	free_nodes(t_algos::root_node(&tree));
 	return 0;
 }

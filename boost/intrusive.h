@@ -296,6 +296,28 @@ struct RbTreeNodeTraits : public CommonNodeTraits<t_tree_node>
 // ----------------------------------------------------------------------------
 // functions
 // ----------------------------------------------------------------------------
+template<class t_node> requires is_common_tree_node<t_node>
+void free_nodes(t_node* node)
+{
+
+	std::function<void(t_node*)> _free_nodes;
+	_free_nodes = [&_free_nodes](t_node* node) -> void
+	{
+		if(!node)
+			return;
+
+		_free_nodes(node->GetLeft());
+		_free_nodes(node->GetRight());
+
+		node->SetLeft(nullptr);
+		node->SetRight(nullptr);
+
+		delete node;
+	};
+
+	_free_nodes(node);
+}
+
 
 template<class t_node> requires is_common_tree_node<t_node>
 void write_graph(std::ostream& ostr, const t_node* node)
