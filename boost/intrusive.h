@@ -5,7 +5,7 @@
  * @license see 'LICENSE.GPL' file
  *
  * References:
- *   - https://www.boost.org/doc/libs/1_74_0/doc/html/intrusive/node_algorithms.html
+ *   - https://www.boost.org/doc/libs/1_76_0/doc/html/intrusive/node_algorithms.html
  */
 
 #ifndef __INTRUSIVE_TREE_WRAPPER_H__
@@ -16,6 +16,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <functional>
+#include <memory>
 #include <cstdint>
 
 #include <boost/intrusive/bstree_algorithms.hpp>
@@ -63,8 +64,26 @@ template<class t_nodetype>
 class CommonTreeNode
 {
 public:
-	CommonTreeNode() {}
-	virtual ~CommonTreeNode() {}
+#ifdef _INTR_USE_SHARED_PTR
+	using t_nodeptr = std::shared_ptr<t_nodetype>;
+	using t_constnodeptr = std::shared_ptr<const t_nodetype>;
+#else
+	using t_nodeptr = std::remove_const_t<t_nodetype>*;
+	using t_constnodeptr = const t_nodetype*;
+#endif
+
+public:
+	CommonTreeNode()
+	{
+	}
+
+	virtual ~CommonTreeNode()
+	{
+		//std::cout << __PRETTY_FUNCTION__ << std::endl;
+
+		//SetLeft(nullptr);
+		//SetRight(nullptr);
+	}
 
 	CommonTreeNode(const CommonTreeNode<t_nodetype>& other)
 	{
@@ -80,22 +99,18 @@ public:
 
 	virtual void PrintValue(std::ostream&) const { }
 
-	t_nodetype* GetParent() { return parent; }
-	t_nodetype* GetLeft() { return left; }
-	t_nodetype* GetRight() { return right; }
+	t_nodeptr GetParent() const { return parent; }
+	t_nodeptr GetLeft() const { return left; }
+	t_nodeptr GetRight() const { return right; }
 
-	const t_nodetype* GetParent() const { return parent; }
-	const t_nodetype* GetLeft() const { return left; }
-	const t_nodetype* GetRight() const { return right; }
-
-	void SetParent(t_nodetype* parent) { this->parent = parent; }
-	void SetLeft(t_nodetype* left) { this->left = left; }
-	void SetRight(t_nodetype* right) { this->right = right; }
+	void SetParent(t_nodeptr parent) { this->parent = parent; }
+	void SetLeft(t_nodeptr left) { this->left = left; }
+	void SetRight(t_nodeptr right) { this->right = right; }
 
 private:
-	t_nodetype *parent{nullptr};
-	t_nodetype *left{nullptr};
-	t_nodetype *right{nullptr};
+	t_nodeptr parent{nullptr};
+	t_nodeptr left{nullptr};
+	t_nodeptr right{nullptr};
 };
 
 
@@ -105,6 +120,7 @@ class BinTreeNode : public CommonTreeNode<t_nodetype>
 public:
 	using t_balance = std::int64_t;
 
+public:
 	BinTreeNode() : CommonTreeNode<t_nodetype>() {};
 	virtual ~BinTreeNode() {}
 
@@ -170,48 +186,51 @@ template<class t_tree_node> requires is_common_tree_node<t_tree_node>
 struct CommonNodeTraits
 {
 	using node = t_tree_node;
-	using node_ptr = node*;
-	using const_node_ptr = const node*;
+	using node_ptr = typename t_tree_node::t_nodeptr;
+	using const_node_ptr = typename t_tree_node::t_constnodeptr;
 
 	using t_splaytreealgos = boost::intrusive::splaytree_algorithms<CommonNodeTraits<t_tree_node>>;
 
 
-	static node* get_parent(const node* thenode)
+	static node_ptr get_parent(const_node_ptr thenode)
 	{
 		if(!thenode)
 			return nullptr;
-		return const_cast<node*>(thenode->GetParent());
+		//return const_cast<node_ptr>(thenode->GetParent());
+		return thenode->GetParent();
 	}
 
-	static node* get_left(const node* thenode)
+	static node_ptr get_left(const_node_ptr thenode)
 	{
 		if(!thenode)
 			return nullptr;
-		return const_cast<node*>(thenode->GetLeft());
+		//return const_cast<node_ptr>(thenode->GetLeft());
+		return thenode->GetLeft();
 	}
 
-	static node* get_right(const node* thenode)
+	static node_ptr get_right(const_node_ptr thenode)
 	{
 		if(!thenode)
 			return nullptr;
-		return const_cast<node*>(thenode->GetRight());
+		//return const_cast<node_ptr>(thenode->GetRight());
+		return thenode->GetRight();
 	}
 
-	static void set_parent(node* thenode, node* parent)
+	static void set_parent(node_ptr thenode, node_ptr parent)
 	{
 		if(!thenode)
 			return;
 		thenode->SetParent(parent);
 	}
 
-	static void set_left(node* thenode, node* left)
+	static void set_left(node_ptr thenode, node_ptr left)
 	{
 		if(!thenode)
 			return;
 		thenode->SetLeft(left);
 	}
 
-	static void set_right(node* thenode, node* right)
+	static void set_right(node_ptr thenode, node_ptr right)
 	{
 		if(!thenode)
 			return;
@@ -240,14 +259,14 @@ struct BinTreeNodeTraits : public CommonNodeTraits<t_tree_node>
 	static balance negative() { return -1; }
 	static balance zero() { return 0; }
 
-	static balance get_balance(const node* thenode)
+	static balance get_balance(const_node_ptr thenode)
 	{
 		if(!thenode)
 			return zero();
 		return thenode->GetBalance();
 	}
 
-	static void set_balance(node* thenode, balance bal)
+	static void set_balance(node_ptr thenode, balance bal)
 	{
 		if(!thenode)
 			return;
@@ -274,14 +293,14 @@ struct RbTreeNodeTraits : public CommonNodeTraits<t_tree_node>
 	static color red() { return 1; }
 	static color black() { return 0; }
 
-	static color get_color(const node* thenode)
+	static color get_color(const_node_ptr thenode)
 	{
 		if(!thenode)
 			return black();
 		return thenode->GetColour();
 	}
 
-	static void set_color(node* thenode, color col)
+	static void set_color(node_ptr thenode, color col)
 	{
 		if(!thenode)
 			return;
@@ -296,12 +315,14 @@ struct RbTreeNodeTraits : public CommonNodeTraits<t_tree_node>
 // ----------------------------------------------------------------------------
 // functions
 // ----------------------------------------------------------------------------
-template<class t_node> requires is_common_tree_node<t_node>
-void free_nodes(t_node* node)
+template<class t_node, class t_algos>
+requires is_common_tree_node<t_node>
+void free_nodes(typename CommonNodeTraits<t_node>::node_ptr node)
 {
+	using node_ptr = typename CommonNodeTraits<t_node>::node_ptr;
 
-	std::function<void(t_node*)> _free_nodes;
-	_free_nodes = [&_free_nodes](t_node* node) -> void
+	std::function<void(node_ptr)> _free_nodes;
+	_free_nodes = [&_free_nodes](node_ptr node) -> void
 	{
 		if(!node)
 			return;
@@ -309,10 +330,11 @@ void free_nodes(t_node* node)
 		_free_nodes(node->GetLeft());
 		_free_nodes(node->GetRight());
 
-		node->SetLeft(nullptr);
-		node->SetRight(nullptr);
-
+		//std::cout << "unlinking " << std::hex << (void*)node.get() << std::endl;
+		t_algos::unlink(node);
+#ifndef _INTR_USE_SHARED_PTR
 		delete node;
+#endif
 	};
 
 	_free_nodes(node);
@@ -320,18 +342,20 @@ void free_nodes(t_node* node)
 
 
 template<class t_node> requires is_common_tree_node<t_node>
-void write_graph(std::ostream& ostr, const t_node* node)
+void write_graph(std::ostream& ostr, typename CommonNodeTraits<t_node>::const_node_ptr node)
 {
+	using const_node_ptr = typename CommonNodeTraits<t_node>::const_node_ptr;
+
 	std::size_t nodeNum = 0;
-	std::unordered_map<const t_node*, std::size_t> nodeNumbers;
+	std::unordered_map<const_node_ptr, std::size_t> nodeNumbers;
 
 	std::ostringstream ostrStates, ostrTransitions;
 	ostrStates.precision(ostr.precision());
 	ostrTransitions.precision(ostr.precision());
 
 
-	std::function<void(const t_node*)> _number_nodes;
-	_number_nodes = [&_number_nodes, &nodeNum, &nodeNumbers](const t_node* node) -> void
+	std::function<void(const_node_ptr)> _number_nodes;
+	_number_nodes = [&_number_nodes, &nodeNum, &nodeNumbers](const_node_ptr node) -> void
 	{
 		if(!node)
 			return;
@@ -345,8 +369,8 @@ void write_graph(std::ostream& ostr, const t_node* node)
 	};
 
 
-	std::function<void(const t_node*)> _write_graph;
-	_write_graph = [&_write_graph, &nodeNumbers, &ostrStates, &ostrTransitions](const t_node* node) -> void
+	std::function<void(const_node_ptr)> _write_graph;
+	_write_graph = [&_write_graph, &nodeNumbers, &ostrStates, &ostrTransitions](const_node_ptr node) -> void
 	{
 		if(!node)
 			return;
