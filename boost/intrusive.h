@@ -80,9 +80,6 @@ public:
 	virtual ~CommonTreeNode()
 	{
 		//std::cout << __PRETTY_FUNCTION__ << std::endl;
-
-		//SetLeft(nullptr);
-		//SetRight(nullptr);
 	}
 
 	CommonTreeNode(const CommonTreeNode<t_nodetype>& other)
@@ -92,25 +89,25 @@ public:
 
 	const CommonTreeNode<t_nodetype>& operator=(const CommonTreeNode<t_nodetype>& other)
 	{
-		this->parent = other.parent;
-		this->left = other.left;
-		this->right = other.right;
+		this->m_parent = other.m_parent;
+		this->m_left = other.m_left;
+		this->m_right = other.m_right;
 	}
 
 	virtual void PrintValue(std::ostream&) const { }
 
-	t_nodeptr GetParent() const { return parent; }
-	t_nodeptr GetLeft() const { return left; }
-	t_nodeptr GetRight() const { return right; }
+	t_nodeptr GetParent() const { return m_parent; }
+	t_nodeptr GetLeft() const { return m_left; }
+	t_nodeptr GetRight() const { return m_right; }
 
-	void SetParent(t_nodeptr parent) { this->parent = parent; }
-	void SetLeft(t_nodeptr left) { this->left = left; }
-	void SetRight(t_nodeptr right) { this->right = right; }
+	void SetParent(t_nodeptr& parent) { this->m_parent = parent; }
+	void SetLeft(t_nodeptr& left) { this->m_left = left; }
+	void SetRight(t_nodeptr& right) { this->m_right = right; }
 
 private:
-	t_nodeptr parent{nullptr};
-	t_nodeptr left{nullptr};
-	t_nodeptr right{nullptr};
+	t_nodeptr m_parent{nullptr};
+	t_nodeptr m_left{nullptr};
+	t_nodeptr m_right{nullptr};
 };
 
 
@@ -132,14 +129,14 @@ public:
 	const BinTreeNode<t_nodetype>& operator=(const BinTreeNode<t_nodetype>& other)
 	{
 		static_cast<CommonTreeNode<t_nodetype>*>(this)->operator=(other);
-		this->balance = other.balance;
+		this->m_balance = other.m_balance;
 	}
 
-	t_balance GetBalance() const { return balance; }
-	void SetBalance(t_balance bal) { this->balance = bal; }
+	t_balance GetBalance() const { return m_balance; }
+	void SetBalance(t_balance bal) { this->m_balance = bal; }
 
 private:
-	t_balance balance{0};
+	t_balance m_balance{0};
 };
 
 
@@ -149,6 +146,7 @@ class RbTreeNode : public CommonTreeNode<t_nodetype>
 public:
 	using t_colour = std::int8_t;
 
+public:
 	RbTreeNode() : CommonTreeNode<t_nodetype>() {};
 	virtual ~RbTreeNode() {}
 
@@ -160,14 +158,14 @@ public:
 	const RbTreeNode<t_nodetype>& operator=(const RbTreeNode<t_nodetype>& other)
 	{
 		static_cast<CommonTreeNode<t_nodetype>*>(this)->operator=(other);
-		this->colour = other.colour;
+		this->m_colour = other.m_colour;
 	}
 
-	t_colour GetColour() const { return colour; }
-	void SetColour(t_colour col) { this->colour = col; }
+	t_colour GetColour() const { return m_colour; }
+	void SetColour(t_colour col) { this->m_colour = col; }
 
 private:
-	t_colour colour{0};
+	t_colour m_colour{0};
 };
 
 // ----------------------------------------------------------------------------
