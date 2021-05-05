@@ -15,6 +15,7 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <functional>
 #include <memory>
 #include <cstdint>
@@ -100,9 +101,9 @@ public:
 	t_nodeptr GetLeft() const { return m_left; }
 	t_nodeptr GetRight() const { return m_right; }
 
-	void SetParent(t_nodeptr& parent) { this->m_parent = parent; }
-	void SetLeft(t_nodeptr& left) { this->m_left = left; }
-	void SetRight(t_nodeptr& right) { this->m_right = right; }
+	void SetParent(t_nodeptr parent) { this->m_parent = parent; }
+	void SetLeft(t_nodeptr left) { this->m_left = left; }
+	void SetRight(t_nodeptr right) { this->m_right = right; }
 
 private:
 	t_nodeptr m_parent{nullptr};
@@ -319,17 +320,23 @@ void free_nodes(typename CommonNodeTraits<t_node>::node_ptr node)
 {
 	using node_ptr = typename CommonNodeTraits<t_node>::node_ptr;
 
+	//std::unordered_set<node_ptr> alreadySeen;
 	std::function<void(node_ptr)> _free_nodes;
-	_free_nodes = [&_free_nodes](node_ptr node) -> void
+	_free_nodes = [&_free_nodes/*, &alreadySeen*/](node_ptr node) -> void
 	{
 		if(!node)
 			return;
+		/*if(alreadySeen.find(node) != alreadySeen.end())
+			return;
+		alreadySeen.insert(node);*/
 
 		_free_nodes(node->GetLeft());
 		_free_nodes(node->GetRight());
 
-		//std::cout << "unlinking " << std::hex << (void*)node.get() << std::endl;
+		//std::cout << "removing " << std::hex << (void*)node.get() << std::endl;
+		//t_algos::erase(t_algos::get_header(node), node);
 		t_algos::unlink(node);
+
 #ifndef _INTR_USE_SHARED_PTR
 		delete node;
 #endif

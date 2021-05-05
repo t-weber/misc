@@ -6,6 +6,8 @@
  *
  * References:
  *   - https://www.boost.org/doc/libs/1_76_0/doc/html/intrusive/usage.html
+ *
+ * g++ -std=c++20 -Wall -Wextra -Weffc++ -o intrusive intrusive.cpp
  */
 
 //#define _INTR_USE_SHARED_PTR
@@ -17,12 +19,12 @@ template<class t_val>
 class TreeNode : public BinTreeNode<TreeNode<t_val>>
 {
 public:
-	TreeNode(t_val data=t_val{}) : BinTreeNode<TreeNode<t_val>>(), data{data}
+	TreeNode(t_val m_data=t_val{}) : BinTreeNode<TreeNode<t_val>>(), m_data{m_data}
 	{}
 
 	virtual ~TreeNode()
 	{
-		//std::cout << __PRETTY_FUNCTION__ << ", val = " << data << std::endl;
+		//std::cout << __PRETTY_FUNCTION__ << ", val = " << m_data << std::endl;
 	}
 
 	TreeNode(const TreeNode<t_val>& other)
@@ -33,26 +35,27 @@ public:
 	const TreeNode<t_val>& operator=(const TreeNode<t_val>& other)
 	{
 		static_cast<BinTreeNode<TreeNode<t_val>>*>(this)->operator=(other);
-		this->data = other.data;
+		this->m_data = other.m_data;
 	}
 
 	t_val GetData() const
 	{
-		return data;
-	}
-
-	static typename TreeNode<t_val>::t_nodeptr create(t_val val=0)
-	{
-#ifdef _INTR_USE_SHARED_PTR
-		return std::make_shared<TreeNode<t_val>>(val);
-#else
-		return new TreeNode<t_val>(val);
-#endif
+		return m_data;
 	}
 
 	virtual void PrintValue(std::ostream& ostr) const override
 	{
-		ostr << data;
+		ostr << m_data << " (balance: " << BinTreeNode<TreeNode<t_val>>::GetBalance() << ")";
+	}
+
+
+	static typename TreeNode<t_val>::t_nodeptr create(t_val val=0)
+	{
+		#ifdef _INTR_USE_SHARED_PTR
+		return std::make_shared<TreeNode<t_val>>(val);
+		#else
+		return new TreeNode<t_val>(val);
+		#endif
 	}
 
 	static bool compare(
@@ -64,12 +67,12 @@ public:
 
 	friend bool operator<(const TreeNode& node1, const TreeNode& node2)
 	{
-		//std::cout << "compare " << node1.data << " < " << node2.data << "?" << std::endl;
+		//std::cout << "compare " << node1.m_data << " < " << node2.m_data << "?" << std::endl;
 		return node1.GetData() < node2.GetData();
 	}
 
 private:
-	t_val data{0};
+	t_val m_data{0};
 };
 
 
@@ -97,13 +100,14 @@ int main()
 	std::cout << "\n" << std::endl;
 
 	// write graph diagram
-	write_graph<t_node>(std::cout, t_algos::root_node(tree));
+	if(t_algos::root_node(tree) != tree)
+		write_graph<t_node>(std::cout, t_algos::root_node(tree));
 
 #ifndef _INTR_USE_SHARED_PTR
-	free_nodes<t_node, t_algos>(t_algos::root_node(tree));
-	delete tree;
+	if(t_algos::root_node(tree) != tree)
+		free_nodes<t_node, t_algos>(t_algos::root_node(tree));
 #endif
-	//t_algos::unlink(t_algos::root_node(tree));
 
+	//std::cout << "end of " << __PRETTY_FUNCTION__ << std::endl;
 	return 0;
 }
