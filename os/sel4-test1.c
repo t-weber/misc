@@ -2,7 +2,7 @@
  * sel4 test
  * @author Tobias Weber
  * @date apr-2021
- * @license GPLv3
+ * @license GPLv3, see 'LICENSE.GPL' file
  *
  * References:
  *   - https://github.com/seL4/sel4-tutorials/blob/master/tutorials/mapping/mapping.md

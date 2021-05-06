@@ -2,7 +2,7 @@
  * stack protector canary test
  * @author Tobias Weber
  * @date may-2021
- * @license GPLv3
+ * @license GPLv3, see 'LICENSE.GPL' file
  *
  * @see https://en.wikipedia.org/wiki/Buffer_overflow_protection
  *
@@ -16,7 +16,9 @@
 #include <stdio.h>
 
 
-#define NUM_ADDRS   3
+#define NUM_ADDRS      1 //+ 3
+#define CANARY_VALUE   0x12345678  // canary value
+#define SIMPLE_CANARY  1           // additional, simple canary
 
 
 static void my_memcpy(int8_t* buf_dst, int8_t* buf_src, uint64_t num)
@@ -33,12 +35,23 @@ void forbidden_func()
 }
 
 
-void unsafe_func(int8_t *buffer, uint32_t size)
+void unsafe_func(int8_t *buffer, uint64_t size)
 {
-	printf("In %s.\n", __PRETTY_FUNCTION__);
+#if SIMPLE_CANARY == 1
+	uint64_t _canary = CANARY_VALUE;
+#endif
+	printf("In %s\n", __PRETTY_FUNCTION__);
 
-	int8_t local_buffer[8];
+	int8_t local_buffer[sizeof(uint64_t)];
 	my_memcpy(local_buffer, buffer, size);
+
+#if SIMPLE_CANARY == 1
+	if(_canary != CANARY_VALUE)
+	{
+		puts("Stack has been corrupted, exiting.");
+		exit(-1);
+	}
+#endif
 }
 
 
