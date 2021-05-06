@@ -81,17 +81,45 @@ void bintree_insert(t_nodeptr root, t_nodeptr node)
 	if(node->value < root->value)
 	{
 		if(!root->left)
+		{
 			root->left = node;
+			node->parent = root->left;
+		}
 		else
+		{
 			bintree_insert<t_nodeptr>(root->left, node);
+		}
 	}
 	else
 	{
 		if(!root->right)
+		{
 			root->right = node;
+			node->parent = root->right;
+		}
 		else
+		{
 			bintree_insert<t_nodeptr>(root->right, node);
+		}
 	}
+
+	//bintree_set_parents<t_nodeptr>(root);
+}
+
+
+/**
+ * correctly set the parent pointers
+ */
+template<class t_nodeptr> requires is_node<decltype(*t_nodeptr{})>
+void bintree_set_parents(t_nodeptr node, t_nodeptr parent=nullptr)
+{
+	if(parent)
+		node->parent = parent;
+
+	if(node->left)
+		bintree_set_parents<t_nodeptr>(node->left, node);
+	if(node->right)
+		bintree_set_parents<t_nodeptr>(node->right, node);
 }
 
 
@@ -138,7 +166,10 @@ void bintree_write_graph(std::ostream& ostr, t_nodeptr node)
 			_write_graph(node->left);
 		}
 
-		ostrStates << "\t" << num << " [label=\"" << node->value << "\"];\n";
+		ostrStates << "\t" << num << " [label=\"" << node->value;
+		if constexpr(is_avl_node<decltype(*t_nodeptr{})>)
+			ostrStates << " (balance: " << node->balance << ")";
+		ostrStates << "\"];\n";
 
 		if(node->right)
 		{
@@ -160,6 +191,80 @@ void bintree_write_graph(std::ostream& ostr, t_nodeptr node)
 	ostr << ostrTransitions.str();
 	ostr << "\n}\n";
 }
+
+
+/**
+ * calculate avl tree balance factors
+ * @see https://en.wikipedia.org/wiki/AVL_tree
+ */
+template<class t_nodeptr> requires is_avl_node<decltype(*t_nodeptr{})>
+void avltree_calc_balances(t_nodeptr node)
+{
+	std::function<std::size_t(t_nodeptr)> _get_height;
+	_get_height = [&_get_height](t_nodeptr node) -> std::size_t
+	{
+		std::size_t heightLeft = node->left ? _get_height(node->left) + 1 : 0;
+		std::size_t heightRight = node->right ? _get_height(node->right) + 1 : 0;
+		node->balance = heightRight - heightLeft;
+
+		return std::max(heightLeft, heightRight);
+	};
+
+	_get_height(node);
+}
+
+
+/**
+ * calculate avl tree balance factors
+ * @see https://en.wikipedia.org/wiki/AVL_tree
+ */
+template<class t_nodeptr> requires is_avl_node<decltype(*t_nodeptr{})>
+t_nodeptr avltree_rotate(t_nodeptr node, bool rot_left)
+{
+	t_nodeptr new_root = node;
+
+	// left rotation
+	if(rot_left)
+	{
+		t_nodeptr parent = node->parent;
+		bool node_is_left_child = (parent->left == node);
+
+		t_nodeptr right = node->right;
+		if(node_is_left_child)
+			parent->left = right;
+		else
+			parent->right = right;
+
+		node->right = right->left;
+		right->left = node;
+
+		new_root = right;
+	}
+
+	// right rotation
+	else
+	{
+		t_nodeptr parent = node->parent;
+		bool node_is_left_child = (parent->left == node);
+
+		t_nodeptr left = node->left;
+		if(node_is_left_child)
+			parent->right = left;
+		else
+			parent->left = left;
+
+		node->left = left->right;
+		left->right = node;
+
+		new_root = left;
+	}
+
+	bintree_set_parents<t_nodeptr>(new_root);
+	avltree_calc_balances<t_nodeptr>(new_root);
+
+	return new_root;
+}
+
 
 // ----------------------------------------------------------------------------
 

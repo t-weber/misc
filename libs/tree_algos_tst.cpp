@@ -15,12 +15,19 @@ int main()
 	using t_node = avl_node<int>;
 	using t_nodeptr = typename t_node::t_nodeptr;
 
+	auto header = t_node::create(0);
 	auto root = t_node::create(123);
+	header->right = root;
+	root->parent = header;
 
 	bintree_insert<t_nodeptr>(root, t_node::create(456));
 	bintree_insert<t_nodeptr>(root, t_node::create(789));
 	bintree_insert<t_nodeptr>(root, t_node::create(-321));
 	bintree_insert<t_nodeptr>(root, t_node::create(-654));
+
+	avltree_calc_balances(root);
+	root = avltree_rotate(root, true);
+	root = avltree_rotate(root, false);
 
 	bintree_write_graph<t_nodeptr>(std::cout, root);
 	return 0;
