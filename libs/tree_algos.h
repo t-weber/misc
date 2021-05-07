@@ -35,6 +35,7 @@ template<class T>
 concept is_avl_node = requires(const T& a)
 {
 	a.balance;
+	//a.height;
 } && is_node<T>;
 
 // ----------------------------------------------------------------------------
@@ -55,6 +56,7 @@ struct avl_node
 	t_nodeptr left{};
 	t_nodeptr right{};
 	int balance{};
+	//unsigned int height{};
 
 	t_val value{};
 
@@ -205,9 +207,13 @@ void avltree_calc_balances(t_nodeptr node)
 	{
 		std::size_t heightLeft = node->left ? _get_height(node->left) + 1 : 0;
 		std::size_t heightRight = node->right ? _get_height(node->right) + 1 : 0;
+		std::size_t height = std::max(heightLeft, heightRight);
 		node->balance = heightRight - heightLeft;
+		//node->left->height = heightLeft;
+		//node->right->height = heightRight;
+		//node->height = height;
 
-		return std::max(heightLeft, heightRight);
+		return height;
 	};
 
 	_get_height(node);
@@ -226,6 +232,10 @@ t_nodeptr avltree_rotate(t_nodeptr node, bool rot_left)
 	// left rotation
 	if(rot_left)
 	{
+		// pre-condition
+		if(node->balance != 2)
+			return node;
+
 		t_nodeptr parent = node->parent;
 		bool node_is_left_child = (parent->left == node);
 
@@ -244,6 +254,10 @@ t_nodeptr avltree_rotate(t_nodeptr node, bool rot_left)
 	// right rotation
 	else
 	{
+		// pre-condition
+		if(node->balance != -2)
+			return node;
+
 		t_nodeptr parent = node->parent;
 		bool node_is_left_child = (parent->left == node);
 
@@ -263,6 +277,39 @@ t_nodeptr avltree_rotate(t_nodeptr node, bool rot_left)
 	avltree_calc_balances<t_nodeptr>(new_root);
 
 	return new_root;
+}
+
+
+/**
+ * calculate avl tree balance factors
+ * @see https://en.wikipedia.org/wiki/AVL_tree
+ */
+template<class t_nodeptr> requires is_avl_node<decltype(*t_nodeptr{})>
+t_nodeptr avltree_doublerotate(t_nodeptr node, bool rot_rightleft)
+{
+	// rl rotation
+	if(rot_rightleft)
+	{
+		// pre-conditions
+		if(node->balance != 2 && node->right->balance >= 0)
+			return node;
+
+		node->right = avltree_rotate(node->right, false);
+		node = avltree_rotate(node, true);
+	}
+
+	// lr rotation
+	else
+	{
+		// pre-conditions
+		if(node->balance != -2 && node->left->balance <= 0)
+			return node;
+
+		node->left = avltree_rotate(node->left, true);
+		node = avltree_rotate(node, false);
+	}
+
+	return node;
 }
 
 
