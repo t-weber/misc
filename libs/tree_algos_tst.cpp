@@ -5,6 +5,7 @@
  * @license see 'LICENSE.EUPL' file
  *
  * g++ -std=c++20 -Wall -Wextra -Weffc++ -o tree_algos_tst tree_algos_tst.cpp
+ * ./tree_algos_tst > 0.dot && dot -Tpdf 0.dot > 0.pdf
  */
 
 #include "tree_algos.h"
@@ -20,25 +21,25 @@ int main()
 	header->right = root;
 	root->parent = header;
 
-	bintree_insert<t_nodeptr>(root, t_node::create(456));
-	bintree_insert<t_nodeptr>(root, t_node::create(789));
-	bintree_insert<t_nodeptr>(root, t_node::create(-321));
-	bintree_insert<t_nodeptr>(root, t_node::create(-654));
-	bintree_insert<t_nodeptr>(root, t_node::create(999));
-	avltree_calc_balances(root);
+	avltree_insert<t_nodeptr>(header->right, t_node::create(456));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(789));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(-321));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(-654));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(999));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(399));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(400));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(401));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(500));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(501));
+	avltree_insert<t_nodeptr>(header->right, t_node::create(502));
 
-	root->right = avltree_rotate(root->right, true);
-	avltree_calc_balances(root);
+	std::cout << "// sorted values = ";
+	bintree_for_each<t_nodeptr>(header->right, [](t_nodeptr node) -> void
+	{
+		std::cout << node->value << " ";
+	});
+	std::cout << "\n" << std::endl;
 
-	bintree_insert<t_nodeptr>(root, t_node::create(400));
-	bintree_insert<t_nodeptr>(root, t_node::create(401));
-	bintree_insert<t_nodeptr>(root, t_node::create(500));
-	bintree_insert<t_nodeptr>(root, t_node::create(501));
-	avltree_calc_balances(root);
-
-	root = avltree_doublerotate(root, true);
-	avltree_calc_balances(root);
-
-	bintree_write_graph<t_nodeptr>(std::cout, root);
+	bintree_print_graph<t_nodeptr>(header->right, std::cout);
 	return 0;
 }
