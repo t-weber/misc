@@ -75,7 +75,7 @@ protected:
 			}
 		}
 		else if constexpr(std::is_integral_v<t_real>)
-		{	// real
+		{	// int
 			std::regex regex{"[0-9]+"};
 			std::smatch smatch;
 			if(std::regex_match(str, smatch, regex))
