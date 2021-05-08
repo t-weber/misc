@@ -8,13 +8,17 @@
  * References:
  *	- https://www.cs.uaf.edu/~cs331/notes/FirstFollow.pdf
  *	- https://de.wikipedia.org/wiki/LL(k)-Grammatik
+ *
+ * gcc -Wall -Wextra -o expr_parser expr_parser.c string.c -lm
  */
 
-#include <string.h>
+//#include <string.h>
+//#include <ctype.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <math.h>
+
+#include "string.h"
 
 
 // ----------------------------------------------------------------------------
@@ -23,7 +27,7 @@
 #define MAX_IDENT 256
 
 
-#define USE_INTEGER
+//#define USE_INTEGER
 #ifdef USE_INTEGER
 	typedef int t_value;
 #else
@@ -58,24 +62,6 @@ static t_value factor();
 
 
 // ----------------------------------------------------------------------------
-// helper functions
-// ----------------------------------------------------------------------------
-
-static void strncat_char(char* str, char c, int max_len)
-{
-	int len = strlen(str);
-	if(len+1 < max_len)
-	{
-		str[len] = c;
-		str[len+1] = 0;
-	}
-}
-
-// ----------------------------------------------------------------------------
-
-
-
-// ----------------------------------------------------------------------------
 // symbol table
 // ----------------------------------------------------------------------------
 
@@ -94,7 +80,7 @@ static struct Symbol g_symboltable;
 struct Symbol* create_symbol(const char* name, t_value value)
 {
 	struct Symbol *sym = (struct Symbol*)malloc(sizeof(struct Symbol));
-	strncpy(sym->name, name, MAX_IDENT);
+	my_strncpy(sym->name, name, MAX_IDENT);
 	sym->value = value;
 	sym->next = 0;
 
@@ -104,7 +90,7 @@ struct Symbol* create_symbol(const char* name, t_value value)
 
 void init_symbols()
 {
-	strncpy(g_symboltable.name, "", MAX_IDENT);
+	my_strncpy(g_symboltable.name, "", MAX_IDENT);
 	g_symboltable.value = 0;
 
 	struct Symbol *sym = create_symbol("pi", M_PI);
@@ -133,7 +119,7 @@ struct Symbol* find_symbol(const char* name)
 
 	while(sym)
 	{
-		if(strncmp(sym->name, name, MAX_IDENT) == 0)
+		if(my_strncmp(sym->name, name, MAX_IDENT) == 0)
 			return sym;
 
 		sym = sym->next;
@@ -181,7 +167,7 @@ void print_symbols()
 #ifdef USE_INTEGER
 		printf("%s = %d\n", sym->name, sym->value);
 #else
-		printf("%s = %f\n", sym->name, sym->value);
+		printf("%s = %g\n", sym->name, sym->value);
 #endif
 		sym = sym->next;
 	}
@@ -195,39 +181,59 @@ void print_symbols()
 // ------------------------------------------------------------------------
 
 
+#ifdef USE_INTEGER
+
 static int match_int(const char* tok)
 {
-	int len = strlen(tok);
+	int len = my_strlen(tok);
+
 	for(int i=0; i<len; ++i)
 	{
-		if(!isdigit(tok[i]))
+		if(!my_isdigit(tok[i], 0))
 			return 0;
 	}
 	return 1;
 }
 
+#else
 
 static int match_real(const char* tok)
 {
-	// TODO
-	return match_int(tok);
+	int len = my_strlen(tok);
+	int point_seen = 0;
+
+	for(int i=0; i<len; ++i)
+	{
+		if(my_isdigit(tok[i], 0))
+			continue;
+		if(tok[i] == '.' && !point_seen)
+		{
+			point_seen = 1;
+			continue;
+		}
+		else
+			return 0;
+	}
+	return 1;
 }
 
+#endif
 
 static int match_ident(const char* tok)
 {
-	int len = strlen(tok);
+	int len = my_strlen(tok);
 	if(len == 0)
 		return 0;
-	if(!isalpha(tok[0]))
+	if(!my_isalpha(tok[0]))
 		return 0;
 
 	for(int i=1; i<len; ++i)
 	{
-		if(!isdigit(tok[i]) || !isalpha(tok[i]))
+		if(!my_isdigit(tok[i], 0) && !my_isalpha(tok[i]))
 			return 0;
 	}
 
+	//printf("Match: %s\n", tok);
 	return 1;
 }
 
@@ -242,7 +248,7 @@ static int get_matching_token(const char* str, t_value* value)
 		if(match_int(str))
 		{
 			t_value val = 0;
-			val = atoi(str);
+			val = my_atoi(str, 10);
 
 			*value = val;
 			return TOK_VALUE;
@@ -253,7 +259,7 @@ static int get_matching_token(const char* str, t_value* value)
 		if(match_real(str))
 		{
 			t_value val = 0.;
-			val = atof(str);
+			val = my_atof(str, 10);
 
 			*value = val;
 			return TOK_VALUE;
@@ -270,10 +276,10 @@ static int get_matching_token(const char* str, t_value* value)
 	}
 
 	{	// tokens represented by themselves
-		if(strcmp(str, "+")==0 || strcmp(str, "-")==0 || strcmp(str, "*")==0 ||
-			strcmp(str, "/")==0 || strcmp(str, "%")==0 || strcmp(str, "^")==0 ||
-			strcmp(str, "(")==0 || strcmp(str, ")")==0 || strcmp(str, ",")==0 ||
-			strcmp(str, "=")==0)
+		if(my_strcmp(str, "+")==0 || my_strcmp(str, "-")==0 || my_strcmp(str, "*")==0 ||
+			my_strcmp(str, "/")==0 || my_strcmp(str, "%")==0 || my_strcmp(str, "^")==0 ||
+			my_strcmp(str, "(")==0 || my_strcmp(str, ")")==0 || my_strcmp(str, ",")==0 ||
+			my_strcmp(str, "=")==0)
 		{
 			*value = 0;
 			return (int)str[0];
@@ -293,7 +299,7 @@ static const char* g_input = 0;
 static void set_input(const char* input)
 {
 	g_input = input;
-	g_input_len = strlen(g_input);
+	g_input_len = my_strlen(g_input);
 	g_input_idx = 0;
 }
 
@@ -309,10 +315,10 @@ static int input_get()
 
 static int input_peek()
 {
-	if(g_input_idx+1 >= g_input_len)
+	if(g_input_idx >= g_input_len)
 		return EOF;
 
-	return g_input[g_input_idx+1];
+	return g_input[g_input_idx];
 }
 
 
@@ -320,12 +326,6 @@ static void input_putback(/*char c*/)
 {
 	if(g_input_idx > 0)
 		--g_input_idx;
-}
-
-
-static int input_eof()
-{
-	return g_input_idx >= g_input_len;
 }
 
 
@@ -358,7 +358,7 @@ static int lex(t_value* lval, char* text)
 			if(c=='\n')
 			{
 				*lval = 0;
-				strncpy(text, longest_input, MAX_IDENT);
+				my_strncpy(text, longest_input, MAX_IDENT);
 				return TOK_END;
 			}
 		}
@@ -368,11 +368,11 @@ static int lex(t_value* lval, char* text)
 		int matching = get_matching_token(input, &matching_val);
 		if(matching != TOK_INVALID)
 		{
-			strncpy(longest_input, input, MAX_IDENT);
+			my_strncpy(longest_input, input, MAX_IDENT);
 			longest_matching_token = matching;
 			longest_matching_value = matching_val;
 
-			if(input_peek()==EOF || input_eof())
+			if(input_peek()==EOF)
 				break;
 		}
 		else
@@ -384,10 +384,10 @@ static int lex(t_value* lval, char* text)
 	}
 
 	// at EOF
-	if(longest_matching_token == TOK_INVALID && strlen(input) == 0)
+	if(longest_matching_token == TOK_INVALID && my_strlen(input) == 0)
 	{
 		*lval = 0;
-		strncpy(text, longest_input, MAX_IDENT);
+		my_strncpy(text, longest_input, MAX_IDENT);
 		return TOK_END;
 	}
 
@@ -397,7 +397,7 @@ static int lex(t_value* lval, char* text)
 		fprintf(stderr, "Invalid input in lexer: \"%s\".\n", input);
 
 		*lval = 0;
-		strncpy(text, longest_input, MAX_IDENT);
+		my_strncpy(text, longest_input, MAX_IDENT);
 		return TOK_INVALID;
 	}
 
@@ -405,13 +405,13 @@ static int lex(t_value* lval, char* text)
 	if(longest_matching_token != TOK_INVALID)
 	{
 		*lval = longest_matching_value;
-		strncpy(text, longest_input, MAX_IDENT);
+		my_strncpy(text, longest_input, MAX_IDENT);
 		return longest_matching_token;
 	}
 
 	// should not get here
 	*lval = 0;
-	strncpy(text, longest_input, MAX_IDENT);
+	my_strncpy(text, longest_input, MAX_IDENT);
 	return TOK_INVALID;
 }
 // ------------------------------------------------------------------------
@@ -476,7 +476,7 @@ static t_value plus_term()
 	}
 
 	if(g_lookahead == 0 || g_lookahead == EOF)
-		exit(0);
+		return 0;
 
 	fprintf(stderr, "Invalid lookahead in %s: %d.\n", __func__, g_lookahead);
 	return 0.;
@@ -654,7 +654,7 @@ static t_value factor()
 	else if(g_lookahead == TOK_IDENT)
 	{
 		char ident[MAX_IDENT];
-		strncpy(ident, g_lookahead_text, MAX_IDENT);
+		my_strncpy(ident, g_lookahead_text, MAX_IDENT);
 
 		next_lookahead();
 
@@ -693,15 +693,15 @@ static t_value factor()
 				{
 					next_lookahead();
 
-					if(strncmp(ident, "sin", MAX_IDENT)==0)
+					if(my_strncmp(ident, "sin", MAX_IDENT)==0)
 					{
 						return sin(expr_val1);
 					}
-					else if(strncmp(ident, "cos", MAX_IDENT)==0)
+					else if(my_strncmp(ident, "cos", MAX_IDENT)==0)
 					{
 						return cos(expr_val1);
 					}
-					else if(strncmp(ident, "tan", MAX_IDENT)==0)
+					else if(my_strncmp(ident, "tan", MAX_IDENT)==0)
 					{
 						return tan(expr_val1);
 					}
@@ -721,7 +721,7 @@ static t_value factor()
 					match(')');
 					next_lookahead();
 
-					if(strncmp(ident, "atan2", MAX_IDENT)==0)
+					if(my_strncmp(ident, "atan2", MAX_IDENT)==0)
 					{
 						return atan2(expr_val1, expr_val2);
 					}
@@ -781,13 +781,13 @@ int main()
 {
 	init_symbols();
 
-	t_value val1 = parse("a = 2 + 3*4");
-	t_value val2 = parse("(2 + (b=3))*4 + b*2");
+	t_value val1 = parse("x = cos(pi)");
+	t_value val2 = parse("c = (2 + (b=3))*4 + b*2");
 
 #ifdef USE_INTEGER
 	printf("%d\n%d\n\n", val1, val2);
 #else
-	printf("%f\n%f\n\n", val1, val2);
+	printf("%g\n%g\n\n", val1, val2);
 #endif
 	print_symbols();
 
