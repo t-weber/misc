@@ -36,6 +36,12 @@ public:
 	}
 
 
+	const std::unordered_map<std::string, t_real>& get_symbols() const
+	{
+		return m_mapSymbols;
+	}
+
+
 protected:
 	// ------------------------------------------------------------------------
 	// Lexer
@@ -92,8 +98,8 @@ protected:
 		}
 
 		{	// tokens represented by themselves
-			if(str == "+" || str == "-" || str == "*" || str == "/" ||
-				str == "%" || str == "^" || str == "(" || str == ")" || str == ",")
+			if(str == "+" || str == "-" || str == "*" || str == "/" || str == "%" ||
+				str == "^" || str == "(" || str == ")" || str == "," || str == "=")
 				matches.push_back(std::make_pair((int)str[0], 0.));
 		}
 
@@ -487,6 +493,15 @@ protected:
 				}
 			}
 
+			// assignment
+			else if(m_lookahead == '=')
+			{
+				next_lookahead();
+				t_real assign_val = plus_term();
+				m_mapSymbols[ident] = assign_val;
+				return assign_val;
+			}
+
 			// variable lookup
 			else
 			{
@@ -508,11 +523,11 @@ protected:
 
 
 private:
-	std::shared_ptr<std::istream> m_istr;
+	std::shared_ptr<std::istream> m_istr{};
 
 	int m_lookahead = (int)Token::TOK_INVALID;
-	t_real m_lookahead_val = 0;
-	std::string m_lookahead_text;
+	t_real m_lookahead_val{};
+	std::string m_lookahead_text{};
 
 
 	// ----------------------------------------------------------------------------
