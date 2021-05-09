@@ -27,6 +27,9 @@ extern i8 my_strcmp(const i8* str1, const i8* str2);
 
 extern u64 my_strlen(const i8* str);
 extern void my_memset(i8* mem, i8 val, u64 size);
+extern void my_memset_interleaved(i8* mem, i8 val, u64 size, u8 interleave);
+extern void my_memcpy(i8* mem_dst, i8* mem_src, u64 size);
+extern void my_memcpy_interleaved(i8* mem_dst, i8* mem_src, u64 size, u8 interleave);
 
 extern i64 my_max(i64 a, i64 b);
 

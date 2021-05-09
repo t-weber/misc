@@ -110,6 +110,27 @@ void my_memset(i8* mem, i8 val, u64 size)
 }
 
 
+void my_memset_interleaved(i8* mem, i8 val, u64 size, u8 interleave)
+{
+	for(u64 i=0; i<size; i+=interleave)
+		mem[i] = val;
+}
+
+
+void my_memcpy(i8* mem_dst, i8* mem_src, u64 size)
+{
+	for(u64 i=0; i<size; ++i)
+		mem_dst[i] = mem_src[i];
+}
+
+
+void my_memcpy_interleaved(i8* mem_dst, i8* mem_src, u64 size, u8 interleave)
+{
+	for(u64 i=0; i<size; i+=interleave)
+		mem_dst[i] = mem_src[i];
+}
+
+
 void my_strncpy(i8* str_dst, const i8* str_src, i64 max_len)
 {
 	for(i64 i=0; i<max_len; ++i)

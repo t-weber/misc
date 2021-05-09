@@ -25,13 +25,14 @@ struct Keyboard
 {
 	seL4_SlotPos keyb_slot;
 	seL4_SlotPos irq_slot;
-	seL4_SlotPos irq_notify; 
+	seL4_SlotPos irq_notify;
 };
 
 
 void calc(struct Keyboard *keyb, i8 *charout, seL4_SlotPos notify)
 {
 	i32 x=0, y=1;
+	i32 x_prev=x, y_prev=y;
 
 	if(notify)
 	{
@@ -48,6 +49,13 @@ void calc(struct Keyboard *keyb, i8 *charout, seL4_SlotPos notify)
 
 	while(1)
 	{
+		// cursor
+		charout[(y_prev*SCREEN_COL_SIZE + x_prev)*2 + 1] = ATTR_NORM;
+		charout[(y*SCREEN_COL_SIZE + x)*2 + 1] = ATTR_INV;
+
+		x_prev = x;
+		y_prev = y;
+
 		seL4_Wait(keyb->irq_notify, 0);
 		seL4_X86_IOPort_In8_t key = seL4_X86_IOPort_In8(keyb->keyb_slot, 0x60);
 
@@ -60,89 +68,131 @@ void calc(struct Keyboard *keyb, i8 *charout, seL4_SlotPos notify)
 			printf("Key pressed: 0x%x.\n", key.result);
 			seL4_IRQHandler_Ack(keyb->irq_slot);
 
-			// digit
-			u64 num = key.result - 0x01;
-			if(num == 10)
-				num = 0;
-			if(num >= 0 && num <= 9)
+			if(key.result == 0x1c)	// enter
 			{
-				write_char((i8)(num+0x30), ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
-				++x;
-			}
+				// scroll
+				if(y >= SCREEN_ROW_SIZE - 2)
+				{
+					// reset cursor
+					charout[(y_prev*SCREEN_COL_SIZE + x_prev)*2 + 1] = ATTR_NORM;
 
-			// space
-			else if(key.result == 0x39)
-			{
-				write_char(' ', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
-				++x;
-			}
+					for(u32 scr=0; scr<2; ++scr)
+					{
+						for(u32 _y = 2; _y<SCREEN_ROW_SIZE; ++_y)
+						{
+							my_memcpy(
+								charout+SCREEN_COL_SIZE*(_y-1)*2,
+								charout+SCREEN_COL_SIZE*_y*2,
+								SCREEN_COL_SIZE*2);
+							//my_memset_interleaved(
+							//	charout+SCREEN_COL_SIZE*(_y-1)*2 + 1,
+							//	ATTR_NORM,
+							//	SCREEN_COL_SIZE*2, 2);
+						}
 
-			// backspace
-			else if(key.result == 0x0e)
-			{
-				--x;
-				write_char(' ', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
-			}
+						y -= 1;
+					}
+				}
 
-			// +
-			else if(key.result == 0x0d)
-			{
-				write_char('+', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
-				++x;
-			}
-
-			// -
-			else if(key.result == 0x0c)
-			{
-				write_char('-', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
-				++x;
-			}
-
-			// *
-			else if(key.result == 0x27)
-			{
-				write_char('*', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
-				++x;
-			}
-
-			// /
-			else if(key.result == 0x28)
-			{
-				write_char('/', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
-				++x;
-			}
-
-			// (
-			else if(key.result == 0x1a)
-			{
-				write_char('(', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
-				++x;
-			}
-
-			// )
-			else if(key.result == 0x1b)
-			{
-				write_char(')', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
-				++x;
-			}
-
-			// enter
-			else if(key.result == 0x1c)
-			{
 				// read current line
 				i8 line[SCREEN_COL_SIZE+1];
 				read_str(line, charout+y*SCREEN_COL_SIZE*2, SCREEN_COL_SIZE);
 				t_value val = parse(line);
-				
+
 				i8 numbuf[32];
 				int_to_str(val, 10, numbuf);
-				write_str(numbuf, ATTR_NORM, charout + (y+1)*SCREEN_COL_SIZE*2);
-				
+				write_str(numbuf, ATTR_BOLD, charout + (y+1)*SCREEN_COL_SIZE*2);
+
 				//print_symbols();
 
 				// new line
 				y += 2;
 				x = 0;
+			}
+			else if(key.result == 0x0e && x >= 1)	// backspace
+			{
+				--x;
+				write_char(' ', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+			}
+			else if(x < SCREEN_COL_SIZE)
+			{
+				// digit
+				u64 num = key.result - 0x01;
+				if(num == 10)
+					num = 0;
+				if(num >= 0 && num <= 9)
+					write_char((i8)(num+0x30), ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x39)	// space
+					write_char(' ', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x27 || key.result == 0x0d)	// +
+					write_char('+', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x28 || key.result == 0x0c)	// -
+					write_char('-', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x34)	// *
+					write_char('*', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x28 || key.result == 0x35)	// /
+					write_char('/', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x1a)	// (
+					write_char('(', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x1b)	// )
+					write_char(')', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x2b || key.result == 0x33)	// =
+					write_char('=', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x10)	// q
+					write_char('q', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x11)	// w
+					write_char('w', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x12)	// e
+					write_char('e', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x13)	// r
+					write_char('r', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x14)	// t
+					write_char('t', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x15)	// y
+					write_char('y', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x16)	// u
+					write_char('u', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x17)	// i
+					write_char('i', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x18)	// o
+					write_char('o', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x19)	// p
+					write_char('p', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x1e)	// a
+					write_char('a', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x1f)	// s
+					write_char('s', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x20)	// d
+					write_char('d', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x21)	// f
+					write_char('f', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x22)	// g
+					write_char('g', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x23)	// h
+					write_char('h', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x24)	// j
+					write_char('j', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x25)	// k
+					write_char('k', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x26)	// l
+					write_char('l', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x2c)	// z
+					write_char('z', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x2d)	// x
+					write_char('x', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x2e)	// c
+					write_char('c', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x2f)	// v
+					write_char('v', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x30)	// b
+					write_char('b', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x31)	// n
+					write_char('n', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else if(key.result == 0x32)	// m
+					write_char('m', ATTR_NORM, charout + y*SCREEN_COL_SIZE*2 + x*2);
+				else
+					continue;
+				++x;
 			}
 		}
 	}
@@ -386,23 +436,23 @@ i64 main()
 
 	// keyboard interrupt
 	keyb.keyb_slot = cur_slot++;
-	if(seL4_X86_IOPortControl_Issue(this_ioctrl, KEYB_DATA_PORT, KEYB_DATA_PORT, 
+	if(seL4_X86_IOPortControl_Issue(this_ioctrl, KEYB_DATA_PORT, KEYB_DATA_PORT,
 		this_cnode, keyb.keyb_slot, seL4_WordBits) != seL4_NoError)
 		printf("Error getting keyboard IO control!\n");
 
 	keyb.irq_slot = cur_slot++;
 	//seL4_IRQControl_Get(this_irqctrl, KEYB_IRQ, this_cnode, keyb.irq_slot, seL4_WordBits);
-	if(seL4_IRQControl_GetIOAPIC(this_irqctrl, this_cnode, keyb.irq_slot, 
+	if(seL4_IRQControl_GetIOAPIC(this_irqctrl, this_cnode, keyb.irq_slot,
 		seL4_WordBits, KEYB_PIC, KEYB_IRQ, 0, 1, KEYB_INT) != seL4_NoError)
 		printf("Error getting keyboard interrupt control!\n");
 
-	keyb.irq_notify = get_slot(seL4_NotificationObject, 1<<seL4_NotificationBits, 
+	keyb.irq_notify = get_slot(seL4_NotificationObject, 1<<seL4_NotificationBits,
 		untyped_start, untyped_end, untyped_list, &cur_slot, this_cnode);
 	if(seL4_IRQHandler_SetNotification(keyb.irq_slot, keyb.irq_notify) != seL4_NoError)
 		printf("Error setting keyboard interrupt notification!\n");
 
 	//keyb.irq_notify2 = cur_slot++;
-	//if(seL4_CNode_Mint(this_cnode, keyb.irq_notify2, seL4_WordBits, this_cnode, 
+	//if(seL4_CNode_Mint(this_cnode, keyb.irq_notify2, seL4_WordBits, this_cnode,
 	//	keyb.irq_notify, seL4_WordBits, seL4_AllRights, 0) != seL4_NoError)
 	//	printf("Error: Mint failed.");
 	// ------------------------------------------------------------------------
@@ -414,7 +464,7 @@ i64 main()
 	seL4_SlotPos page_slot_tcb_stack = map_page(untyped_start, untyped_end,
 		untyped_list, &cur_slot, virt_addr_tcb_stack);
 
-	seL4_SlotPos tcb = get_slot(seL4_TCBObject, 1<<seL4_TCBBits, 
+	seL4_SlotPos tcb = get_slot(seL4_TCBObject, 1<<seL4_TCBBits,
 		untyped_start, untyped_end, untyped_list, &cur_slot, this_cnode);
 
 	// the child thread uses the main thread's cnode and vspace
@@ -426,12 +476,12 @@ i64 main()
 		printf("Error: Cannot set TCB priority!\n");
 
 	// create semaphore for thread signalling
-	seL4_SlotPos notify = get_slot(seL4_NotificationObject, 1<<seL4_NotificationBits, 
+	seL4_SlotPos notify = get_slot(seL4_NotificationObject, 1<<seL4_NotificationBits,
 		untyped_start, untyped_end, untyped_list, &cur_slot, this_cnode);
 
 	// copy semaphore
 	seL4_SlotPos notify2 = cur_slot++;
-	if(seL4_CNode_Mint(this_cnode, notify2, seL4_WordBits, this_cnode, 
+	if(seL4_CNode_Mint(this_cnode, notify2, seL4_WordBits, this_cnode,
 		notify, seL4_WordBits, seL4_AllRights, 0) != seL4_NoError)
 		printf("Error: Mint failed.");
 
