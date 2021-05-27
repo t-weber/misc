@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <memory>
+#include <set>
 
 
 template<class t_pixel=bool>
@@ -103,192 +104,244 @@ Image<t_pixel> trace_boundary(const Image<t_pixel>& img)
 	Image<t_pixel> boundary{img.GetWidth(), img.GetHeight()};
 
 
-	// find start pixel
-	std::size_t start[2] = {0, 0};
-	bool start_found = 0;
-
-	for(std::size_t y=0; y<img.GetHeight(); ++y)
+	// remember already seen contours
+	std::set<std::pair<std::size_t, std::size_t>> contour_vertices;
+	auto already_seen = [&contour_vertices](std::size_t x, std::size_t y) -> bool
 	{
-		for(std::size_t x=0; x<img.GetWidth(); ++x)
-		{
-			if(img.GetPixel(x, y))
-			{
-				start[0] = x;
-				start[1] = y;
-				start_found = 1;
-				break;
-			}
-
-			if(start_found)
-				break;
-		}
-	}
-
-	if(!start_found)
-		return boundary;
-	else
-		boundary.SetPixel(start[0], start[1], 1);
-
-
-	// trace boundary
-	std::size_t pos[2] = { start[0], start[1] };
-	int dir[2] = {1, 0};
-	int next_dir[2] = {0, 0};
-	bool has_next_dir = false;
-
-	// next possible position depending on direction
-	auto get_next_dir = [](const int* dir, int* next_dir, int iter=0) -> bool
-	{
-		const int back_dir[2] = { -dir[0], -dir[1] };
-
-		if(back_dir[0] == -1 && back_dir[1] == 0)
-		{
-			switch(iter)
-			{
-				case 0: next_dir[0] = -1; next_dir[1] = -1; return true;
-				case 1: next_dir[0] = 0; next_dir[1] = -1; return true;
-				case 2: next_dir[0] = 1; next_dir[1] = -1; return true;
-				case 3: next_dir[0] = 1; next_dir[1] = 0; return true;
-				case 4: next_dir[0] = 1; next_dir[1] = 1; return true;
-				case 5: next_dir[0] = 0; next_dir[1] = 1; return true;
-				case 6: next_dir[0] = -1; next_dir[1] = 1; return true;
-				default: return false;
-			}
-		}
-		else if(back_dir[0] == -1 && back_dir[1] == -1)
-		{
-			switch(iter)
-			{
-				case 0: next_dir[0] = 0; next_dir[1] = -1; return true;
-				case 1: next_dir[0] = 1; next_dir[1] = -1; return true;
-				case 2: next_dir[0] = 1; next_dir[1] = 0; return true;
-				case 3: next_dir[0] = 1; next_dir[1] = 1; return true;
-				case 4: next_dir[0] = 0; next_dir[1] = 1; return true;
-				case 5: next_dir[0] = -1; next_dir[1] = 1; return true;
-				case 6: next_dir[0] = -1; next_dir[1] = 0; return true;
-				default: return false;
-			}
-		}
-		else if(back_dir[0] == 0 && back_dir[1] == -1)
-		{
-			switch(iter)
-			{
-				case 0: next_dir[0] = 1; next_dir[1] = -1; return true;
-				case 1: next_dir[0] = 1; next_dir[1] = 0; return true;
-				case 2: next_dir[0] = 1; next_dir[1] = 1; return true;
-				case 3: next_dir[0] = 0; next_dir[1] = 1; return true;
-				case 4: next_dir[0] = -1; next_dir[1] = 1; return true;
-				case 5: next_dir[0] = -1; next_dir[1] = 0; return true;
-				case 6: next_dir[0] = -1; next_dir[1] = -1; return true;
-				default: return false;
-			}
-		}
-		else if(back_dir[0] == 1 && back_dir[1] == -1)
-		{
-			switch(iter)
-			{
-				case 0: next_dir[0] = 1; next_dir[1] = 0; return true;
-				case 1: next_dir[0] = 1; next_dir[1] = 1; return true;
-				case 2: next_dir[0] = 0; next_dir[1] = 1; return true;
-				case 3: next_dir[0] = -1; next_dir[1] = 1; return true;
-				case 4: next_dir[0] = -1; next_dir[1] = 0; return true;
-				case 5: next_dir[0] = -1; next_dir[1] = -1; return true;
-				case 6: next_dir[0] = 0; next_dir[1] = -1; return true;
-				default: return false;
-			}
-		}
-		else if(back_dir[0] == 1 && back_dir[1] == 0)
-		{
-			switch(iter)
-			{
-				case 0: next_dir[0] = 1; next_dir[1] = 1; return true;
-				case 1: next_dir[0] = 0; next_dir[1] = 1; return true;
-				case 2: next_dir[0] = -1; next_dir[1] = 1; return true;
-				case 3: next_dir[0] = -1; next_dir[1] = 0; return true;
-				case 4: next_dir[0] = -1; next_dir[1] = -1; return true;
-				case 5: next_dir[0] = 0; next_dir[1] = -1; return true;
-				case 6: next_dir[0] = 1; next_dir[1] = -1; return true;
-				default: return false;
-			}
-		}
-		else if(back_dir[0] == 1 && back_dir[1] == 1)
-		{
-			switch(iter)
-			{
-				case 0: next_dir[0] = 0; next_dir[1] = 1; return true;
-				case 1: next_dir[0] = -1; next_dir[1] = 1; return true;
-				case 2: next_dir[0] = -1; next_dir[1] = 0; return true;
-				case 3: next_dir[0] = -1; next_dir[1] = -1; return true;
-				case 4: next_dir[0] = 0; next_dir[1] = -1; return true;
-				case 5: next_dir[0] = 1; next_dir[1] = -1; return true;
-				case 6: next_dir[0] = 1; next_dir[1] = 0; return true;
-				default: return false;
-			}
-		}
-		else if(back_dir[0] == 0 && back_dir[1] == 1)
-		{
-			switch(iter)
-			{
-				case 0: next_dir[0] = -1; next_dir[1] = 1; return true;
-				case 1: next_dir[0] = -1; next_dir[1] = 0; return true;
-				case 2: next_dir[0] = -1; next_dir[1] = -1; return true;
-				case 3: next_dir[0] = 0; next_dir[1] = -1; return true;
-				case 4: next_dir[0] = 1; next_dir[1] = -1; return true;
-				case 5: next_dir[0] = 1; next_dir[1] = 0; return true;
-				case 6: next_dir[0] = 1; next_dir[1] = 1; return true;
-				default: return false;
-			}
-		}
-		else if(back_dir[0] == -1 && back_dir[1] == 1)
-		{
-			switch(iter)
-			{
-				case 0: next_dir[0] = -1; next_dir[1] = 0; return true;
-				case 1: next_dir[0] = -1; next_dir[1] = -1; return true;
-				case 2: next_dir[0] = 0; next_dir[1] = -1; return true;
-				case 3: next_dir[0] = 1; next_dir[1] = -1; return true;
-				case 4: next_dir[0] = 1; next_dir[1] = 0; return true;
-				case 5: next_dir[0] = 1; next_dir[1] = 1; return true;
-				case 6: next_dir[0] = 0; next_dir[1] = 1; return true;
-				default: return false;
-			}
-		}
-
-		return false;
+		return contour_vertices.find(std::make_pair(x, y)) != contour_vertices.end();
 	};
+
+
+	// find multiple contours
+	std::size_t start[2] = { 0, 0 };
 
 	while(1)
 	{
-		for(int i=0; i<7; ++i)
+		// find start pixel
+		bool start_found = 0;
+		//std::cout << "start: " << start[0] << ", " << start[1] << std::endl;
+
+		for(std::size_t y=start[1]; y<img.GetHeight(); ++y)
 		{
-			if(get_next_dir(dir, next_dir, i))
+			for(std::size_t x=0; x<img.GetWidth(); ++x)
 			{
-				if(img.GetPixel(pos[0]+next_dir[0], pos[1]+next_dir[1]))
+				if(img.GetPixel(x, y))
 				{
-					has_next_dir = true;
+					//std::cout << "possible contour: " << x << ", " << y << std::endl;
+
+					// for multiple contours: inside one contour
+					if(x>0 && img.GetPixel(x-1, y))
+					{
+						//std::cout << "inside contour: " << x << ", " << y << std::endl;
+						continue;
+					}
+
+					if(already_seen(x, y))
+					{
+						//std::cout << "already seen: " << x << ", " << y << std::endl;
+						continue;
+					}
+
+					start[0] = x;
+					start[1] = y;
+					start_found = 1;
+					//std::cout << "start: " << start[0] << ", " << start[1] << std::endl;
+
 					break;
 				}
+
+				if(start_found)
+					break;
 			}
+
+		if(start_found)
+			break;
 		}
 
-		if(has_next_dir)
+		if(start_found)
 		{
-			dir[0] = next_dir[0];
-			dir[1] = next_dir[1];
-
-			pos[0] += dir[0];
-			pos[1] += dir[1];
-
-			boundary.SetPixel(pos[0], pos[1], 1);
+			boundary.SetPixel(start[0], start[1], 1);
+			contour_vertices.insert(std::make_pair(start[0], start[1]));
 		}
 		else
 		{
-			break;
+			return boundary;
 		}
 
-		// back at start
-		if(pos[0] == start[0] && pos[1] == start[1])
-			break;
+
+		// trace boundary
+		std::size_t pos[2] = { start[0], start[1] };
+		int dir[2] = {1, 0};
+		int next_dir[2] = {0, 0};
+		bool has_next_dir = false;
+
+		// next possible position depending on direction
+		auto get_next_dir = [](const int* dir, int* next_dir, int iter=0) -> bool
+		{
+			const int back_dir[2] = { -dir[0], -dir[1] };
+
+			if(back_dir[0] == -1 && back_dir[1] == 0)
+			{
+				switch(iter)
+				{
+					case 0: next_dir[0] = -1; next_dir[1] = -1; return true;
+					case 1: next_dir[0] = 0; next_dir[1] = -1; return true;
+					case 2: next_dir[0] = 1; next_dir[1] = -1; return true;
+					case 3: next_dir[0] = 1; next_dir[1] = 0; return true;
+					case 4: next_dir[0] = 1; next_dir[1] = 1; return true;
+					case 5: next_dir[0] = 0; next_dir[1] = 1; return true;
+					case 6: next_dir[0] = -1; next_dir[1] = 1; return true;
+					case 7: next_dir[0] = -1; next_dir[1] = 0; return true;
+					default: return false;
+				}
+			}
+			else if(back_dir[0] == -1 && back_dir[1] == -1)
+			{
+				switch(iter)
+				{
+					case 0: next_dir[0] = 0; next_dir[1] = -1; return true;
+					case 1: next_dir[0] = 1; next_dir[1] = -1; return true;
+					case 2: next_dir[0] = 1; next_dir[1] = 0; return true;
+					case 3: next_dir[0] = 1; next_dir[1] = 1; return true;
+					case 4: next_dir[0] = 0; next_dir[1] = 1; return true;
+					case 5: next_dir[0] = -1; next_dir[1] = 1; return true;
+					case 6: next_dir[0] = -1; next_dir[1] = 0; return true;
+					case 7: next_dir[0] = -1; next_dir[1] = -1; return true;
+					default: return false;
+				}
+			}
+			else if(back_dir[0] == 0 && back_dir[1] == -1)
+			{
+				switch(iter)
+				{
+					case 0: next_dir[0] = 1; next_dir[1] = -1; return true;
+					case 1: next_dir[0] = 1; next_dir[1] = 0; return true;
+					case 2: next_dir[0] = 1; next_dir[1] = 1; return true;
+					case 3: next_dir[0] = 0; next_dir[1] = 1; return true;
+					case 4: next_dir[0] = -1; next_dir[1] = 1; return true;
+					case 5: next_dir[0] = -1; next_dir[1] = 0; return true;
+					case 6: next_dir[0] = -1; next_dir[1] = -1; return true;
+					case 7: next_dir[0] = 0; next_dir[1] = -1; return true;
+					default: return false;
+				}
+			}
+			else if(back_dir[0] == 1 && back_dir[1] == -1)
+			{
+				switch(iter)
+				{
+					case 0: next_dir[0] = 1; next_dir[1] = 0; return true;
+					case 1: next_dir[0] = 1; next_dir[1] = 1; return true;
+					case 2: next_dir[0] = 0; next_dir[1] = 1; return true;
+					case 3: next_dir[0] = -1; next_dir[1] = 1; return true;
+					case 4: next_dir[0] = -1; next_dir[1] = 0; return true;
+					case 5: next_dir[0] = -1; next_dir[1] = -1; return true;
+					case 6: next_dir[0] = 0; next_dir[1] = -1; return true;
+					case 7: next_dir[0] = 1; next_dir[1] = -1; return true;
+					default: return false;
+				}
+			}
+			else if(back_dir[0] == 1 && back_dir[1] == 0)
+			{
+				switch(iter)
+				{
+					case 0: next_dir[0] = 1; next_dir[1] = 1; return true;
+					case 1: next_dir[0] = 0; next_dir[1] = 1; return true;
+					case 2: next_dir[0] = -1; next_dir[1] = 1; return true;
+					case 3: next_dir[0] = -1; next_dir[1] = 0; return true;
+					case 4: next_dir[0] = -1; next_dir[1] = -1; return true;
+					case 5: next_dir[0] = 0; next_dir[1] = -1; return true;
+					case 6: next_dir[0] = 1; next_dir[1] = -1; return true;
+					case 7: next_dir[0] = 1; next_dir[1] = 0; return true;
+					default: return false;
+				}
+			}
+			else if(back_dir[0] == 1 && back_dir[1] == 1)
+			{
+				switch(iter)
+				{
+					case 0: next_dir[0] = 0; next_dir[1] = 1; return true;
+					case 1: next_dir[0] = -1; next_dir[1] = 1; return true;
+					case 2: next_dir[0] = -1; next_dir[1] = 0; return true;
+					case 3: next_dir[0] = -1; next_dir[1] = -1; return true;
+					case 4: next_dir[0] = 0; next_dir[1] = -1; return true;
+					case 5: next_dir[0] = 1; next_dir[1] = -1; return true;
+					case 6: next_dir[0] = 1; next_dir[1] = 0; return true;
+					case 7: next_dir[0] = 1; next_dir[1] = 1; return true;
+					default: return false;
+				}
+			}
+			else if(back_dir[0] == 0 && back_dir[1] == 1)
+			{
+				switch(iter)
+				{
+					case 0: next_dir[0] = -1; next_dir[1] = 1; return true;
+					case 1: next_dir[0] = -1; next_dir[1] = 0; return true;
+					case 2: next_dir[0] = -1; next_dir[1] = -1; return true;
+					case 3: next_dir[0] = 0; next_dir[1] = -1; return true;
+					case 4: next_dir[0] = 1; next_dir[1] = -1; return true;
+					case 5: next_dir[0] = 1; next_dir[1] = 0; return true;
+					case 6: next_dir[0] = 1; next_dir[1] = 1; return true;
+					case 7: next_dir[0] = 0; next_dir[1] = 1; return true;
+					default: return false;
+				}
+			}
+			else if(back_dir[0] == -1 && back_dir[1] == 1)
+			{
+				switch(iter)
+				{
+					case 0: next_dir[0] = -1; next_dir[1] = 0; return true;
+					case 1: next_dir[0] = -1; next_dir[1] = -1; return true;
+					case 2: next_dir[0] = 0; next_dir[1] = -1; return true;
+					case 3: next_dir[0] = 1; next_dir[1] = -1; return true;
+					case 4: next_dir[0] = 1; next_dir[1] = 0; return true;
+					case 5: next_dir[0] = 1; next_dir[1] = 1; return true;
+					case 6: next_dir[0] = 0; next_dir[1] = 1; return true;
+					case 7: next_dir[0] = -1; next_dir[1] = 1; return true;
+					default: return false;
+				}
+			}
+
+			return false;
+		};
+
+		while(1)
+		{
+			has_next_dir = false;
+
+			for(int i=0; i<8; ++i)
+			{
+				if(get_next_dir(dir, next_dir, i))
+				{
+					if(img.GetPixel(pos[0]+next_dir[0], pos[1]+next_dir[1]))
+					{
+						has_next_dir = true;
+						break;
+					}
+				}
+			}
+
+			if(has_next_dir)
+			{
+				dir[0] = next_dir[0];
+				dir[1] = next_dir[1];
+
+				pos[0] += dir[0];
+				pos[1] += dir[1];
+
+				boundary.SetPixel(pos[0], pos[1], 1);
+				contour_vertices.insert(std::make_pair(pos[0], pos[1]));
+			}
+			else
+			{
+				break;
+			}
+
+			// back at start
+			if(pos[0] == start[0] && pos[1] == start[1])
+				break;
+		}
+
+		//break;
 	}
 
 	return boundary;
@@ -300,12 +353,11 @@ int main()
 	bool tstimg[20 * 20] =
 	{
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0,
+		0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0,
+		0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0,
+		0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0,
 		0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
@@ -314,9 +366,10 @@ int main()
 		0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	};
@@ -326,7 +379,7 @@ int main()
 	std::cout << "Image:\n" << img << std::endl;
 
 	auto boundary = trace_boundary(img);
-	std::cout << "Boundary:\n" << boundary << std::endl;
+	std::cout << "Boundaries:\n" << boundary << std::endl;
 
 	return 0;
 }
