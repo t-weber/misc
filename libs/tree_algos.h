@@ -192,6 +192,7 @@ void bintree_set_parents(t_nodeptr node, t_nodeptr parent=nullptr)
 
 /**
  * write the tree out as directed graph
+ * @see https://graphviz.org/doc/info/lang.html
  */
 template<class t_nodeptr> requires is_node<decltype(*t_nodeptr{})>
 void bintree_print_graph(t_nodeptr node, std::ostream& ostr = std::cout)
