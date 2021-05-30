@@ -14,6 +14,7 @@
 template<class t_graph>
 void tst()
 {
+	using namespace m_ops;
 	t_graph graph;
 
 	graph.AddVertex("A");
@@ -30,7 +31,25 @@ void tst()
 	graph.AddEdge("C", "E", 1);
 
 	print_graph<t_graph>(graph, std::cout);
-	dijk<t_graph>(graph, "A");
+	auto predecessors = dijk<t_graph>(graph, "A");
+	auto distvecs = bellman<t_graph>(graph, "A");
+
+	std::cout << "\ndijkstra:" << std::endl;
+	for(std::size_t i=0; i<graph.GetNumVertices(); ++i)
+	{
+		const auto& _predidx = predecessors[i];
+		if(!_predidx)
+			continue;
+
+		std::size_t predidx = *_predidx;
+		const std::string& vert = graph.GetVertexIdent(i);
+		const std::string& pred = graph.GetVertexIdent(predidx);
+
+		std::cout << "predecessor of " << vert << ": " << pred << "." << std::endl;
+	}
+
+	std::cout << "\nbellman:" << std::endl;
+	std::cout << distvecs << std::endl;
 }
 
 
@@ -43,7 +62,7 @@ int main()
 	}
 
 	{
-		std::cout << "\nusing adjacency list" << std::endl;
+		std::cout << "\n\nusing adjacency list" << std::endl;
 		using t_graph = adjacency_list<unsigned int>;
 		tst<t_graph>();
 	}

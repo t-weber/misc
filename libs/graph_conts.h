@@ -146,33 +146,61 @@ public:
 	}
 
 
-	std::vector<std::size_t> GetNeighbours(std::size_t idx) const
+	std::vector<std::size_t> GetNeighbours(std::size_t idx, bool outgoing_edges=true) const
 	{
 		std::vector<std::size_t> neighbours;
 
-		for(std::size_t idxOther=0; idxOther<m_mat.size2(); ++idxOther)
+		// neighbour vertices on outgoing edges
+		if(outgoing_edges)
 		{
-			if(GetWeight(idx, idxOther))
-				neighbours.push_back(idxOther);
+			for(std::size_t idxOther=0; idxOther<m_mat.size2(); ++idxOther)
+			{
+				if(GetWeight(idx, idxOther))
+					neighbours.push_back(idxOther);
+			}
+		}
+
+		// neighbour vertices on incoming edges
+		else
+		{
+			for(std::size_t idxOther=0; idxOther<m_mat.size1(); ++idxOther)
+			{
+				if(GetWeight(idxOther, idx))
+					neighbours.push_back(idxOther);
+			}
 		}
 
 		return neighbours;
 	}
 
 
-	std::vector<std::string> GetNeighbours(const std::string& vert) const
+	std::vector<std::string> GetNeighbours(const std::string& vert, bool outgoing_edges=true) const
 	{
-		std::vector<std::string> neighbours;
-
 		auto iter = std::find(m_vertexidents.begin(), m_vertexidents.end(), vert);
 		if(iter == m_vertexidents.end())
-			return neighbours;
-
+			return {};
 		std::size_t idx = iter - m_vertexidents.begin();
-		for(std::size_t idxOther=0; idxOther<m_mat.size2(); ++idxOther)
+
+		std::vector<std::string> neighbours;
+
+		// neighbour vertices on outgoing edges
+		if(outgoing_edges)
 		{
-			if(GetWeight(idx, idxOther))
-				neighbours.push_back(m_vertexidents[idxOther]);
+			for(std::size_t idxOther=0; idxOther<m_mat.size2(); ++idxOther)
+			{
+				if(GetWeight(idx, idxOther))
+					neighbours.push_back(m_vertexidents[idxOther]);
+			}
+		}
+
+		// neighbour vertices on incoming edges
+		else
+		{
+			for(std::size_t idxOther=0; idxOther<m_mat.size1(); ++idxOther)
+			{
+				if(GetWeight(idxOther, idx))
+					neighbours.push_back(m_vertexidents[idxOther]);
+			}
 		}
 
 		return neighbours;
@@ -376,27 +404,50 @@ public:
 	}
 
 
-	std::vector<std::size_t> GetNeighbours(std::size_t idx) const
+	std::vector<std::size_t> GetNeighbours(std::size_t idx, bool outgoing_edges=true) const
 	{
 		std::vector<std::size_t> neighbours;
 		neighbours.reserve(GetNumVertices());
 
-		std::shared_ptr<AdjNode> node = m_nodes[idx];
-
-		while(node)
+		// neighbour vertices on outgoing edges
+		if(outgoing_edges)
 		{
-			neighbours.push_back(node->idx);
-			node = node->next;
+			std::shared_ptr<AdjNode> node = m_nodes[idx];
+
+			while(node)
+			{
+				neighbours.push_back(node->idx);
+				node = node->next;
+			}
+		}
+
+		// neighbour vertices on incoming edges
+		else
+		{
+			for(std::size_t i=0; i<m_nodes.size(); ++i)
+			{
+				std::shared_ptr<AdjNode> node = m_nodes[i];
+
+				while(node)
+				{
+					if(node->idx == idx)
+					{
+						neighbours.push_back(i);
+						break;
+					}
+					node = node->next;
+				}
+			}
 		}
 
 		return neighbours;
 	}
 
 
-	std::vector<std::string> GetNeighbours(const std::string& vert) const
+	std::vector<std::string> GetNeighbours(const std::string& vert, bool outgoing_edges=true) const
 	{
 		std::size_t idx = GetVertexIndex(vert);
-		std::vector<std::size_t> neighbour_indices = GetNeighbours(idx);
+		std::vector<std::size_t> neighbour_indices = GetNeighbours(idx, outgoing_edges);
 
 		std::vector<std::string> neighbours;
 		neighbours.reserve(neighbour_indices.size());
