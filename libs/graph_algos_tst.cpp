@@ -11,10 +11,9 @@
 #include "graph_algos.h"
 
 
-int main()
+template<class t_graph>
+void tst()
 {
-	using t_graph = adjacency_matrix<unsigned int>;
-
 	t_graph graph;
 
 	graph.AddVertex("A");
@@ -32,6 +31,21 @@ int main()
 
 	print_graph<t_graph>(graph, std::cout);
 	dijk<t_graph>(graph, "A");
+}
 
+
+int main()
+{
+	{
+		std::cout << "using adjacency matrix" << std::endl;
+		using t_graph = adjacency_matrix<unsigned int>;
+		tst<t_graph>();
+	}
+
+	{
+		std::cout << "\nusing adjacency list" << std::endl;
+		using t_graph = adjacency_list<unsigned int>;
+		tst<t_graph>();
+	}
 	return 0;
 }
