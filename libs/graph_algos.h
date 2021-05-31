@@ -185,6 +185,7 @@ t_mat bellman(const t_graph& graph, const std::string& startvert)
 		dists(0, vertidx) = (vertidx==startidx ? 0 : infinity);
 
 
+	// iterate vertices
 	for(std::size_t i=1; i<N; ++i)
 	{
 		for(std::size_t vertidx=0; vertidx<N; ++vertidx)
@@ -203,6 +204,64 @@ t_mat bellman(const t_graph& graph, const std::string& startvert)
 				}
 			}
 		}
+	}
+
+	return dists;
+}
+
+
+/**
+ * floyd-warshall algorithm
+ * @see (FUH 2021), Kurseinheit 4, p. 23
+ */
+template<class t_graph, class t_mat=m::mat<typename t_graph::t_weight, std::vector>>
+requires is_graph<t_graph> && m::is_mat<t_mat>
+t_mat floyd(const t_graph& graph)
+{
+	// distances
+	const std::size_t N = graph.GetNumVertices();
+	using t_weight = typename t_graph::t_weight;
+	t_mat dists = m::zero<t_mat>(N, N);
+	t_mat next_dists = m::zero<t_mat>(N, N);
+
+
+	// don't use the full maximum to prevent overflows when we're adding the weight afterwards
+	const t_weight infinity = std::numeric_limits<t_weight>::max() / 2;
+
+	// initial weights
+	for(std::size_t vertidx1=0; vertidx1<N; ++vertidx1)
+	{
+		std::vector<std::size_t> neighbours = graph.GetNeighbours(vertidx1);
+
+		for(std::size_t vertidx2=0; vertidx2<N; ++vertidx2)
+		{
+			if(vertidx2 == vertidx1)
+				continue;
+
+			// is vertidx2 a direct neighbour of vertidx1?
+			if(std::find(neighbours.begin(), neighbours.end(), vertidx2) != neighbours.end())
+				dists(vertidx1, vertidx2) = graph.GetWeight(vertidx1, vertidx2);
+			else
+				dists(vertidx1, vertidx2) = infinity;
+		}
+	}
+
+
+	// iterate vertices
+	for(std::size_t i=1; i<N; ++i)
+	{
+		for(std::size_t vertidx1=0; vertidx1<N; ++vertidx1)
+		{
+			for(std::size_t vertidx2=0; vertidx2<N; ++vertidx2)
+			{
+				t_weight dist1 = dists(vertidx1, vertidx2);
+				t_weight dist2 = dists(vertidx1, i) + dists(i, vertidx2);
+
+				next_dists(vertidx1, vertidx2) = std::min(dist1, dist2);
+			}
+		}
+
+		std::swap(dists, next_dists);
 	}
 
 	return dists;

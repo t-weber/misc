@@ -33,6 +33,7 @@ void tst()
 	print_graph<t_graph>(graph, std::cout);
 	auto predecessors = dijk<t_graph>(graph, "A");
 	auto distvecs = bellman<t_graph>(graph, "A");
+	auto distvecs2 = floyd<t_graph>(graph);
 
 	std::cout << "\ndijkstra:" << std::endl;
 	for(std::size_t i=0; i<graph.GetNumVertices(); ++i)
@@ -50,6 +51,11 @@ void tst()
 
 	std::cout << "\nbellman:" << std::endl;
 	std::cout << distvecs << std::endl;
+
+
+	std::cout << "\nfloyd:" << std::endl;
+	std::cout << distvecs2 << std::endl;
+
 }
 
 
