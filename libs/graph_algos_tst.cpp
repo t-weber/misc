@@ -78,12 +78,16 @@ void tst_flux()
 	graph.AddEdge("C", "D", 1);  graph.SetCapacity("C", "D", 2);
 
 	t_graph rest = calc_restflux<t_flux_graph, t_graph>(graph);
+	t_flux_graph maxflux = flux_max<t_flux_graph, t_graph>(graph, "A", "D");
 
 	std::cout << "graph:" << std::endl;
 	print_graph(graph, std::cout);
 
 	std::cout << "\nrest graph:" << std::endl;
 	print_graph(rest, std::cout);
+
+	std::cout << "\nflux maximum:" << std::endl;
+	print_graph(maxflux, std::cout);
 }
 
 
@@ -95,14 +99,18 @@ int main()
 		tst<t_graph>();
 	}
 
+	std::cout << "\n--------------------------------------------------------------------------------" << std::endl;
+
 	{
-		std::cout << "\n\nusing adjacency list" << std::endl;
+		std::cout << "\nusing adjacency list" << std::endl;
 		using t_graph = adjacency_list<unsigned int>;
 		tst<t_graph>();
 	}
 
+	std::cout << "\n--------------------------------------------------------------------------------" << std::endl;
+
 	{
-		std::cout << "\n\nflux graph" << std::endl;
+		std::cout << "\nflux graph" << std::endl;
 		using t_flux_graph = adjacency_matrix<std::pair<unsigned int, unsigned int>, unsigned int>;
 		using t_graph = adjacency_matrix<unsigned int>;
 		tst_flux<t_flux_graph, t_graph>();

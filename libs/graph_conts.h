@@ -198,14 +198,16 @@ public:
 	}
 
 
-	void AddEdge(std::size_t idx1, std::size_t idx2, t_weight w=0)
+	void AddEdge(std::size_t idx1, std::size_t idx2, t_weight w = t_weight{})
 	{
+		// TODO: weight == 0 should not be the same as having no edge
 		SetWeight(idx1, idx2, w);
 	}
 
 
-	void AddEdge(const std::string& vert1, const std::string& vert2, t_weight w=0)
+	void AddEdge(const std::string& vert1, const std::string& vert2, t_weight w = t_weight{})
 	{
+		// TODO: weight == 0 should not be the same as having no edge
 		SetWeight(vert1, vert2, w);
 	}
 
@@ -229,6 +231,7 @@ public:
 				// include edges which have a weight
 				else
 				{
+					// TODO: weight == 0 should not be the same as having no edge
 					if(GetWeight(i, j))
 						edges.emplace_back(std::make_tuple(i, j, m_mat(i, j)));
 				}
@@ -247,12 +250,14 @@ public:
 
 	bool IsAdjacent(std::size_t idx1, std::size_t idx2) const
 	{
+		// TODO: weight == 0 should not be the same as having no edge
 		return GetWeight(idx1, idx2) != t_weight{};
 	}
 
 
 	bool IsAdjacent(const std::string& vert1, const std::string& vert2) const
 	{
+		// TODO: weight == 0 should not be the same as having no edge
 		return GetWeight(vert1, vert2) != t_weight{};
 	}
 
@@ -266,6 +271,7 @@ public:
 		{
 			for(std::size_t idxOther=0; idxOther<m_mat.size2(); ++idxOther)
 			{
+				// TODO: weight == 0 should not be the same as having no edge
 				if(GetWeight(idx, idxOther))
 					neighbours.push_back(idxOther);
 			}
@@ -276,6 +282,7 @@ public:
 		{
 			for(std::size_t idxOther=0; idxOther<m_mat.size1(); ++idxOther)
 			{
+				// TODO: weight == 0 should not be the same as having no edge
 				if(GetWeight(idxOther, idx))
 					neighbours.push_back(idxOther);
 			}
@@ -299,6 +306,7 @@ public:
 		{
 			for(std::size_t idxOther=0; idxOther<m_mat.size2(); ++idxOther)
 			{
+				// TODO: weight == 0 should not be the same as having no edge
 				if(GetWeight(idx, idxOther))
 					neighbours.push_back(m_vertexidents[idxOther]);
 			}
@@ -309,6 +317,7 @@ public:
 		{
 			for(std::size_t idxOther=0; idxOther<m_mat.size1(); ++idxOther)
 			{
+				// TODO: weight == 0 should not be the same as having no edge
 				if(GetWeight(idxOther, idx))
 					neighbours.push_back(m_vertexidents[idxOther]);
 			}
@@ -461,7 +470,7 @@ public:
 	}
 
 
-	void AddEdge(std::size_t idx1, std::size_t idx2, t_weight w=0)
+	void AddEdge(std::size_t idx1, std::size_t idx2, t_weight w = t_weight{})
 	{
 		std::shared_ptr<AdjNode> node = m_nodes[idx1];
 		m_nodes[idx1] = std::make_shared<AdjNode>();
@@ -471,7 +480,7 @@ public:
 	}
 
 
-	void AddEdge(const std::string& vert1, const std::string& vert2, t_weight w=0)
+	void AddEdge(const std::string& vert1, const std::string& vert2, t_weight w = t_weight{})
 	{
 		auto idx1 = GetVertexIndex(vert1);
 		auto idx2 = GetVertexIndex(vert2);
@@ -511,13 +520,19 @@ public:
 
 	bool IsAdjacent(std::size_t idx1, std::size_t idx2) const
 	{
-		return GetWeight(idx1, idx2) != t_weight{};
+		auto neighbours = GetNeighbours(idx1);
+		return std::find(neighbours.begin(), neighbours.end(), idx2) != neighbours.end();
 	}
 
 
 	bool IsAdjacent(const std::string& vert1, const std::string& vert2) const
 	{
-		return GetWeight(vert1, vert2) != t_weight{};
+		auto idx1 = GetVertexIndex(vert1);
+		auto idx2 = GetVertexIndex(vert2);
+		if(!idx1 || !idx2)
+			return false;
+
+		return IsAdjacent(*idx1, *idx2);
 	}
 
 
@@ -563,8 +578,10 @@ public:
 
 	std::vector<std::string> GetNeighbours(const std::string& vert, bool outgoing_edges=true) const
 	{
-		std::size_t idx = GetVertexIndex(vert);
-		std::vector<std::size_t> neighbour_indices = GetNeighbours(idx, outgoing_edges);
+		auto idx = GetVertexIndex(vert);
+		if(!idx)
+			return {};
+		std::vector<std::size_t> neighbour_indices = GetNeighbours(*idx, outgoing_edges);
 
 		std::vector<std::string> neighbours;
 		neighbours.reserve(neighbour_indices.size());
