@@ -1,6 +1,6 @@
 /**
  * graph containers
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date may-2021
  * @license see 'LICENSE.EUPL' file
  *
@@ -16,9 +16,16 @@
 #include <vector>
 #include <memory>
 #include <optional>
+#include <type_traits>
 
 #include "math_conts.h"
 #include "math_algos.h"
+
+
+template<class T, class t_val = typename std::tuple_element<0, T>::type>
+constexpr bool is_pair =
+	std::is_same_v<T, std::pair<t_val, t_val>> ||
+	std::is_same_v<T, std::tuple<t_val, t_val>>;
 
 
 /**
@@ -26,12 +33,13 @@
  * @see (FUH 2021), Kurseinheit 4, pp. 3-5
  * @see https://en.wikipedia.org/wiki/Adjacency_matrix
  */
-template<class _t_weight = unsigned int>
+template<class _t_data = unsigned int, class _t_weight = _t_data>
 class adjacency_matrix
 {
 public:
+	using t_data = _t_data;
 	using t_weight = _t_weight;
-	using t_mat = m::mat<t_weight, std::vector>;
+	using t_mat = m::mat<t_data, std::vector>;
 
 
 public:
@@ -88,12 +96,21 @@ public:
 	}
 
 
+	/**
+	 * set weight (or flux)
+	 */
 	void SetWeight(std::size_t idx1, std::size_t idx2, t_weight w)
 	{
-		m_mat(idx1, idx2) = w;
+		if constexpr(is_pair<t_data, t_weight>)
+			std::get<0>(m_mat(idx1, idx2)) = w;
+		else
+			m_mat(idx1, idx2) = w;
 	}
 
 
+	/**
+	 * set weight (or flux)
+	 */
 	void SetWeight(const std::string& vert1, const std::string& vert2, t_weight w)
 	{
 		auto idx1 = GetVertexIndex(vert1);
@@ -104,21 +121,86 @@ public:
 	}
 
 
+	/**
+	 * get weight (or flux)
+	 */
 	t_weight GetWeight(std::size_t idx1, std::size_t idx2) const
 	{
-		return m_mat(idx1, idx2);
+		if constexpr(is_pair<t_data, t_weight>)
+			return std::get<0>(m_mat(idx1, idx2));
+		else
+			return m_mat(idx1, idx2);
 	}
 
 
+	/**
+	 * get weight (or flux)
+	 */
 	t_weight GetWeight(const std::string& vert1, const std::string& vert2) const
 	{
 		auto idx1 = GetVertexIndex(vert1);
 		auto idx2 = GetVertexIndex(vert2);
 
 		if(idx1 && idx2)
-		return GetWeight(*idx1, *idx2);
+			return GetWeight(*idx1, *idx2);
 
-		return t_weight{0};
+		return t_weight{};
+	}
+
+
+	/**
+	 * set capacity (if t_data is a pair)
+	 */
+	void SetCapacity(std::size_t idx1, std::size_t idx2, t_weight c)
+	{
+		if constexpr(is_pair<t_data, t_weight>)
+			std::get<1>(m_mat(idx1, idx2)) = c;
+	}
+
+
+	/**
+	 * set capacity (if t_data is a pair)
+	 */
+	void SetCapacity(const std::string& vert1, const std::string& vert2, t_weight c)
+	{
+		auto idx1 = GetVertexIndex(vert1);
+		auto idx2 = GetVertexIndex(vert2);
+
+		if(idx1 && idx2)
+			SetCapacity(*idx1, *idx2, c);
+	}
+
+
+	/**
+	 * get capacity (if t_data is a pair)
+	 */
+	t_weight GetCapacity(std::size_t idx1, std::size_t idx2) const
+	{
+		if constexpr(is_pair<t_data, t_weight>)
+			return std::get<1>(m_mat(idx1, idx2));
+		else
+			return t_weight{};
+	}
+
+
+	/**
+	 * get capacity (if t_data is a pair)
+	 */
+	t_weight GetCapacity(const std::string& vert1, const std::string& vert2) const
+	{
+		auto idx1 = GetVertexIndex(vert1);
+		auto idx2 = GetVertexIndex(vert2);
+
+		if(idx1 && idx2)
+			return GetWeight(*idx1, *idx2);
+
+		return t_weight{};
+	}
+
+
+	void AddEdge(std::size_t idx1, std::size_t idx2, t_weight w=0)
+	{
+		SetWeight(idx1, idx2, w);
 	}
 
 
@@ -128,21 +210,50 @@ public:
 	}
 
 
+	std::vector<std::tuple<std::size_t, std::size_t, t_data>> GetEdges() const
+	{
+		std::vector<std::tuple<std::size_t, std::size_t, t_data>> edges;
+		edges.reserve(m_mat.size1() * m_mat.size2());
+
+		for(std::size_t i=0; i<m_mat.size1(); ++i)
+		{
+			for(std::size_t j=0; j<m_mat.size2(); ++j)
+			{
+				// include edges which have a capacity
+				if constexpr(is_pair<t_data, t_weight>)
+				{
+					if(GetCapacity(i, j))
+						edges.emplace_back(std::make_tuple(i, j, m_mat(i, j)));
+				}
+
+				// include edges which have a weight
+				else
+				{
+					if(GetWeight(i, j))
+						edges.emplace_back(std::make_tuple(i, j, m_mat(i, j)));
+				}
+			}
+		}
+
+		return edges;
+	}
+
+
 	void RemoveEdge(const std::string& vert1, const std::string& vert2)
 	{
-		SetWeight(vert1, vert2, t_weight{0});
+		SetWeight(vert1, vert2, t_weight{});
 	}
 
 
 	bool IsAdjacent(std::size_t idx1, std::size_t idx2) const
 	{
-		return GetWeight(idx1, idx2) != t_weight{0};
+		return GetWeight(idx1, idx2) != t_weight{};
 	}
 
 
 	bool IsAdjacent(const std::string& vert1, const std::string& vert2) const
 	{
-		return GetWeight(vert1, vert2) != t_weight{0};
+		return GetWeight(vert1, vert2) != t_weight{};
 	}
 
 
@@ -346,7 +457,17 @@ public:
 		if(idx1 && idx2)
 			return GetWeight(*idx1, *idx2);
 
-		return t_weight{0};
+		return t_weight{};
+	}
+
+
+	void AddEdge(std::size_t idx1, std::size_t idx2, t_weight w=0)
+	{
+		std::shared_ptr<AdjNode> node = m_nodes[idx1];
+		m_nodes[idx1] = std::make_shared<AdjNode>();
+		m_nodes[idx1]->next = node;
+		m_nodes[idx1]->idx = idx2;
+		m_nodes[idx1]->weight = w;
 	}
 
 
@@ -357,11 +478,7 @@ public:
 		if(!idx1 || !idx2)
 			return;
 
-		std::shared_ptr<AdjNode> node = m_nodes[*idx1];
-		m_nodes[*idx1] = std::make_shared<AdjNode>();
-		m_nodes[*idx1]->next = node;
-		m_nodes[*idx1]->idx = *idx2;
-		m_nodes[*idx1]->weight = w;
+		AddEdge(*idx1, *idx2, w);
 	}
 
 
@@ -394,13 +511,13 @@ public:
 
 	bool IsAdjacent(std::size_t idx1, std::size_t idx2) const
 	{
-		return GetWeight(idx1, idx2) != t_weight{0};
+		return GetWeight(idx1, idx2) != t_weight{};
 	}
 
 
 	bool IsAdjacent(const std::string& vert1, const std::string& vert2) const
 	{
-		return GetWeight(vert1, vert2) != t_weight{0};
+		return GetWeight(vert1, vert2) != t_weight{};
 	}
 
 

@@ -1,6 +1,6 @@
 /**
  * graph algorithms
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date may-2021
  * @license see 'LICENSE.EUPL' file
  *
@@ -26,23 +26,39 @@
 // concept for the container interface
 // ----------------------------------------------------------------------------
 template<class t_graph>
-concept is_graph = requires(const t_graph& graph, std::size_t vertidx)
+concept is_graph = requires(t_graph& graph, std::size_t vertidx, typename t_graph::t_weight w)
 {
 	{ graph.GetNumVertices() } -> std::convertible_to<std::size_t>;
 	{ graph.GetVertexIdent(vertidx) } -> std::convertible_to<std::string>;
 
+	graph.SetWeight(vertidx, vertidx, w);
 	{ graph.GetWeight(vertidx, vertidx) } -> std::convertible_to<typename t_graph::t_weight>;
 
 	graph.GetNeighbours(vertidx);
+
+	graph.AddVertex("123");
+	graph.AddEdge(0, 1);
+	graph.AddEdge("1", "2");
+};
+
+
+template<class t_graph>
+concept is_flux_graph = requires(t_graph& graph, std::size_t vertidx, typename t_graph::t_weight w)
+{
+	requires is_graph<t_graph>;
+	requires is_pair<typename t_graph::t_data>;
+
+	graph.SetCapacity(vertidx, vertidx, w);
+	{ graph.GetCapacity(vertidx, vertidx) } -> std::convertible_to<typename t_graph::t_weight>;
 };
 // ----------------------------------------------------------------------------
 
 
 /**
- * export to dot
+ * export graph to dot
  * @see https://graphviz.org/doc/info/lang.html
  */
-template<class t_graph> requires is_graph<t_graph>
+template<class t_graph> requires (is_graph<t_graph> && !is_flux_graph<t_graph>)
 void print_graph(const t_graph& graph, std::ostream& ostr = std::cout)
 {
 	const std::size_t N = graph.GetNumVertices();
@@ -65,6 +81,41 @@ void print_graph(const t_graph& graph, std::ostream& ostr = std::cout)
 				continue;
 
 			ostr << "\t" << i << " -> " << j << " [label=\"" << w << "\"];\n";
+		}
+	}
+
+	ostr << "}\n";
+}
+
+
+/**
+ * export flux graph to dot
+ * @see https://graphviz.org/doc/info/lang.html
+ */
+template<class t_graph> requires is_flux_graph<t_graph>
+void print_graph(const t_graph& graph, std::ostream& ostr = std::cout)
+{
+	const std::size_t N = graph.GetNumVertices();
+
+	ostr << "digraph my_graph\n{\n";
+
+	ostr << "\t// vertices\n";
+	for(std::size_t i=0; i<N; ++i)
+		ostr << "\t" << i << " [label=\"" << graph.GetVertexIdent(i) << "\"];\n";
+
+	ostr << "\n";
+	ostr << "\t// edges and weights\n";
+
+	for(std::size_t i=0; i<N; ++i)
+	{
+		for(std::size_t j=0; j<N; ++j)
+		{
+			typename t_graph::t_weight f = graph.GetWeight(i, j);
+			typename t_graph::t_weight c = graph.GetCapacity(i, j);
+			if(!c)
+				continue;
+
+			ostr << "\t" << i << " -> " << j << " [label=\"" << f << " / " << c << "\"];\n";
 		}
 	}
 
@@ -265,6 +316,32 @@ t_mat floyd(const t_graph& graph)
 	}
 
 	return dists;
+}
+
+
+/**
+ * rest function
+ * @see (FUH 2021), Kurseinheit 5, p. 4
+ */
+template<class t_graph, class t_graph_rest>
+	requires is_flux_graph<t_graph> && is_graph<t_graph_rest>
+t_graph_rest calc_restflux(const t_graph& graph)
+{
+	t_graph_rest rest;
+
+	for(std::size_t i=0; i<graph.GetNumVertices(); ++i)
+		rest.AddVertex(graph.GetVertexIdent(i));
+
+	for(const auto [vert1, vert2, data] : graph.GetEdges())
+	{
+		auto weight = std::get<0>(data);
+		auto cap = std::get<1>(data);
+
+		rest.AddEdge(vert2, vert1, weight);
+		rest.AddEdge(vert1, vert2, cap - weight);
+	}
+
+	return rest;
 }
 
 #endif

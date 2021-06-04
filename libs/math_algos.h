@@ -364,11 +364,12 @@ t_mat zero(std::size_t N1, std::size_t N2)
 requires is_mat<t_mat>
 {
 	using t_size = decltype(t_mat{}.size1());
+	using t_val = typename t_mat::value_type;
 	t_mat mat = create<t_mat>(N1, N2);
 
 	for(t_size i=0; i<mat.size1(); ++i)
 		for(t_size j=0; j<mat.size2(); ++j)
-			mat(i,j) = 0;
+			mat(i,j) = t_val{};
 
 	return mat;
 }
