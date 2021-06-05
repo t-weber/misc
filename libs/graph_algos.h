@@ -156,7 +156,8 @@ dijk(const t_graph& graph, const std::string& startvert, bool use_weights = true
 	// distance priority queue and comparator
 	auto vert_cmp = [&dists](std::size_t idx1, std::size_t idx2) -> bool
 	{
-		return dists[idx1] > dists[idx2];
+		// sort by ascending value: !operator<
+		return dists[idx1] >= dists[idx2];
 	};
 
 	std::priority_queue<std::size_t, std::vector<std::size_t>, decltype(vert_cmp)>
@@ -367,7 +368,7 @@ t_graph_rest calc_restflux(const t_graph& graph)
 	for(std::size_t i=0; i<graph.GetNumVertices(); ++i)
 		rest.AddVertex(graph.GetVertexIdent(i));
 
-	for(const auto [vert1, vert2, data] : graph.GetEdges())
+	for(const auto& [vert1, vert2, data] : graph.GetEdges())
 	{
 		auto weight = std::get<0>(data);
 		auto cap = std::get<1>(data);
