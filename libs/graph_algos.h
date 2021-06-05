@@ -123,6 +123,10 @@ void print_graph(const t_graph& graph, std::ostream& ostr = std::cout)
 }
 
 
+//#define __DIJK_IMPL_SORT__ 1	// use a std::priority_queue
+//#define __DIJK_IMPL_SORT__ 2	// use a heap
+#define __DIJK_IMPL_SORT__ 3	// use a sorted vector
+
 /**
  * dijkstra algorithm
  * @see (FUH 2021), Kurseinheit 4, p. 17
@@ -160,17 +164,43 @@ dijk(const t_graph& graph, const std::string& startvert, bool use_weights = true
 		return dists[idx1] >= dists[idx2];
 	};
 
+#if __DIJK_IMPL_SORT__ == 1
 	std::priority_queue<std::size_t, std::vector<std::size_t>, decltype(vert_cmp)>
 		prio{vert_cmp};
+#elif __DIJK_IMPL_SORT__ == 2 || __DIJK_IMPL_SORT__ == 3
+	std::vector<std::size_t> prio;
+	prio.reserve(N);
+#endif
 
 	for(std::size_t vertidx=0; vertidx<N; ++vertidx)
+	{
+#if __DIJK_IMPL_SORT__ == 1
 		prio.push(vertidx);
+#elif __DIJK_IMPL_SORT__ == 2 || __DIJK_IMPL_SORT__ == 3
+		prio.push_back(vertidx);
+#endif
+	}
+
+#if __DIJK_IMPL_SORT__ == 2
+	std::make_heap(prio.begin(), prio.end(), vert_cmp);
+#elif __DIJK_IMPL_SORT__ == 3
+	std::sort(prio.begin(), prio.end(), vert_cmp);
+#endif
 
 
 	while(prio.size())
 	{
+#if __DIJK_IMPL_SORT__ == 1
 		std::size_t vertidx = prio.top();
 		prio.pop();
+#elif __DIJK_IMPL_SORT__ == 2
+		std::size_t vertidx = *prio.begin();
+		std::pop_heap(prio.begin(), prio.end(), vert_cmp);
+		prio.pop_back();
+#elif __DIJK_IMPL_SORT__ == 3
+		std::size_t vertidx = *prio.rbegin();
+		prio.pop_back();
+#endif
 
 		std::vector<std::size_t> neighbours = graph.GetNeighbours(vertidx);
 		for(std::size_t neighbouridx : neighbours)
@@ -182,6 +212,17 @@ dijk(const t_graph& graph, const std::string& startvert, bool use_weights = true
 			{
 				dists[neighbouridx] = dists[vertidx] + w;
 				predecessors[neighbouridx] = vertidx;
+
+#if __DIJK_IMPL_SORT__ == 1
+				// add another node with the same index but the changed distances
+				prio.push(neighbouridx);
+#elif __DIJK_IMPL_SORT__ == 2
+				// resort the priority queue heap after the distance changes
+				std::make_heap(prio.begin(), prio.end(), vert_cmp);
+#elif __DIJK_IMPL_SORT__ == 3
+				// resort with changed distances
+				std::sort(prio.begin(), prio.end(), vert_cmp);
+#endif
 			}
 		}
 	}
