@@ -6,9 +6,10 @@
  *
  * References:
  *  * http://www.boost.org/doc/libs/1_65_1/doc/html/signals2.html
+ *  * https://www.boost.org/doc/libs/1_76_0/doc/html/signals2/tutorial.html
  *  * https://github.com/boostorg/signals2/tree/develop/example
  *
- * gcc -o sig sig.cpp -std=c++17 -lstdc++
+ * g++ -std=c++20 -Wall -Wextra -Weffc++ -o sig sig.cpp
  */
 
 #include <iostream>
@@ -45,6 +46,26 @@ struct C
 };
 
 
+// combined return values
+struct Combiner
+{
+	using result_type = int;
+
+	result_type operator()(const auto& begin, const auto& end) const
+	{
+		result_type val{};
+
+		for(auto iter=begin; iter!=end; ++iter)
+		{
+			//std::cout << "iter = " << *iter << std::endl;
+			val += *iter;
+		}
+
+		return val;
+	}
+};
+
+
 int main()
 {
 	// signal / slot
@@ -72,11 +93,18 @@ int main()
 
 	// signal / multiple slots
 	{
+		// last return value
 		sig::signal<int(int)> sig;
 		sig.connect([](int i) -> int { return i+1; });
 		sig.connect([](int i) -> int { return i+2; });
 		auto optRet = sig(123);
-		std::cout << *optRet << "\n";
+		std::cout << "last return value: " << *optRet << "\n";
+
+		// combined return value
+		sig::signal<int(int), Combiner> sig2;
+		sig2.connect([](int i) -> int { return i+1; });
+		sig2.connect([](int i) -> int { return i+2; });
+		std::cout << "combined return value: " << sig2(2) << "\n";
 	}
 
 	std::cout << "\n";
@@ -97,10 +125,10 @@ int main()
 
 	// more member functions
 	{
-		B b;
+		B b{};
 		b.connect([]() { std::cout << "Member signal.\n"; });
 
-		C c;
+		C c{};
 		b.connect([&c]() { c.slot(); });
 
 		b.emit();
