@@ -71,11 +71,21 @@ int main()
 	// signal / slot
 	{
 		sig::signal<void()> sig;
-		sig.connect([]() { std::cout << "Signal 1.\n"; });
+
+		sig::connection sig1 = sig.connect([]() { std::cout << "Signal 1.\n"; });
+		sig::connection sig2 = sig.connect([]() { std::cout << "Signal 2.\n"; });
+
 		{
-			sig::scoped_connection _sc(sig.connect([]() { std::cout << "Temporary signal 2.\n"; }));
+			sig::scoped_connection _sc(sig.connect([]() { std::cout << "Temporary signal 3.\n"; }));
+			std::cout << "With temporary signal:\n";
 			sig();
 		}
+
+		std::cout << "Without temporary signal:\n";
+		sig();
+
+		sig1.disconnect();
+		std::cout << "After disconnect of signal 1:\n";
 		sig();
 	}
 
