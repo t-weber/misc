@@ -11,6 +11,7 @@
  * 	- (Merziger06): G. Merziger and T. Wirth, ISBN: 3923923333 (2006).
  * 	- (Scarpino11): M. Scarpino, ISBN: 978-1-6172-9017-6 (2011).
  * 	- (Shirane02): G. Shirane et al., ISBN: 978-0-5214-1126-4 (2002).
+ * 	- (FUH 2021): "Effiziente Algorithmen" (2021), Kurs 1684, Fernuni Hagen (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/01684).
  */
 
 #ifndef __MATH_ALGOS_H__
@@ -303,6 +304,7 @@ t_cont<t_obj_dst> convert(const t_cont<t_obj_src>& src_objs)
 requires (is_vec<t_obj_dst> || is_mat<t_obj_dst>) && (is_vec<t_obj_src> || is_mat<t_obj_src>)
 {
 	t_cont<t_obj_dst> dst_objs;
+	dst_objs.reserve(src_objs.size());
 
 	for(const t_obj_src& src_obj : src_objs)
 		dst_objs.emplace_back(convert<t_obj_dst, t_obj_src>(src_obj));
@@ -373,6 +375,7 @@ requires is_mat<t_mat>
 
 	return mat;
 }
+
 
 /**
  * zero matrix
@@ -1165,6 +1168,7 @@ t_cont_out<t_vec> orthonorm_sys(const t_cont_in<t_vec>& sys)
 requires is_vec<t_vec>
 {
 	t_cont_out<t_vec> newsys;
+	newsys.reserve(sys.size());
 
 	//const std::size_t N = sys.size();
 	for(const t_vec& vecSys : sys)
@@ -1228,6 +1232,7 @@ requires is_basic_vec<t_vec>
 {
 	using t_size = decltype(mat.size());
 	t_vec vec;
+	vec.reserve(iNumRows);
 
 	for(t_size iRow=0; iRow<iNumRows; ++iRow)
 	{
@@ -1495,6 +1500,8 @@ requires is_mat<t_mat> && is_basic_vec<t_vec>
 	basis_inv *= c;
 
 	t_cont_out<t_vec> lstRecip;
+	lstRecip.reserve(basis_inv.size1());
+
 	for(t_size currow=0; currow<basis_inv.size1(); ++currow)
 	{
 		const t_vec rowvec = row<t_mat, t_vec>(basis_inv, currow);
@@ -1622,6 +1629,7 @@ requires is_vec<t_vec>
 	// two intersections
 	auto val = std::sqrt(rt);
 	t_cont<t_vec> inters;
+	inters.reserve(2);
 
 	T lam1 = (proj + val)/lenDir;
 	T lam2 = (proj - val)/lenDir;
@@ -1687,6 +1695,8 @@ requires is_vec<t_vec>
 		- (T(2)*m1_2*m2_4 + m1_2*m1_2*m2_2 + m2_4*m2_2);
 
 	t_cont<t_vec> inters;
+	inters.reserve(4);
+
 	if(rt < T(0))
 		return inters;
 
@@ -2179,6 +2189,7 @@ t_cont<t_vec> create_lines(const t_cont<t_vec>& vertices, const t_cont<t_cont<st
 requires is_vec<t_vec>
 {
 	t_cont<t_vec> lineverts;
+	lineverts.reserve(faces.size() * 4);
 
 	auto line_already_seen = [&lineverts](const t_vec& vec1, const t_vec& vec2) -> bool
 	{
@@ -2243,6 +2254,10 @@ requires is_vec<t_vec>
 	t_cont<t_vec> triangles;
 	t_cont<t_vec> triag_normals;
 	t_cont<t_vec> vert_uvs;
+
+	triangles.reserve(faces.size() * 3);
+	triag_normals.reserve(faces.size() /* * 3*/);
+	vert_uvs.reserve(faces.size() * 3);
 
 	auto iterFaces = faces.begin();
 	auto iterNorms = normals.begin();
@@ -2339,6 +2354,9 @@ requires is_vec<t_vec>
 	t_cont<t_vec> normals_new;
 	t_cont<t_vec> uvs_new;
 
+	vertices_new.reserve(vertices.size() * 4*3);
+	normals_new.reserve(vertices.size() * 4);
+	uvs_new.reserve(vertices.size() * 4*3);
 
 	// iterate over triplets forming triangles
 	auto itervert = vertices.begin();
@@ -2469,6 +2487,9 @@ requires is_vec<t_vec>
 	t_cont<t_vec> vertices_new;
 	t_cont<t_vec> normals_new;
 
+	vertices_new.reserve(vertices.size());
+	normals_new.reserve(vertices.size());
+
 
 	// vertices
 	for(t_vec vec : vertices)
@@ -2565,6 +2586,7 @@ requires is_vec<t_vec>
 
 	// vertices
 	t_cont<t_vec> vertices;
+	vertices.reserve(num_points);
 
 	// inner vertex
 	//vertices.push_back(create<t_vec>({ 0, 0, 0 }));
@@ -2617,6 +2639,7 @@ requires is_vec<t_vec>
 
 	// vertices
 	t_cont<t_vec> vertices;
+	vertices.reserve(1 + num_points*2);
 
 	// inner vertex
 	vertices.push_back(create<t_vec>({ 0, 0, h }));
@@ -2637,6 +2660,10 @@ requires is_vec<t_vec>
 	t_cont<t_vec> normals;
 	t_cont<t_cont<t_vec>> uvs;	// TODO
 
+	faces.reserve(num_points*2);
+	normals.reserve(num_points*2);
+	uvs.reserve(num_points*2);
+
 	for(std::size_t face=0; face<num_points; ++face)
 	{
 			std::size_t idx0 = face + 1;	// outer 1
@@ -2655,7 +2682,8 @@ requires is_vec<t_vec>
 
 	if(bWithCap)
 	{
-		const auto [disk_vertices, disk_faces, disk_normals, disk_uvs] = create_disk<t_vec, t_cont>(r, num_points);
+		const auto [disk_vertices, disk_faces, disk_normals, disk_uvs] =
+			create_disk<t_vec, t_cont>(r, num_points);
 
 		// vertex indices have to be adapted for merging
 		const std::size_t vert_start_idx = vertices.size();
@@ -3281,8 +3309,66 @@ requires is_mat<t_mat>
 // ----------------------------------------------------------------------------
 
 /**
+ * hadamard operator/gate
+ * @see (FUH 2021), p. 7
+ */
+template<class t_mat>
+const t_mat& hadamard()
+requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
+{
+	using t_cplx = typename t_mat::value_type;
+	using t_real = typename t_cplx::value_type;
+	t_cplx c(t_real(1)/std::sqrt(t_real(2)), 0);
+
+	static const t_mat mat = create<t_mat>({{c, c}, { c,  -c}});
+	return mat;
+}
+
+
+/**
+ * phase gate
+ * @see (FUH 2021), p. 12
+ */
+template<class t_mat, class t_cplx = typename t_mat::value_type, class t_real = typename t_cplx::value_type>
+const t_mat& phasegate(t_cplx phase = pi<t_real>/t_real(2))
+requires is_mat<t_mat> && is_complex<t_cplx>
+{
+	constexpr t_cplx c1(1, 0);
+	constexpr t_cplx cI(0, 1);
+
+	static const t_mat mat = create<t_mat>({
+		{ c1, 0 },
+		{  0, std::exp(cI * phase) }
+	});
+	return mat;
+}
+
+
+/**
+ * CNOT gate
+ * @see (FUH 2021), p. 9
+ */
+template<class t_mat>
+const t_mat& cnot()
+requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
+{
+	using t_cplx = typename t_mat::value_type;
+	constexpr t_cplx c(1, 0);
+
+	static const t_mat mat = create<t_mat>({
+		{ c, 0, 0, 0 },
+		{ 0, c, 0, 0 },
+		{ 0, 0, 0, c },
+		{ 0, 0, c, 0 },
+	});
+	return mat;
+}
+
+
+/**
  * SU(2) generators, pauli matrices sig_i = 2*S_i
  * @see (Arfken13), p. 110
+ * @see (FUH 2021), p. 7
  */
 template<class t_mat>
 const t_mat& su2_matrix(std::size_t which)
@@ -3317,6 +3403,8 @@ requires is_basic_vec<t_vec> && is_mat<typename t_vec::value_type>
 	using t_mat = typename t_vec::value_type;
 
 	t_vec vec;
+	vec.reserve(4);
+
 	if(bIncludeUnit)
 		vec.emplace_back(unit<t_mat>(2));
 	for(t_size i=0; i<3; ++i)
