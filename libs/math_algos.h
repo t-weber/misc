@@ -807,7 +807,7 @@ requires is_mat<t_mat>
 	const t_size m1s2 = mat1.size2();
 	const t_size m2s1 = mat2.size1();
 	const t_size m2s2 = mat2.size2();
-	t_mat mat = create<t_mat>(m1s1+m2s1, m1s2+m2s2);
+	t_mat mat = create<t_mat>(m1s1*m2s1, m1s2*m2s2);
 
 	for(t_size i1=0; i1<m1s1; ++i1)
 		for(t_size j1=0; j1<m1s2; ++j1)
