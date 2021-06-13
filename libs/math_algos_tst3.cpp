@@ -19,14 +19,25 @@ using namespace m_ops;
 template<class t_scalar, class t_vec, class t_mat>
 void qm_tests()
 {
+	const t_mat I = unit<t_mat>(2);
 	const t_mat& H = hadamard<t_mat>();
+	t_vec up = m::create<t_vec>({ 1, 0 });
+	t_vec down = m::create<t_vec>({ 0, 1 });
+
 	std::cout << "H H^+ = " << m::trans(H) * H << std::endl;
 	std::cout << "H^+ H = " << H * m::trans(H) << std::endl;
 
-	t_vec up = m::create<t_vec>({ 1, 0 });
-	t_vec down = m::create<t_vec>({ 0, 1 });
-	std::cout << "H |up> = " << H*up << std::endl;
-	std::cout << "H |down> = " << H*down << std::endl;
+	std::cout << "H x H = " << outer<t_mat>(H, H) << std::endl;
+	std::cout << "I x H = " << outer<t_mat>(I, H) << std::endl;
+	std::cout << "H x I = " << outer<t_mat>(H, I) << std::endl;
+
+	t_vec vec1 = H*up;
+	t_vec vec2 = H*down;
+	t_vec twobitstate1 = m::outer_flat<t_vec, t_mat>(up, vec1);
+
+	std::cout << "H |up> = " << vec1 << std::endl;
+	std::cout << "H |down> = " << vec2 << std::endl;
+	std::cout << "|up> x  H |up> = " << twobitstate1 << std::endl;
 }
 
 

@@ -772,6 +772,53 @@ requires is_basic_vec<t_vec> && is_mat<t_mat>
 }
 
 
+/**
+ * outer product |v1><v2|, "flattened" to a (state) vector
+ */
+template<class t_vec, class t_mat>
+t_vec outer_flat(const t_vec& vec1, const t_vec& vec2)
+requires is_basic_vec<t_vec> && is_mat<t_mat>
+{
+	using t_size = decltype(vec1.size());
+	const t_size ROWS = vec1.size();
+	const t_size COLS = vec2.size();
+
+	t_mat outer = m::outer<t_mat, t_vec>(vec1, vec2);
+	t_vec outer_flat = create<t_vec>(ROWS*COLS);
+
+	for(t_size i=0; i<ROWS; ++i)
+		for(t_size j=0; j<COLS; ++j)
+			outer_flat[i*COLS + j] = outer(i, j);
+
+	return outer_flat;
+}
+
+
+/**
+ * outer/tensor product
+ */
+template<class t_mat>
+t_mat outer(const t_mat& mat1, const t_mat& mat2)
+requires is_mat<t_mat>
+{
+	using t_size = decltype(mat1.size1());
+
+	const t_size m1s1 = mat1.size1();
+	const t_size m1s2 = mat1.size2();
+	const t_size m2s1 = mat2.size1();
+	const t_size m2s2 = mat2.size2();
+	t_mat mat = create<t_mat>(m1s1+m2s1, m1s2+m2s2);
+
+	for(t_size i1=0; i1<m1s1; ++i1)
+		for(t_size j1=0; j1<m1s2; ++j1)
+			for(t_size i2=0; i2<m2s1; ++i2)
+				for(t_size j2=0; j2<m2s2; ++j2)
+					mat(i1*m2s1+i2, j1*m2s2+j2) = mat1(i1, j1) * mat2(i2, j2);
+
+	return mat;
+}
+
+
 
 // ----------------------------------------------------------------------------
 // with metric
