@@ -819,6 +819,32 @@ requires is_mat<t_mat>
 }
 
 
+/**
+ * matrix-vector product using only a portion of the matrix
+ */
+template<class t_mat, class t_vec>
+t_vec mult(const t_mat& mat, const t_vec& vec, std::size_t outsize,
+	std::size_t row_begin=0, std::size_t col_begin=0)
+requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
+&& m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
+{
+	using t_real = typename t_vec::value_type;
+	using t_size = decltype(t_mat{}.size1());
+
+	t_size insize = std::min(vec.size(), mat.size2()-col_begin);
+	outsize = std::min(outsize, mat.size1()-row_begin);
+	t_vec vecRet(outsize);
+
+	for(t_size row=row_begin; row<row_begin+outsize; ++row)
+	{
+		vecRet[row-row_begin] = t_real{/*0*/};
+		for(t_size col=col_begin; col<col_begin+insize; ++col)
+			vecRet[row-row_begin] += mat(row, col) * vec[col-col_begin];
+	}
+
+	return vecRet;
+}
+
 
 // ----------------------------------------------------------------------------
 // with metric
@@ -2025,8 +2051,10 @@ requires is_vec<t_vec>
 	const T lenuv13 = norm<t_vec>(uv13);
 	auto vecBasis = orthonorm_sys<t_vec, std::initializer_list, std::vector>({vec12, vec13});
 	auto uvBasis = orthonorm_sys<t_vec, std::initializer_list, std::vector>({uv12, uv13});
-	vec12 = vecBasis[0]*len12; vec13 = vecBasis[1]*len13;
-	uv12 = uvBasis[0]*lenuv12; uv13 = uvBasis[1]*lenuv13;
+	vec12 = vecBasis[0]*len12;
+	vec13 = vecBasis[1]*len13;
+	uv12 = uvBasis[0]*lenuv12;
+	uv13 = uvBasis[1]*lenuv13;
 	// ----------------------------------------------------
 
 

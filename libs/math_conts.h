@@ -474,7 +474,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 		for(t_size col=0; col<mat.size2(); ++col)
 		{
 			auto elem = mat(row, col) * vec[col];
-			vecRet[row] = vecRet[row] + elem;
+			vecRet[row] += elem;
 		}
 	}
 
