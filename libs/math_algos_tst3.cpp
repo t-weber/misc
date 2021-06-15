@@ -24,31 +24,53 @@ void qm_tests()
 	t_vec down = m::create<t_vec>({ 1, 0 });
 	t_vec up = m::create<t_vec>({ 0, 1 });
 
+	t_mat I_H = outer<t_mat>(I, H);
+	t_mat H_I = outer<t_mat>(H, I);
+
 	std::cout << "H H^+ = " << m::trans(H) * H << std::endl;
 	std::cout << "H^+ H = " << H * m::trans(H) << std::endl;
 
 	std::cout << "\nH x H = " << outer<t_mat>(H, H) << std::endl;
-	std::cout << "I x H = " << outer<t_mat>(I, H) << std::endl;
-	std::cout << "H x I = " << outer<t_mat>(H, I) << std::endl;
+	std::cout << "I x H = " << I_H << std::endl;
+	std::cout << "H x I = " << H_I << std::endl;
+
+	t_vec upup = m::outer_flat<t_vec, t_mat>(up, up);
+	t_vec downdown = m::outer_flat<t_vec, t_mat>(down, down);
+	t_vec downup = m::outer_flat<t_vec, t_mat>(down, up);
 
 	t_vec vec1 = H*up;
 	t_vec vec2 = H*down;
 	t_vec twobitstate1 = m::outer_flat<t_vec, t_mat>(up, vec1);
+	t_vec twobitstate4b = I_H * upup;
 
 	std::cout << "\nH |up> = " << vec1 << std::endl;
 	std::cout << "H |down> = " << vec2 << std::endl;
-	std::cout << "|up> x  H |up> = " << twobitstate1 << std::endl;
+	std::cout << "|up> ^ H |up> = " << twobitstate1 << std::endl;
+	std::cout << "I^H |up up> = " << twobitstate4b << std::endl;
 
-	t_vec twobitstate2 = m::outer_flat<t_vec, t_mat>(down, down);
-	t_vec twobitstate3 = m::outer_flat<t_vec, t_mat>(down, up);
-	t_vec threebitstate1 = m::outer_flat<t_vec, t_mat>(twobitstate2, down);
-	t_vec threebitstate2 = m::outer_flat<t_vec, t_mat>(twobitstate2, up);
-	t_vec threebitstate3 = m::outer_flat<t_vec, t_mat>(twobitstate3, down);
-	t_vec threebitstate4 = m::outer_flat<t_vec, t_mat>(twobitstate3, up);
-	std::cout << "\n|down down down> = " << threebitstate1 << std::endl;
-	std::cout << "|down down up> = " << threebitstate2 << std::endl;
-	std::cout << "|down up down> = " << threebitstate3 << std::endl;
-	std::cout << "|down up up> = " << threebitstate4 << std::endl;
+	t_vec downdowndown = m::outer_flat<t_vec, t_mat>(downdown, down);
+	t_vec downdownup = m::outer_flat<t_vec, t_mat>(downdown, up);
+	t_vec downupdown = m::outer_flat<t_vec, t_mat>(downup, down);
+	t_vec downupup = m::outer_flat<t_vec, t_mat>(downup, up);
+
+	t_mat H_I_H = outer<t_mat>(outer<t_mat>(H, I), H);
+	t_mat H_I_I = outer<t_mat>(outer<t_mat>(H, I), I);
+	t_mat I_I_H = outer<t_mat>(outer<t_mat>(I, I), H);
+
+	t_vec threebitstate1b = H_I_H * downdowndown;
+	t_vec threebitstate1c = H_I_I * downdowndown;
+	t_vec threebitstate2b = H_I_I * downdownup;
+	t_vec threebitstate2c = I_I_H * downdownup;
+
+	std::cout << "\n|down down down> = " << downdowndown << std::endl;
+	std::cout << "|down down up> = " << downdownup << std::endl;
+	std::cout << "|down up down> = " << downupdown << std::endl;
+	std::cout << "|down up up> = " << downupup << std::endl;
+
+	std::cout << "\nH^I^H |down down down> = " << threebitstate1b << std::endl;
+	std::cout << "H^I^I |down down down> = " << threebitstate1c << std::endl;
+	std::cout << "H^I^I |down down up> = " << threebitstate2b << std::endl;
+	std::cout << "I^I^H |down down up> = " << threebitstate2c << std::endl;
 }
 
 
