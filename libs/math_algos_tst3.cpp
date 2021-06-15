@@ -16,42 +16,65 @@ using namespace m;
 using namespace m_ops;
 
 
+/**
+ * get total operator of the circuit:
+ *
+ * qubit 1: ---one_pre_1---|                        |---one_post_1---
+ *                         |---two_pre---two_post---|
+ * qubit 2: ---one_pre_2---|                        |---one_post_2---
+ *
+ * with one-qubit operators "one*" and two-qubit operator "two"
+ */
+template<class t_mat> requires is_mat<t_mat>
+t_mat circuit_total_op(
+	const t_mat& one_pre_1, const t_mat& one_pre_2,
+	const t_mat& two_pre, const t_mat& two_post,
+	const t_mat& one_post_1, const t_mat& one_post_2)
+{
+	t_mat pre = outer<t_mat>(one_pre_1, one_pre_2);
+	t_mat post = outer<t_mat>(one_post_1, one_post_2);
+
+	return (pre * two_pre) * (two_post * post);
+}
+
+
 template<class t_scalar, class t_vec, class t_mat>
+requires is_mat<t_mat> && is_vec<t_vec>
 void qm_tests()
 {
 	const t_mat I = unit<t_mat>(2);
 	const t_mat& H = hadamard<t_mat>();
-	t_vec down = m::create<t_vec>({ 1, 0 });
-	t_vec up = m::create<t_vec>({ 0, 1 });
+	t_vec down = create<t_vec>({ 1, 0 });
+	t_vec up = create<t_vec>({ 0, 1 });
 
 	t_mat I_H = outer<t_mat>(I, H);
 	t_mat H_I = outer<t_mat>(H, I);
 
-	std::cout << "H H^+ = " << m::trans(H) * H << std::endl;
-	std::cout << "H^+ H = " << H * m::trans(H) << std::endl;
+	std::cout << "H H^+ = " << trans(H) * H << std::endl;
+	std::cout << "H^+ H = " << H * trans(H) << std::endl;
 
 	std::cout << "\nH x H = " << outer<t_mat>(H, H) << std::endl;
 	std::cout << "I x H = " << I_H << std::endl;
 	std::cout << "H x I = " << H_I << std::endl;
 
-	t_vec upup = m::outer_flat<t_vec, t_mat>(up, up);
-	t_vec downdown = m::outer_flat<t_vec, t_mat>(down, down);
-	t_vec downup = m::outer_flat<t_vec, t_mat>(down, up);
+	t_vec upup = outer_flat<t_vec, t_mat>(up, up);
+	t_vec downdown = outer_flat<t_vec, t_mat>(down, down);
+	t_vec downup = outer_flat<t_vec, t_mat>(down, up);
 
 	t_vec vec1 = H*up;
 	t_vec vec2 = H*down;
-	t_vec twobitstate1 = m::outer_flat<t_vec, t_mat>(up, vec1);
+	t_vec twobitstate1 = outer_flat<t_vec, t_mat>(up, vec1);
 	t_vec twobitstate4b = I_H * upup;
 
 	std::cout << "\nH |up> = " << vec1 << std::endl;
 	std::cout << "H |down> = " << vec2 << std::endl;
-	std::cout << "|up> ^ H |up> = " << twobitstate1 << std::endl;
-	std::cout << "I^H |up up> = " << twobitstate4b << std::endl;
+	std::cout << "|up> x H |up> = " << twobitstate1 << std::endl;
+	std::cout << "I x H |up up> = " << twobitstate4b << std::endl;
 
-	t_vec downdowndown = m::outer_flat<t_vec, t_mat>(downdown, down);
-	t_vec downdownup = m::outer_flat<t_vec, t_mat>(downdown, up);
-	t_vec downupdown = m::outer_flat<t_vec, t_mat>(downup, down);
-	t_vec downupup = m::outer_flat<t_vec, t_mat>(downup, up);
+	t_vec downdowndown = outer_flat<t_vec, t_mat>(downdown, down);
+	t_vec downdownup = outer_flat<t_vec, t_mat>(downdown, up);
+	t_vec downupdown = outer_flat<t_vec, t_mat>(downup, down);
+	t_vec downupup = outer_flat<t_vec, t_mat>(downup, up);
 
 	t_mat H_I_H = outer<t_mat>(outer<t_mat>(H, I), H);
 	t_mat H_I_I = outer<t_mat>(outer<t_mat>(H, I), I);
@@ -67,10 +90,19 @@ void qm_tests()
 	std::cout << "|down up down> = " << downupdown << std::endl;
 	std::cout << "|down up up> = " << downupup << std::endl;
 
-	std::cout << "\nH^I^H |down down down> = " << threebitstate1b << std::endl;
-	std::cout << "H^I^I |down down down> = " << threebitstate1c << std::endl;
-	std::cout << "H^I^I |down down up> = " << threebitstate2b << std::endl;
-	std::cout << "I^I^H |down down up> = " << threebitstate2c << std::endl;
+	std::cout << "\nH x I x H |down down down> = " << threebitstate1b << std::endl;
+	std::cout << "H x I x I |down down down> = " << threebitstate1c << std::endl;
+	std::cout << "H x I x I |down down up> = " << threebitstate2b << std::endl;
+	std::cout << "I x I x H |down down up> = " << threebitstate2c << std::endl;
+
+	t_mat X = su2_matrix<t_mat>(0);
+	t_mat Y = su2_matrix<t_mat>(1);
+	t_mat Z = su2_matrix<t_mat>(2);
+	t_mat C1 = cnot<t_mat>(0);
+	t_mat C2 = cnot<t_mat>(1);
+	t_mat I4 = unit<t_mat>(4);
+
+	std::cout << "circuit total operator: " << circuit_total_op<t_mat>(Y, X, C1, I4, X, Y) << std::endl;
 }
 
 

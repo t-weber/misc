@@ -3424,7 +3424,7 @@ requires is_mat<t_mat> && is_complex<t_cplx>
  * @see (FUH 2021), p. 9
  */
 template<class t_mat>
-const t_mat& cnot()
+const t_mat& cnot(bool flipped = false)
 requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 {
 	using t_cplx = typename t_mat::value_type;
@@ -3436,7 +3436,15 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 		{ 0, 0, 0, c },
 		{ 0, 0, c, 0 },
 	});
-	return mat;
+
+	static const t_mat mat_flipped = create<t_mat>({
+		{ 0, c, 0, 0 },
+		{ c, 0, 0, 0 },
+		{ 0, 0, c, 0 },
+		{ 0, 0, 0, c },
+	});
+
+	return flipped ? mat_flipped : mat;
 }
 
 
