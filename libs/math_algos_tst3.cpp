@@ -26,7 +26,7 @@ using namespace m_ops;
  * with one-qubit operators "one*" and two-qubit operator "two"
  */
 template<class t_mat> requires is_mat<t_mat>
-t_mat circuit_total_op(
+static t_mat circuit_total_op(
 	const t_mat& one_pre_1, const t_mat& one_pre_2,
 	const t_mat& two_pre, const t_mat& two_post,
 	const t_mat& one_post_1, const t_mat& one_post_2)
@@ -57,6 +57,7 @@ void qm_tests()
 	std::cout << "I x H = " << I_H << std::endl;
 	std::cout << "H x I = " << H_I << std::endl;
 
+
 	t_vec upup = outer_flat<t_vec, t_mat>(up, up);
 	t_vec downdown = outer_flat<t_vec, t_mat>(down, down);
 	t_vec downup = outer_flat<t_vec, t_mat>(down, up);
@@ -70,6 +71,7 @@ void qm_tests()
 	std::cout << "H |down> = " << vec2 << std::endl;
 	std::cout << "|up> x H |up> = " << twobitstate1 << std::endl;
 	std::cout << "I x H |up up> = " << twobitstate4b << std::endl;
+
 
 	t_vec downdowndown = outer_flat<t_vec, t_mat>(downdown, down);
 	t_vec downdownup = outer_flat<t_vec, t_mat>(downdown, up);
@@ -95,6 +97,7 @@ void qm_tests()
 	std::cout << "H x I x I |down down up> = " << threebitstate2b << std::endl;
 	std::cout << "I x I x H |down down up> = " << threebitstate2c << std::endl;
 
+
 	t_mat X = su2_matrix<t_mat>(0);
 	t_mat Y = su2_matrix<t_mat>(1);
 	t_mat Z = su2_matrix<t_mat>(2);
@@ -102,7 +105,12 @@ void qm_tests()
 	t_mat C2 = cnot<t_mat>(1);
 	t_mat I4 = unit<t_mat>(4);
 
-	std::cout << "circuit total operator: " << circuit_total_op<t_mat>(Y, X, C1, I4, X, Y) << std::endl;
+	t_mat circ1_op = circuit_total_op<t_mat>(Y, X, C1, I4, X, Y);
+	std::cout << "circuit total operator: " << circ1_op << std::endl;
+
+	// see: https://en.wikipedia.org/wiki/Controlled_NOT_gate
+	t_mat cnot_flipped_op = circuit_total_op<t_mat>(H, H, C1, I4, H, H);
+	std::cout << std::boolalpha << equals<t_mat>(cnot_flipped_op, C2, 1e-6) << std::endl;
 
 
 	t_mat density1 = outer<t_mat, t_vec>(up, up);
@@ -121,8 +129,6 @@ int main()
 {
 	using t_real = double;
 	using t_cplx = std::complex<t_real>;
-	//using t_vec = vec<t_real, std::vector>;
-	//using t_mat = mat<t_real, std::vector>;
 	using t_vec_cplx = vec<t_cplx, std::vector>;
 	using t_mat_cplx = mat<t_cplx, std::vector>;
 

@@ -177,8 +177,16 @@ requires is_mat<t_mat>
 	{
 		for(t_size j=0; j<mat1.size2(); ++j)
 		{
-			if(!equals<T>(mat1(i,j), mat2(i,j), eps))
-				return false;
+			if constexpr(is_complex<decltype(eps)>)
+			{
+				if(!equals<T>(mat1(i,j), mat2(i,j), eps.real()))
+					return false;
+			}
+			else
+			{
+				if(!equals<T>(mat1(i,j), mat2(i,j), eps))
+					return false;
+			}
 		}
 	}
 
@@ -3434,8 +3442,9 @@ requires is_mat<t_mat> && is_complex<t_cplx>
 
 
 /**
- * CNOT gate
+ * controlled NOT gate
  * @see (FUH 2021), p. 9
+ * @see https://en.wikipedia.org/wiki/Controlled_NOT_gate
  */
 template<class t_mat>
 const t_mat& cnot(bool flipped = false)
@@ -3452,10 +3461,10 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 	});
 
 	static const t_mat mat_flipped = create<t_mat>({
-		{ 0, c, 0, 0 },
 		{ c, 0, 0, 0 },
-		{ 0, 0, c, 0 },
 		{ 0, 0, 0, c },
+		{ 0, 0, c, 0 },
+		{ 0, c, 0, 0 },
 	});
 
 	return flipped ? mat_flipped : mat;
