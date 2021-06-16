@@ -3403,6 +3403,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 /**
  * phase gate
  * @see (FUH 2021), p. 12
+ * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
  */
 template<class t_mat, class t_cplx = typename t_mat::value_type, class t_real = typename t_cplx::value_type>
 const t_mat& phasegate(t_cplx phase = pi<t_real>/t_real(2))
@@ -3416,6 +3417,19 @@ requires is_mat<t_mat> && is_complex<t_cplx>
 		{  0, std::exp(cI * phase) }
 	});
 	return mat;
+}
+
+
+/**
+ * discrete phase gate
+ * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
+ */
+template<class t_mat, class t_cplx = typename t_mat::value_type, class t_real = typename t_cplx::value_type>
+const t_mat& phasegate_discrete(t_real k = 1)
+requires is_mat<t_mat> && is_complex<t_cplx>
+{
+	t_real phase = t_real(2)*pi<t_real> / std::pow(t_real(2), k);
+	return phasegate<t_mat, t_cplx, t_real>(phase);
 }
 
 
@@ -3767,9 +3781,32 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
+ * bloch vector
+ * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 24
+ */
+template<class t_vec, class t_mat>
+t_vec bloch_vector(const t_mat& state_density)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	//using t_val = typename t_mat::value_type;
+
+	const auto sigma = su2_matrices<std::vector<t_mat>>(false);
+	const std::size_t N = sigma.size();
+
+	t_vec bloch = create<t_vec>(N);
+	for(std::size_t i=0; i<N; ++i)
+		bloch[i] = trace<t_mat>(state_density * sigma[i]);
+
+	return bloch;
+}
+
+
+/**
  * Blume-Maleev equation
  * @returns scattering intensity and final polarisation vector
+ *
  * @see https://doi.org/10.1016/B978-044451050-1/50006-9 - pp. 225-226
+ * @see lecture notes by P. J. Brown, 2006
  */
 template<class t_vec, typename t_cplx = typename t_vec::value_type>
 std::tuple<t_cplx, t_vec> blume_maleev(const t_vec& P_i, const t_vec& Mperp, const t_cplx& N)

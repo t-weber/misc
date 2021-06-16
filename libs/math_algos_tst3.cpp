@@ -103,6 +103,17 @@ void qm_tests()
 	t_mat I4 = unit<t_mat>(4);
 
 	std::cout << "circuit total operator: " << circuit_total_op<t_mat>(Y, X, C1, I4, X, Y) << std::endl;
+
+
+	t_mat density1 = outer<t_mat, t_vec>(up, up);
+	t_mat density2 = outer<t_mat, t_vec>(down, down);
+	t_vec bloch1 = bloch_vector<t_vec, t_mat>(density1);
+	t_vec bloch2 = bloch_vector<t_vec, t_mat>(density2);
+	std::cout << "\nbloch vector for |up>: " << bloch1 << std::endl;
+	std::cout << "bloch vector for |down>: " << bloch2 << std::endl;
+
+
+	//t_mat phi = phasegate_discrete<t_mat>(1.);
 }
 
 
