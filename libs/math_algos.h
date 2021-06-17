@@ -3408,6 +3408,55 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 }
 
 
+template<class t_val>
+std::size_t count_equal_1_bits(t_val val1, t_val val2)
+{
+	std::size_t count = 0;
+
+	std::size_t N = sizeof(t_val);
+	for(std::size_t i=0; i<N; ++i)
+	{
+		if((val1 & (1<<i)) && (val2 & (1<<i)))
+			++count;
+	}
+
+	return count;
+}
+
+
+/**
+ * hadamard operator of size 2^n (direct calculation without outer product)
+ * @see (FUH 2021)
+ * @see https://en.wikipedia.org/wiki/Hadamard_transform
+ */
+template<class t_mat>
+t_mat hadamard(std::size_t n)
+requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
+{
+	using t_cplx = typename t_mat::value_type;
+	using t_real = typename t_cplx::value_type;
+
+	const t_real factor = std::pow(t_real(1)/std::sqrt(t_real(2)), t_real(n));
+
+	const std::size_t N = std::pow(2, n);
+	t_mat mat = create<t_mat>(N, N);
+
+	for(std::size_t i=0; i<N; ++i)
+	{
+		for(std::size_t j=0; j<N; ++j)
+		{
+			t_real sign = 1;
+			if(count_equal_1_bits(i, j) % 2 != 0)
+				sign = -1;
+
+			mat(i,j) = sign * factor;
+		}
+	}
+
+	return mat;
+}
+
+
 /**
  * phase gate
  * @see (FUH 2021), p. 12

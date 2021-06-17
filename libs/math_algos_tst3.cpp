@@ -38,6 +38,23 @@ static t_mat circuit_total_op(
 }
 
 
+template<class t_mat> requires is_mat<t_mat>
+static bool check_hadamard(std::size_t n)
+{
+	t_mat H = hadamard<t_mat>();
+	t_mat H1 = H;
+	for(std::size_t i=1; i<n; ++i)
+		H1 = outer<t_mat>(H1, H);
+
+	t_mat H2 = hadamard<t_mat>(n);
+
+	//operator<<(std::cout, H1) << std::endl;
+	//operator<<(std::cout, H2) << std::endl;
+
+	return equals<t_mat>(H1, H2, 1e-6);
+}
+
+
 template<class t_scalar, class t_vec, class t_mat>
 requires is_mat<t_mat> && is_vec<t_vec>
 void qm_tests()
@@ -131,6 +148,12 @@ int main()
 	using t_cplx = std::complex<t_real>;
 	using t_vec_cplx = vec<t_cplx, std::vector>;
 	using t_mat_cplx = mat<t_cplx, std::vector>;
+
+	std::cout << "Hadamard 2x2 ok: " << std::boolalpha << check_hadamard<t_mat_cplx>(1) << std::endl;
+	std::cout << "Hadamard 4x4 ok: " << std::boolalpha << check_hadamard<t_mat_cplx>(2) << std::endl;
+	std::cout << "Hadamard 8x8 ok: " << std::boolalpha << check_hadamard<t_mat_cplx>(3) << std::endl;
+	std::cout << "Hadamard 16x16 ok: " << std::boolalpha << check_hadamard<t_mat_cplx>(4) << std::endl;
+	std::cout << std::endl;
 
 	qm_tests<t_cplx, t_vec_cplx, t_mat_cplx>();
 	return 0;
