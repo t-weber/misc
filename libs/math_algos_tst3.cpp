@@ -134,9 +134,11 @@ void qm_tests()
 
 	t_mat U1 = cunitary<t_mat>(Y, 0);
 	t_mat U2 = cunitary<t_mat>(Y, 1);
+	t_mat U3 = cunitary<t_mat>(X, 1);
 	t_mat cunitary_flipped_op = circuit_total_op<t_mat>(H, H, U1, I4, I4, H, H);
 	std::cout << "\n" << cunitary_flipped_op << "\n" << U2 << std::endl;
-	std::cout << std::boolalpha << equals<t_mat>(cunitary_flipped_op, U2, 1e-6) << std::endl;
+	std::cout << std::boolalpha << equals<t_mat>(cunitary_flipped_op, U2, 1e-6) << ", ";
+	std::cout << std::boolalpha << equals<t_mat>(U3, C2, 1e-6) << std::endl;
 
 
 	// swap state

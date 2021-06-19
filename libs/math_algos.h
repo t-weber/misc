@@ -3386,7 +3386,6 @@ requires is_mat<t_mat>
 
 
 
-
 // ----------------------------------------------------------------------------
 // complex algos
 // ----------------------------------------------------------------------------
@@ -3458,6 +3457,23 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 
 
 /**
+ * hadamard trafo
+ * @see (FUH 2021)
+ * @see https://en.wikipedia.org/wiki/Hadamard_transform
+ */
+template<class t_mat>
+t_mat hadamard_trafo(const t_mat& M)
+requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
+{
+	std::size_t n = std::log2(M.size1());
+	t_mat H = hadamard<t_mat>(n);
+
+	// M_trafo = H^+ M H
+	return H * M * H;
+}
+
+
+/**
  * phase gate
  * @see (FUH 2021), p. 12
  * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
@@ -3502,6 +3518,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 	using t_cplx = typename t_mat::value_type;
 	constexpr t_cplx c(1, 0);
 
+	// C_not
 	static const t_mat mat = create<t_mat>({
 		{ c, 0, 0, 0 },
 		{ 0, c, 0, 0 },
@@ -3509,6 +3526,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 		{ 0, 0, c, 0 },
 	});
 
+	// transformed: (H x H)^+ C_not (H x H)
 	static const t_mat mat_flipped = create<t_mat>({
 		{ c, 0, 0, 0 },
 		{ 0, 0, 0, c },
@@ -3520,6 +3538,8 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 }
 
 
+//#define __CALC_C_UNITARY__
+
 /**
  * controlled unitary gate
  * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 27
@@ -3530,19 +3550,27 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 {
 	using t_cplx = typename t_mat::value_type;
 	using t_real = typename t_cplx::value_type;
-	constexpr t_real c = 1;
 
 	if(!flipped)
 	{
+		// C_unitary
+		constexpr t_real c1 = 1;
+
 		return create<t_mat>({
-			{ c,        0,        0,        0        },
-			{ 0,        c,        0,        0        },
+			{ c1,       0,        0,        0        },
+			{ 0,        c1,       0,        0        },
 			{ 0,        0,        U22(0,0), U22(1,0) },
 			{ 0,        0,        U22(0,1), U22(1,1) },
 		});
 	}
 	else
 	{
+		// transformed: (H x H)^+ C_unitary (H x H)
+#ifdef __CALC_C_UNITARY__
+		t_mat M_unflipped = cunitary<t_mat>(U22, false);
+		t_mat M = hadamard_trafo<t_mat>(M_unflipped);
+
+#else
 		constexpr t_real c2 = 2;
 
 		const t_cplx& a = U22(0,0);
@@ -3550,26 +3578,31 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 		const t_cplx& c = U22(1,0);
 		const t_cplx& d = U22(1,1);
 
-		// trafo: M = H^+ U H
 		t_mat M = create<t_mat>(4,4);
+
 		M(0,0) = c2+a+b+c+d;
 		M(0,1) = a-b+c-d;
 		M(0,2) = c2-a-b-c-d;
 		M(0,3) = -a+b-c+d;
+
 		M(1,0) = std::conj(M(0,1));
 		M(1,1) = c2+a-b-c+d;
 		M(1,2) = -a-b+c+d;
 		M(1,3) = c2-a+b+c-d;
+
 		M(2,0) = std::conj(M(0,2));
 		M(2,1) = std::conj(M(1,2));
 		M(2,2) = c2+a+b+c+d;
 		M(2,3) = a-b+c-d;
+
 		M(3,0) = std::conj(M(0,3));
 		M(3,1) = std::conj(M(1,3));
 		M(3,2) = std::conj(M(2,3));
 		M(3,3) = c2+a-b-c+d;
 
 		M /= t_real(4);
+#endif
+
 		return M;
 	}
 }
