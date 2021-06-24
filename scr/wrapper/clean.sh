@@ -4,8 +4,9 @@ rm -fv expr_parser_wrap.cxx
 rm -fv expr_parser.py
 rm -rfv __pycache__
 rm -vf *.so
+rm -fv SWIGTYPE_*
 
 rm -vf *.class
-rm -f ExprParserD.java
-rm -f expr_parser.java
-rm -f expr_parserJNI.java
+rm -fv ExprParserD.java
+rm -fv expr_parser.java
+rm -fv expr_parserJNI.java

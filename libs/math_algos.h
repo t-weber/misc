@@ -725,6 +725,23 @@ requires is_basic_vec<t_vec1> && is_basic_vec<t_vec2>
 
 
 /**
+ * sum components of a vector
+ */
+template<class t_vec>
+typename t_vec::value_type sum(const t_vec& vec)
+requires is_basic_vec<t_vec>
+{
+	using t_size = decltype(vec.size());
+	typename t_vec::value_type val(0);
+
+	for(t_size i=0; i<vec.size(); ++i)
+		val += vec[i];
+
+	return val;
+}
+
+
+/**
  * 2-norm
  */
 template<class t_vec>
@@ -3906,7 +3923,7 @@ requires is_basic_mat<t_mat>
 
 
 /**
- * polarisation density matrix
+ * bloch density operator (physically: polarisation density matrix if r = P, c = 0.5)
  *
  * eigenvector expansion of a state: |psi> = a_i |xi_i>
  * mean value of operator with mixed states:
@@ -3915,14 +3932,14 @@ requires is_basic_mat<t_mat>
  * <A> = tr( A * rho )
  * polarisation density matrix: rho = 0.5 * (1 + <P|sigma>)
  *
+ * @see (Bronstein08), Ch. 21 (Zusatzkapitel.pdf), pp. 11-12, p. 24
  * @see https://doi.org/10.1016/B978-044451050-1/50006-9
- * @see (Bronstein08), Ch. 21 (Zusatzkapitel.pdf), pp. 11-12
  */
 template<class t_vec, class t_mat>
-t_mat pol_density_mat(const t_vec& P, typename t_vec::value_type c=0.5)
+t_mat bloch_density_op(const t_vec& r, typename t_vec::value_type c=0.5)
 requires is_vec<t_vec> && is_mat<t_mat>
 {
-	return (unit<t_mat>(2,2) + proj_su2<t_vec, t_mat>(P, true)) * c;
+	return (unit<t_mat>(2,2) + proj_su2<t_vec, t_mat>(r, true)) * c;
 }
 
 
@@ -4026,7 +4043,7 @@ requires is_mat<t_mat> && is_vec<t_vec>
 	const auto sigma = su2_matrices<std::vector<t_mat>>(false);
 
 	// density matrix
-	const auto density = pol_density_mat<t_vec, t_mat>(P_i, c);
+	const auto density = bloch_density_op<t_vec, t_mat>(P_i, c);
 
 	// potential
 	const auto V_mag = proj_su2<t_vec, t_mat>(Mperp, true);

@@ -107,6 +107,17 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 
 
 /**
+ * vector * vector
+ */
+template<class t_vec>
+typename t_vec::value_type operator*(const t_vec& vec1, const t_vec& vec2)
+requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
+{
+	return inner<t_vec>(vec1, vec2);
+}
+
+
+/**
  * scalar * vector
  */
 template<class t_vec>
@@ -514,6 +525,7 @@ public:
 	friend const vec& operator+(const vec& vec1) { return m_ops::operator+(vec1); }
 	friend vec operator-(const vec& vec1) { return m_ops::operator-(vec1); }
 
+	friend value_type operator*(const vec& vec1, const vec& vec2) { return m_ops::operator*<vec>(vec1, vec2); }
 	friend vec operator*(value_type d, const vec& vec1) { return m_ops::operator*(d, vec1); }
 	friend vec operator*(const vec& vec1, value_type d) { return m_ops::operator*(vec1, d); }
 	friend vec operator/(const vec& vec1, value_type d) { return m_ops::operator/(vec1, d); }
