@@ -1,0 +1,44 @@
+#!/usr/bin/gnuplot -p
+#
+# plot grover steps
+# @author Tobias Weber (orcid: 0000-0002-7230-1932)
+# @date jun-2021
+# @license see 'LICENSE.GPL' file
+#
+
+data_file = "grover.dat"
+
+stats data_file
+num_grover_steps = STATS_records
+num_indices = STATS_columns
+
+msg = sprintf(\
+	"Number of grover steps: %d\nNumber of indices: %d\nNumber of qubits: %d",\
+	num_grover_steps, num_indices, log(num_indices)/log(2))
+print(msg)
+
+set xlabel "Index"
+set ylabel "Grover Step"
+
+set xtics 2
+set ytics 2
+set ztics 0.5
+set cbtics 0.2
+
+set mxtics 2
+set mytics 2
+set mztics 5
+set mcbtics 2
+
+set xrange [0 : num_indices-1]
+set yrange [0 : num_grover_steps-1]
+set zrange [0 : 1]
+set cbrange [0 : 1]
+
+unset key
+set ticslevel 0
+
+set pm3d explicit at s nohidden3d #map
+set dgrid3d num_grover_steps, num_indices*2, 2
+
+splot data_file matrix with pm3d

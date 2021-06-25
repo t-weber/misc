@@ -1124,6 +1124,9 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * matrix to mirror on plane perpendicular to vector: P = 1 - 2*|v><v|
  * subtracts twice its projection onto the plane normal from the vector
  * @see (Arens15), p. 710
+ *
+ * this operation is used for the grover iterations
+ * @see (FUH 2021), p. 26f.
  */
 template<class t_mat, class t_vec>
 t_mat ortho_mirror_op(const t_vec& vec, bool is_normalised = true)

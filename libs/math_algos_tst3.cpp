@@ -1,6 +1,6 @@
 /**
  * tests the container-agnostic math algorithms
- * @author Tobias Weber
+ * @author Tobias Weber (orcid: 0000-0002-7230-1932)
  * @date jun-2021
  * @license: see 'LICENSE.EUPL' file
  *
@@ -9,6 +9,7 @@
 
 #include <vector>
 #include <iostream>
+#include <fstream>
 
 #include "math_algos.h"
 #include "math_conts.h"
@@ -53,6 +54,76 @@ static bool check_hadamard(std::size_t n)
 	//operator<<(std::cout, H2) << std::endl;
 
 	return equals<t_mat>(H1, H2, 1e-6);
+}
+
+
+template<class t_vec> requires is_vec<t_vec>
+void write_state(std::ostream& ostr, const t_vec& state)
+{
+	using t_cplx = typename t_vec::value_type;
+	using t_real = typename t_cplx::value_type;
+
+	for(std::size_t i=0; i<state.size(); ++i)
+	{
+		t_real n = std::norm(state[i]);
+		ostr << std::left << std::setw(16) << n << " ";
+	}
+
+	ostr << std::endl;
+}
+
+
+/**
+ * grover search algorithm
+ * @see https://en.wikipedia.org/wiki/Grover%27s_algorithm
+ * @see "Effiziente Algorithmen" (2021), Kurs 1684, Fernuni Hagen (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/01684), pp. 26-31.
+ */
+template<class t_mat, class t_vec>
+requires is_mat<t_mat> && is_vec<t_vec>
+static bool check_grover(std::size_t n, std::size_t num_steps, std::size_t idx_to_find)
+{
+	using t_val = typename t_vec::value_type;
+
+	t_mat H = hadamard<t_mat>(n);
+
+	t_vec down = create<t_vec>({ 1, 0 });
+	t_vec state = down;
+
+	for(std::size_t i=0; i<n-1; ++i)
+		state = outer_flat<t_vec, t_mat>(state, down);
+
+	state = H * state;
+	std::cout << "state: " << state << std::endl;
+
+	t_mat mirror = -ortho_mirror_op<t_mat, t_vec>(state, true);
+	//std::cout << mirror << std::endl;
+
+	t_vec oracle_vec = m::zero<t_vec>(state.size());
+	oracle_vec[idx_to_find] = 1;	// index to find
+	t_mat mirror_oracle = ortho_mirror_op<t_mat, t_vec>(oracle_vec, true);
+	//std::cout << mirror_oracle << std::endl;
+
+
+	std::ofstream ofstr("grover.dat");
+
+	for(std::size_t step=0; step<num_steps; ++step)
+	{
+		state = mirror_oracle * state;
+		std::cout << "\nmirror sign: " << state << std::endl;
+
+		state = mirror * state;
+		std::cout << "mirror at mean: " << state << std::endl;
+
+		write_state(ofstr, state);
+	}
+
+
+	// check if the correct index has been recovered
+	auto iter_max = std::max_element(state.begin(), state.end(),
+		[](const t_val& val1, const t_val& val2) -> bool
+			{ return std::norm(val1) < std::norm(val2); });
+
+	return (iter_max - state.begin()) == std::ptrdiff_t(idx_to_find);
 }
 
 
@@ -232,6 +303,9 @@ void qm_tests()
 
 
 	//t_mat phi = phasegate_discrete<t_mat>(1.);
+
+
+	std::cout << "\n" << std::boolalpha << check_grover<t_mat, t_vec>(4, 8, 5) << std::endl;
 }
 
 
