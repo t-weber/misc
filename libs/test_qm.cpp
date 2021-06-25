@@ -4,7 +4,7 @@
  * @date jun-2021
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -std=c++20 -Wall -Wextra -Weffc++ -o math_algos_tst3 math_algos_tst3.cpp
+ * g++ -std=c++20 -Wall -Wextra -Weffc++ -o test_qm test_qm.cpp
  */
 
 #include <vector>
