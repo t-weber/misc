@@ -304,6 +304,7 @@ Image<t_pixel> trace_boundary(const Image<t_pixel>& img)
 			return false;
 		};
 
+
 		while(1)
 		{
 			has_next_dir = false;
@@ -341,7 +342,9 @@ Image<t_pixel> trace_boundary(const Image<t_pixel>& img)
 				break;
 		}
 
-		//break;
+
+		if(!has_next_dir)
+			break;
 	}
 
 	return boundary;
