@@ -195,6 +195,30 @@ requires is_mat<t_mat>
 
 
 /**
+ * are two quaternions equal within an epsilon range?
+ */
+template<class t_quat>
+bool equals(const t_quat& quat1, const t_quat& quat2,
+	typename t_quat::value_type eps = std::numeric_limits<typename t_quat::value_type>::epsilon())
+requires is_basic_quat<t_quat>
+{
+	using T = typename t_quat::value_type;
+
+	// check each element
+	if(!equals<T>(quat1.real(), quat2.real(), eps))
+		return false;
+	if(!equals<T>(quat1.imag1(), quat2.imag1(), eps))
+		return false;
+	if(!equals<T>(quat1.imag2(), quat2.imag2(), eps))
+		return false;
+	if(!equals<T>(quat1.imag3(), quat2.imag3(), eps))
+		return false;
+
+	return true;
+}
+
+
+/**
  * create a vector with given size if it is dynamic
  */
 template<class t_vec>
@@ -417,6 +441,18 @@ requires is_basic_vec<t_vec>
 
 
 /**
+ * zero quaternion
+ */
+template<class t_quat>
+const t_quat& zero()
+requires is_basic_quat<t_quat>
+{
+	static const t_quat quat(0, 0, 0, 0);
+	return quat;
+}
+
+
+/**
  * tests for zero vector
  */
 template<class t_vec>
@@ -437,6 +473,18 @@ bool equals_0(const t_mat& mat,
 requires is_mat<t_mat>
 {
 	return equals<t_mat>(mat, zero<t_mat>(mat.size1(), mat.size2()), eps);
+}
+
+
+/**
+ * tests for zero quaternion
+ */
+template<class t_quat>
+bool equals_0(const t_quat& quat,
+	typename t_quat::value_type eps = std::numeric_limits<typename t_quat::value_type>::epsilon())
+requires is_basic_quat<t_quat>
+{
+	return equals<t_quat>(quat, zero<t_quat>(), eps);
 }
 
 
@@ -4185,6 +4233,86 @@ requires is_quat<t_quat>
 	t_val n = norm_sq<t_quat>(quat);
 
 	return quat_c / n;
+}
+
+
+/**
+ * quaternion exponential
+ * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ */
+template<class t_quat, class t_vec>
+t_quat exp(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	using t_val = typename t_quat::value_type;
+
+	t_val r = quat.real();
+	t_vec v = quat.template imag<t_vec>();
+	t_val n = norm<t_vec>(v);
+
+	t_val exp_r = std::exp(r);
+	t_val ret_r = exp_r * std::cos(n);
+	t_vec ret_v = exp_r * v/n*std::sin(n);
+
+	return t_quat{ret_r, ret_v[0], ret_v[1], ret_v[2]};
+}
+
+
+/**
+ * quaternion logarithm
+ * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ */
+template<class t_quat, class t_vec>
+t_quat log(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	using t_val = typename t_quat::value_type;
+
+	t_val r = quat.real();
+	t_vec v = quat.template imag<t_vec>();
+	t_val n_v = norm<t_vec>(v);
+	t_val n_q = norm<t_quat>(quat);
+
+	t_val ret_r = std::log(n_q);
+	t_vec ret_v = v/n_v*std::acos(r/n_q);
+
+	return t_quat{ret_r, ret_v[0], ret_v[1], ret_v[2]};
+}
+
+
+/**
+ * unit quaternion from rotation axis and angle
+ * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ */
+template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
+t_quat quat_from_rotaxis(const t_vec& vec, t_real angle)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	t_vec vec_norm = vec / norm<t_vec>(vec);
+
+	t_real ret_r = std::cos(angle);
+	t_vec ret_v = std::sin(angle) * vec_norm;
+
+	return t_quat{ret_r, ret_v[0], ret_v[1], ret_v[2]};
+}
+
+
+/**
+ * rotation normalised axis and angle from unit quaternion
+ * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ */
+template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
+std::tuple<t_vec, t_real> quat_to_rotaxis(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	t_real r = quat.real();
+	t_vec v = quat.template imag<t_vec>();
+	t_real n_q = norm<t_quat>(quat);
+
+	t_real angle = std::acos(r/n_q);
+	t_vec vec = v / (n_q * std::sin(angle));
+
+	return std::make_tuple(vec, angle);
 }
 
 // ----------------------------------------------------------------------------

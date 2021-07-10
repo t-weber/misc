@@ -79,6 +79,7 @@ concept /*bool*/ is_basic_quat = requires(T a, typename T::value_type scalar)
 	a.imag1();
 	a.imag2();
 	a.imag3();
+	//a.imag();
 
 	a.real(scalar);
 	a.imag1(scalar);

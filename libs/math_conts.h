@@ -800,10 +800,25 @@ public:
 	value_type imag2() const { return m_data[2]; }
 	value_type imag3() const { return m_data[3]; }
 
+	template<class t_vec> requires is_vec<t_vec>
+	t_vec imag() const
+	{
+		return create<t_vec>({ imag1(), imag2(), imag3() });
+	}
+
 	void real(value_type val) { m_data[0] = val; }
 	void imag1(value_type val) { m_data[1] = val; }
 	void imag2(value_type val) { m_data[2] = val; }
 	void imag3(value_type val) { m_data[3] = val; }
+
+	template<class t_vec> requires is_vec<t_vec>
+	void imag(const t_vec& vec)
+	{
+		imag1(vec[0]);
+		imag2(vec[1]);
+		imag3(vec[2]);
+	}
+
 
 	friend quat operator+(const quat& quat1, const quat& quat2) { return m_ops::operator+(quat1, quat2); }
 	friend quat operator-(const quat& quat1, const quat& quat2) { return m_ops::operator-(quat1, quat2); }
