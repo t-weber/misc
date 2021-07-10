@@ -11,6 +11,7 @@
 #include <boost/algorithm/string.hpp>
 #include <cassert>
 #include <vector>
+#include <array>
 #include <iostream>
 #include <iomanip>
 #include "math_concepts.h"
@@ -186,7 +187,6 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 }
 
 
-
 /**
  * operator <<
  */
@@ -324,6 +324,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 	return mat;
 }
 
+
 /**
  * scalar * matrix
  */
@@ -333,6 +334,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
 	return mat * d;
 }
+
 
 /**
  * matrix / scalar
@@ -458,6 +460,192 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 
 // ----------------------------------------------------------------------------
+// quaternion operators
+// @see https://en.wikipedia.org/wiki/Quaternion
+// @see https://www.boost.org/doc/libs/1_76_0/libs/math/doc/quaternion/TQE.pdf
+// ----------------------------------------------------------------------------
+
+/**
+ * unary +
+ */
+template<class t_quat>
+const t_quat& operator+(const t_quat& quat)
+requires m::is_basic_quat<t_quat>
+{
+	return quat;
+}
+
+
+/**
+ * unary -
+ */
+template<class t_quat>
+t_quat operator-(const t_quat& quat)
+requires m::is_basic_quat<t_quat>
+{
+	return t_quat
+	{
+		-quat.real(),
+		-quat.imag1(),
+		-quat.imag2(),
+		-quat.imag3()
+	};
+}
+
+
+/**
+ * binary +
+ * @see https://en.wikipedia.org/wiki/Quaternion#Scalar_and_vector_parts
+ */
+template<class t_quat>
+t_quat operator+(const t_quat& quat1, const t_quat& quat2)
+requires m::is_basic_quat<t_quat>
+{
+	return t_quat
+	{
+		quat1.real() + quat2.real(),
+		quat1.imag1() + quat2.imag1(),
+		quat1.imag2() + quat2.imag2(),
+		quat1.imag3() + quat2.imag3(),
+	};
+}
+
+
+/**
+ * binary -
+ */
+template<class t_quat>
+t_quat operator-(const t_quat& quat1, const t_quat& quat2)
+requires m::is_basic_quat<t_quat>
+{
+	return t_quat
+	{
+		quat1.real() - quat2.real(),
+		quat1.imag1() - quat2.imag1(),
+		quat1.imag2() - quat2.imag2(),
+		quat1.imag3() - quat2.imag3(),
+	};
+}
+
+
+/**
+ * quat * scalar
+ */
+template<class t_quat>
+t_quat operator*(const t_quat& quat, typename t_quat::value_type scalar)
+requires m::is_basic_quat<t_quat>
+{
+	return t_quat
+	{
+		quat.real() * scalar,
+		quat.imag1() * scalar,
+		quat.imag2() * scalar,
+		quat.imag3() * scalar,
+	};
+}
+
+
+/**
+ * scalar * quat
+ */
+template<class t_quat>
+t_quat operator*(typename t_quat::value_type scalar, const t_quat& quat)
+requires m::is_basic_quat<t_quat>
+{
+	return quat * scalar;
+}
+
+
+/**
+ * quat / scalar
+ */
+template<class t_quat>
+t_quat operator/(const t_quat& quat, typename t_quat::value_type scalar)
+requires m::is_basic_quat<t_quat>
+{
+	using T = typename t_quat::value_type;
+	return quat * (T(1)/scalar);
+}
+
+
+/**
+ * quat * quat
+ * @see https://en.wikipedia.org/wiki/Quaternion#Scalar_and_vector_parts
+ */
+template<class t_quat>
+t_quat operator*(const t_quat& quat1, const t_quat& quat2)
+requires m::is_basic_quat<t_quat>
+{
+	return m::mult<t_quat>(quat1, quat2);
+}
+
+
+/**
+ * quat += quat
+ */
+template<class t_quat>
+t_quat& operator+=(t_quat& quat1, const t_quat& quat2)
+requires m::is_basic_quat<t_quat>
+{
+	quat1 = quat1 + quat2;
+	return quat1;
+}
+
+/**
+ * quat -= quat
+ */
+template<class t_quat>
+t_quat& operator-=(t_quat& quat1, const t_quat& quat2)
+requires m::is_basic_quat<t_quat>
+{
+	quat1 = quat1 - quat2;
+	return quat1;
+}
+
+
+/**
+ * quat *= scalar
+ */
+template<class t_quat>
+t_quat& operator*=(t_quat& quat, typename t_quat::value_type scalar)
+requires m::is_basic_quat<t_quat>
+{
+	quat = quat * scalar;
+	return quat;
+}
+
+/**
+ * quat /= scalar
+ */
+template<class t_quat>
+t_quat& operator/=(t_quat& quat, typename t_quat::value_type scalar)
+requires m::is_basic_quat<t_quat>
+{
+	quat = quat / scalar;
+	return quat;
+}
+
+
+/**
+ * operator <<
+ */
+template<class t_quat>
+std::ostream& operator<<(std::ostream& ostr, const t_quat& quat)
+requires m::is_basic_quat<t_quat>
+{
+	ostr << quat.real() << " + ";
+	ostr << quat.imag1() << "i" << " + ";
+	ostr << quat.imag2() << "j" << " + ";
+	ostr << quat.imag3() << "k";
+
+	return ostr;
+}
+
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
 // mixed operators
 // ----------------------------------------------------------------------------
 
@@ -499,11 +687,12 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 // maths
 namespace m {
 
-// ----------------------------------------------------------------------------
-// vector and matrix containers
-// ----------------------------------------------------------------------------
-
-template<class T=double, template<class...> class t_cont = std::vector>
+/**
+ * ----------------------------------------------------------------------------
+ * vector container
+ * ----------------------------------------------------------------------------
+ */
+template<class T = double, template<class...> class t_cont = std::vector>
 requires is_basic_vec<t_cont<T>> && is_dyn_vec<t_cont<T>>
 class vec : public t_cont<T>
 {
@@ -522,7 +711,7 @@ public:
 
 	friend vec operator+(const vec& vec1, const vec& vec2) { return m_ops::operator+(vec1, vec2); }
 	friend vec operator-(const vec& vec1, const vec& vec2) { return m_ops::operator-(vec1, vec2); }
-	friend const vec& operator+(const vec& vec1) { return m_ops::operator+(vec1); }
+	friend const vec& operator+(const vec& vec1) { return vec1; }
 	friend vec operator-(const vec& vec1) { return m_ops::operator-(vec1); }
 
 	friend value_type operator*(const vec& vec1, const vec& vec2) { return m_ops::operator*<vec>(vec1, vec2); }
@@ -540,7 +729,12 @@ private:
 };
 
 
-template<class T=double, template<class...> class t_cont = std::vector>
+/**
+ * ----------------------------------------------------------------------------
+ * matrix container
+ * ----------------------------------------------------------------------------
+ */
+template<class T = double, template<class...> class t_cont = std::vector>
 requires is_basic_vec<t_cont<T>> && is_dyn_vec<t_cont<T>>
 class mat
 {
@@ -559,7 +753,7 @@ public:
 
 	friend mat operator+(const mat& mat1, const mat& mat2) { return m_ops::operator+(mat1, mat2); }
 	friend mat operator-(const mat& mat1, const mat& mat2) { return m_ops::operator-(mat1, mat2); }
-	friend const mat& operator+(const mat& mat1) { return m_ops::operator+(mat1); }
+	friend const mat& operator+(const mat& mat1) { return mat1; }
 	friend mat operator-(const mat& mat1) { return m_ops::operator-(mat1); }
 
 	friend mat operator*(const mat& mat1, const mat& mat2) { return m_ops::operator*(mat1, mat2); }
@@ -581,6 +775,55 @@ private:
 	std::size_t m_rowsize{}, m_colsize{};
 };
 
+
+/**
+ * ----------------------------------------------------------------------------
+ * quaternion container
+ * @see https://en.wikipedia.org/wiki/Quaternion
+ * @see https://www.boost.org/doc/libs/1_76_0/libs/math/doc/quaternion/TQE.pdf
+ * ----------------------------------------------------------------------------
+ */
+template<class T = double, template<class, std::size_t> class t_cont = std::array>
+requires is_basic_vec<t_cont<T, 4>>
+class quat
+{
+public:
+	using value_type = T;
+	using container_type = t_cont<T, 4>;
+
+	quat(value_type r=0, value_type i1=0, value_type i2=0, value_type i3=0)
+		: m_data{{r, i1, i2, i3}} {}
+	~quat() = default;
+
+	value_type real() const { return m_data[0]; }
+	value_type imag1() const { return m_data[1]; }
+	value_type imag2() const { return m_data[2]; }
+	value_type imag3() const { return m_data[3]; }
+
+	void real(value_type val) { m_data[0] = val; }
+	void imag1(value_type val) { m_data[1] = val; }
+	void imag2(value_type val) { m_data[2] = val; }
+	void imag3(value_type val) { m_data[3] = val; }
+
+	friend quat operator+(const quat& quat1, const quat& quat2) { return m_ops::operator+(quat1, quat2); }
+	friend quat operator-(const quat& quat1, const quat& quat2) { return m_ops::operator-(quat1, quat2); }
+	friend const quat& operator+(const quat& quat) { return quat; }
+	friend quat operator-(const quat& quat) { return m_ops::operator-(quat); }
+
+	friend quat operator*(const quat& quat1, const quat& quat2) { return m_ops::operator*<quat>(quat1, quat2); }
+	friend quat operator*(value_type d, const quat& quat) { return m_ops::operator*(d, quat); }
+	friend quat operator*(const quat& quat, value_type d) { return m_ops::operator*(quat, d); }
+	friend quat operator/(const quat& quat, value_type d) { return m_ops::operator/(quat, d); }
+
+	quat& operator*=(const quat& quat2) { return m_ops::operator*=(*this, quat2); }
+	quat& operator+=(const quat& quat2) { return m_ops::operator+=(*this, quat2); }
+	quat& operator-=(const quat& quat2) { return m_ops::operator-=(*this, quat2); }
+	quat& operator*=(value_type d) { return m_ops::operator*=(*this, d); }
+	quat& operator/=(value_type d) { return m_ops::operator/=(*this, d); }
+
+private:
+	container_type m_data{};
+};
 // ----------------------------------------------------------------------------
 
 }

@@ -84,24 +84,23 @@ static bool check_grover(std::size_t n, std::size_t num_steps, std::size_t idx_t
 {
 	using t_val = typename t_vec::value_type;
 
-	t_mat H = hadamard<t_mat>(n);
-
 	t_vec down = create<t_vec>({ 1, 0 });
 	t_vec state = down;
 
 	for(std::size_t i=0; i<n-1; ++i)
 		state = outer_flat<t_vec, t_mat>(state, down);
 
+	t_mat H = hadamard<t_mat>(n);
 	state = H * state;
 	std::cout << "state: " << state << std::endl;
 
 	t_mat mirror = -ortho_mirror_op<t_mat, t_vec>(state, true);
-	//std::cout << mirror << std::endl;
+	//std::cout << "mirror = " << mirror << std::endl;
 
 	t_vec oracle_vec = m::zero<t_vec>(state.size());
 	oracle_vec[idx_to_find] = 1;	// index to find
 	t_mat mirror_oracle = ortho_mirror_op<t_mat, t_vec>(oracle_vec, true);
-	//std::cout << mirror_oracle << std::endl;
+	//std::cout << "mirror_oracle = " << mirror_oracle << std::endl;
 
 
 	std::ofstream ofstr("grover.dat");

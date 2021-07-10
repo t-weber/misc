@@ -873,6 +873,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 // ----------------------------------------------------------------------------
 // with metric
+// ----------------------------------------------------------------------------
 
 /**
  * covariant metric tensor, g_{i,j} = e_i * e_j
@@ -3868,7 +3869,6 @@ requires is_basic_vec<t_vec>
 	return F;
 }
 
-
 // ----------------------------------------------------------------------------
 
 
@@ -3877,7 +3877,6 @@ requires is_basic_vec<t_vec>
 // ----------------------------------------------------------------------------
 // polarisation
 // ----------------------------------------------------------------------------
-
 
 /**
  * conjugate complex vector
@@ -4069,7 +4068,126 @@ requires is_mat<t_mat> && is_vec<t_vec>
 	return std::make_tuple(I, P_f/I);
 }
 
+// ----------------------------------------------------------------------------
+
+
+
 
 // ----------------------------------------------------------------------------
+// quaternion algorithms
+// ----------------------------------------------------------------------------
+
+/**
+ * quat * quat
+ * @see https://en.wikipedia.org/wiki/Quaternion#Scalar_and_vector_parts
+ */
+template<class t_quat>
+t_quat mult(const t_quat& quat1, const t_quat& quat2)
+requires m::is_quat<t_quat>
+{
+	using T = typename t_quat::value_type;
+
+	T r1 = quat1.real();
+	T i1 = quat1.imag1();
+	T j1 = quat1.imag2();
+	T k1 = quat1.imag3();
+
+	T r2 = quat2.real();
+	T i2 = quat2.imag1();
+	T j2 = quat2.imag2();
+	T k2 = quat2.imag3();
+
+	return t_quat
+	{
+		r1*r2 - (i1*i2 + j1*j2 + k1*k2),
+		r1*i2 + r2*i1 + j1*k2 - k1*j2,
+		r1*j2 + r2*j1 + k1*i2 - i1*k2,
+		r1*k2 + r2*k1 + i1*j2 - j1*i2
+	};
+}
+
+
+/**
+ * conjugate quaternion
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ */
+template<class t_quat>
+t_quat conj(const t_quat& quat)
+requires m::is_quat<t_quat>
+{
+	return t_quat
+	{
+		quat.real(),
+		-quat.imag1(),
+		-quat.imag2(),
+		-quat.imag3()
+	};
+}
+
+
+/**
+ * squared quaternion norm
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ */
+template<class t_quat>
+typename t_quat::value_type norm_sq(const t_quat& quat)
+requires m::is_quat<t_quat>
+{
+	using t_val = typename t_quat::value_type;
+
+	t_val r = quat.real();
+	t_val i = quat.imag1();
+	t_val j = quat.imag2();
+	t_val k = quat.imag3();
+
+	return r*r + i*i + j*j + k*k;
+}
+
+
+/**
+ * quaternion norm
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ */
+template<class t_quat>
+typename t_quat::value_type norm(const t_quat& quat)
+requires m::is_quat<t_quat>
+{
+	return std::sqrt(norm_sq<t_quat>(quat));
+}
+
+
+/**
+ * unit quaternion
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ */
+template<class t_quat>
+t_quat normalise(const t_quat& quat)
+requires m::is_quat<t_quat>
+{
+	using t_val = typename t_quat::value_type;
+
+	t_val n = norm<t_quat>(quat);
+	return quat / n;
+}
+
+
+/**
+ * inverted quaternion
+ * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ */
+template<class t_quat>
+t_quat inv(const t_quat& quat)
+requires is_quat<t_quat>
+{
+	using t_val = typename t_quat::value_type;
+
+	t_quat quat_c = conj<t_quat>(quat);
+	t_val n = norm_sq<t_quat>(quat);
+
+	return quat_c / n;
+}
+
+// ----------------------------------------------------------------------------
+
 }
 #endif

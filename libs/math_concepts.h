@@ -40,6 +40,7 @@ concept /*bool*/ is_basic_vec = requires(const T& a)
 	a.operator[](1);		// must have an operator[]
 };
 
+
 /**
  * requirements of a vector type with a dynamic size
  */
@@ -49,18 +50,56 @@ concept /*bool*/ is_dyn_vec = requires(const T& a)
 	T(3); T{3};					// constructor with size
 };
 
+
 /**
  * requirements for a vector container
  */
 template<class T>
 concept /*bool*/ is_vec = requires(const T& a)
 {
-	a+a;						// operator+
-	a-a;						// operator-
-	a[0]*a;						// operator*
-	a*a[0];
-	a/a[0];						// operator/
+	a + a;						// operator+
+	a - a;						// operator-
+	a[0] * a;					// operator*
+	a * a[0];
+	a / a[0];					// operator/
 } && is_basic_vec<T>;
+
+
+/**
+ * requirements for a basic quaternion container
+ */
+template<class T>
+concept /*bool*/ is_basic_quat = requires(T a, typename T::value_type scalar)
+{
+	typename T::value_type;		// must have a value_type
+
+	T(scalar, scalar, scalar, scalar);
+
+	a.real();
+	a.imag1();
+	a.imag2();
+	a.imag3();
+
+	a.real(scalar);
+	a.imag1(scalar);
+	a.imag2(scalar);
+	a.imag3(scalar);
+};
+
+
+/**
+ * requirements for a quaternion container with operators
+ */
+template<class T>
+concept /*bool*/ is_quat = requires(T a, typename T::value_type scalar)
+{
+	a + a;						// operator+
+	a - a;						// operator-
+	a * a;						// operator-
+	scalar * a;					// operator*
+	a * scalar;
+	a / scalar;					// operator/
+} && is_basic_quat<T>;
 
 
 /**
@@ -76,6 +115,7 @@ concept /*bool*/ is_basic_mat = requires(const T& a)
 	a.operator()(1,1);		// must have an operator()
 };
 
+
 /**
  * requirements of a matrix type with a dynamic size
  */
@@ -85,20 +125,19 @@ concept /*bool*/ is_dyn_mat = requires(const T& a)
 	T(3,3);	T{3,3};					// constructor with sizes
 };
 
+
 /**
  * requirements for a matrix container
  */
 template<class T>
 concept /*bool*/ is_mat = requires(const T& a)
 {
-	a+a;						// operator+
-	a-a;						// operator-
-	a(0,0)*a;					// operator*
-	a*a(0,0);
-	a/a(0,0);					// operator/
+	a + a;						// operator+
+	a - a;						// operator-
+	a(0,0) * a;					// operator*
+	a * a(0,0);
+	a / a(0,0);					// operator/
 } && is_basic_mat<T>;
-
-
 
 
 /**
@@ -113,10 +152,10 @@ concept /*bool*/ is_complex = requires(const T& a)
 	a.real();			// must have a real() member function
 	a.imag();			// must have an imag() member function
 
-	a+a;
-	a-a;
-	a*a;
-	a/a;
+	a + a;
+	a - a;
+	a * a;
+	a / a;
 };
 
 
