@@ -22,25 +22,49 @@ void quat_tests()
 	t_quat q1_inv = inv(q1);
 	t_quat q1_norm = normalise(q1);
 
+	std::cout << "q1 = ";
 	m_ops::operator<<(std::cout, q1) << std::endl;
+	std::cout << "v1 = ";
 	m_ops::operator<<(std::cout, vec1) << std::endl;
+	std::cout << "q1_inv = ";
 	m_ops::operator<<(std::cout, q1_inv) << std::endl;
+	std::cout << "q1_norm = ";
 	m_ops::operator<<(std::cout, q1_norm) << std::endl;
+	std::cout << "q1/q1 = ";
 	m_ops::operator<<(std::cout, q1 / q1) << std::endl;
+	std::cout << "log(exp(q1)) = ";
 	m_ops::operator<<(std::cout, m::log<t_quat, t_vec>((m::exp<t_quat, t_vec>(q1_norm)))) << std::endl;
+	std::cout << "exp(q1)*exp(-q1) = ";
+	m_ops::operator<<(std::cout, m::exp<t_quat, t_vec>(q1) * m::exp<t_quat, t_vec>(-q1)) << std::endl;
+	std::cout << "q1*q1_inv = ";
 	m_ops::operator<<(std::cout, q1*q1_inv) << std::endl;
+	std::cout << "q1_inv*q1 = ";
 	m_ops::operator<<(std::cout, q1_inv*q1) << std::endl;
+	std::cout << "q1 == 0: ";
 	std::cout << std::boolalpha << m::equals_0<t_quat>(q1) << std::endl;
 
 	t_quat q2 = m::from_rotaxis<t_quat, t_vec>(m::create<t_vec>({1, 2, 1}), 0.123);
+	std::cout << "q2 = ";
+	m_ops::operator<<(std::cout, q2) << std::endl;
 	auto [axis2, angle2] = m::to_rotaxis<t_quat, t_vec>(q2);
+	std::cout << "rotation axis: ";
 	m_ops::operator<<(std::cout, axis2) << ", angle: " << angle2 << std::endl;
 
 	t_mat_cplx mat1_su2 = m::to_su2<t_quat, t_vec, t_mat_cplx>(q1_norm);
+	std::cout << "su2: ";
 	m_ops::operator<<(std::cout, mat1_su2) << std::endl;
 
 	t_mat mat2_so3 = m::to_so3<t_quat, t_vec, t_mat>(q2);
+	std::cout << "so3: ";
 	m_ops::operator<<(std::cout, mat2_so3) << std::endl;
+
+	for(t_scalar t=0.; t<=1; t+=0.25)
+	{
+		t_quat qs = slerp<t_quat, t_vec>(q1_norm, q2, t);
+
+		std::cout << "slerp(q1, q2, " << t << ") = ";
+		m_ops::operator<<(std::cout, qs) << std::endl;
+	}
 }
 
 

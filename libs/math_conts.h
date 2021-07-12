@@ -532,46 +532,6 @@ requires m::is_basic_quat<t_quat>
 
 
 /**
- * quat * scalar
- */
-template<class t_quat>
-t_quat operator*(const t_quat& quat, typename t_quat::value_type scalar)
-requires m::is_basic_quat<t_quat>
-{
-	return t_quat
-	{
-		quat.real() * scalar,
-		quat.imag1() * scalar,
-		quat.imag2() * scalar,
-		quat.imag3() * scalar,
-	};
-}
-
-
-/**
- * scalar * quat
- */
-template<class t_quat>
-t_quat operator*(typename t_quat::value_type scalar, const t_quat& quat)
-requires m::is_basic_quat<t_quat>
-{
-	return quat * scalar;
-}
-
-
-/**
- * quat / scalar
- */
-template<class t_quat>
-t_quat operator/(const t_quat& quat, typename t_quat::value_type scalar)
-requires m::is_basic_quat<t_quat>
-{
-	using T = typename t_quat::value_type;
-	return quat * (T(1)/scalar);
-}
-
-
-/**
  * quat * quat
  * @see https://en.wikipedia.org/wiki/Quaternion#Scalar_and_vector_parts
  */
@@ -592,6 +552,40 @@ t_quat operator/(const t_quat& quat1, const t_quat& quat2)
 requires m::is_basic_quat<t_quat>
 {
 	return m::div<t_quat>(quat1, quat2);
+}
+
+
+/**
+ * quat * scalar
+ */
+template<class t_quat>
+t_quat operator*(const t_quat& quat, typename t_quat::value_type scalar)
+requires m::is_basic_quat<t_quat>
+{
+	return quat * t_quat{ scalar, 0, 0, 0 };
+}
+
+
+/**
+ * scalar * quat
+ */
+template<class t_quat>
+t_quat operator*(typename t_quat::value_type scalar, const t_quat& quat)
+requires m::is_basic_quat<t_quat>
+{
+	return t_quat{ scalar, 0, 0, 0 } * quat;
+}
+
+
+/**
+ * quat / scalar
+ */
+template<class t_quat>
+t_quat operator/(const t_quat& quat, typename t_quat::value_type scalar)
+requires m::is_basic_quat<t_quat>
+{
+	using T = typename t_quat::value_type;
+	return quat * (T(1)/scalar);
 }
 
 

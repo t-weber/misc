@@ -4252,11 +4252,15 @@ requires m::is_quat<t_quat>
 /**
  * quaternion exponential
  * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ * @see (Bronstein08), chapter 4, equation (4.170)
  */
 template<class t_quat, class t_vec>
 t_quat exp(const t_quat& quat)
 requires is_quat<t_quat> && is_vec<t_vec>
 {
+	if(equals_0<t_quat>(quat))
+		return t_quat{1, 0, 0, 0};
+
 	using t_val = typename t_quat::value_type;
 
 	t_val r = quat.real();
@@ -4290,6 +4294,19 @@ requires is_quat<t_quat> && is_vec<t_vec>
 	t_vec ret_v = v/n_v*std::acos(r/n_q);
 
 	return t_quat{ret_r, ret_v[0], ret_v[1], ret_v[2]};
+}
+
+
+/**
+ * quaternion power
+ * @see (Bronstein08), chapter 4, equation (4.180)
+ */
+template<class t_quat, class t_vec>
+t_quat pow(const t_quat& quat, typename t_quat::value_type x)
+requires is_quat<t_quat> && is_vec<t_vec>
+{
+	t_quat l = log<t_quat, t_vec>(quat);
+	return exp<t_quat, t_vec>(x * l);
 }
 
 
@@ -4380,6 +4397,32 @@ requires is_quat<t_quat> && is_vec<t_vec> && is_mat<t_mat>
 		quat2.template imag<t_vec>(),
 		quat3.template imag<t_vec>()
 	});
+}
+
+
+/**
+ * linear interpolation
+ * @see (Bronstein08), chapter 4, equation (4.206)
+ */
+template<class t_quat, class t_real = typename t_quat::value_type>
+t_quat lerp(const t_quat& quat1, const t_quat& quat2, t_real t)
+requires is_quat<t_quat>
+{
+	return (t_real{1}-t)*quat1 + t*quat2;
+}
+
+
+/**
+ * spherical linear interpolation
+ * @see (Bronstein08), chapter 4, equation (4.207)
+ */
+template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
+t_quat slerp(const t_quat& quat1, const t_quat& quat2, t_real t)
+requires is_quat<t_quat>
+{
+	t_quat quat1_conj = conj<t_quat>(quat1);
+	t_quat p = pow<t_quat, t_vec>(quat1_conj * quat2, t);
+	return quat1 * p;
 }
 
 // ----------------------------------------------------------------------------
