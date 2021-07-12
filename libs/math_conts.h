@@ -3,6 +3,9 @@
  * @author Tobias Weber
  * @date jan-18
  * @license: see 'LICENSE.EUPL' file
+ *
+ * @see general references for algorithms:
+ *	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its html version "Desktop Bronstein"].
  */
 
 #ifndef __MATH_CONTS_H__
@@ -581,6 +584,18 @@ requires m::is_basic_quat<t_quat>
 
 
 /**
+ * quat / quat
+ * @see (Bronstein08), chapter 4, equation (4.168)
+ */
+template<class t_quat>
+t_quat operator/(const t_quat& quat1, const t_quat& quat2)
+requires m::is_basic_quat<t_quat>
+{
+	return m::div<t_quat>(quat1, quat2);
+}
+
+
+/**
  * quat += quat
  */
 template<class t_quat>
@@ -826,6 +841,8 @@ public:
 	friend quat operator-(const quat& quat) { return m_ops::operator-(quat); }
 
 	friend quat operator*(const quat& quat1, const quat& quat2) { return m_ops::operator*<quat>(quat1, quat2); }
+	friend quat operator/(const quat& quat1, const quat& quat2) { return m_ops::operator/<quat>(quat1, quat2); }
+
 	friend quat operator*(value_type d, const quat& quat) { return m_ops::operator*(d, quat); }
 	friend quat operator*(const quat& quat, value_type d) { return m_ops::operator*(quat, d); }
 	friend quat operator/(const quat& quat, value_type d) { return m_ops::operator/(quat, d); }

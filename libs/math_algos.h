@@ -7,7 +7,7 @@
  * @see general references for algorithms:
  * 	- (Arens15): T. Arens et al., ISBN: 978-3-642-44919-2, DOI: 10.1007/978-3-642-44919-2 (2015).
  * 	- (Arfken13): G. B. Arfken et al., ISBN: 978-0-12-384654-9, DOI: 10.1016/C2009-0-30629-7 (2013).
- * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008).
+ * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its html version "Desktop Bronstein"].
  * 	- (Merziger06): G. Merziger and T. Wirth, ISBN: 3923923333 (2006).
  * 	- (Scarpino11): M. Scarpino, ISBN: 978-1-6172-9017-6 (2011).
  * 	- (Shirane02): G. Shirane et al., ISBN: 978-0-5214-1126-4 (2002).
@@ -4237,6 +4237,19 @@ requires is_quat<t_quat>
 
 
 /**
+ * quat / quat
+ * @see (Bronstein08), chapter 4, equation (4.168)
+ */
+template<class t_quat>
+t_quat div(const t_quat& quat1, const t_quat& quat2)
+requires m::is_quat<t_quat>
+{
+	t_quat quat2_inv = inv<t_quat>(quat2);
+	return mult<t_quat>(quat1, quat2_inv);
+}
+
+
+/**
  * quaternion exponential
  * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
  */
@@ -4281,28 +4294,30 @@ requires is_quat<t_quat> && is_vec<t_vec>
 
 
 /**
- * unit quaternion from rotation axis and angle
+ * unit quaternion from rotation axis and angle (quaternion version of Euler formula)
  * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ * @see https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
  */
 template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
-t_quat quat_from_rotaxis(const t_vec& vec, t_real angle)
+t_quat from_rotaxis(const t_vec& vec, t_real angle)
 requires is_quat<t_quat> && is_vec<t_vec>
 {
 	t_vec vec_norm = vec / norm<t_vec>(vec);
 
-	t_real ret_r = std::cos(angle);
-	t_vec ret_v = std::sin(angle) * vec_norm;
+	t_real ret_r = std::cos(angle * t_real(0.5));
+	t_vec ret_v = std::sin(angle * t_real(0.5)) * vec_norm;
 
 	return t_quat{ret_r, ret_v[0], ret_v[1], ret_v[2]};
 }
 
 
 /**
- * rotation normalised axis and angle from unit quaternion
+ * rotation normalised axis and angle from unit quaternion (quaternion version of Euler formula)
  * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
+ * @see https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
  */
 template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
-std::tuple<t_vec, t_real> quat_to_rotaxis(const t_quat& quat)
+std::tuple<t_vec, t_real> to_rotaxis(const t_quat& quat)
 requires is_quat<t_quat> && is_vec<t_vec>
 {
 	t_real r = quat.real();
@@ -4312,7 +4327,59 @@ requires is_quat<t_quat> && is_vec<t_vec>
 	t_real angle = std::acos(r/n_q);
 	t_vec vec = v / (n_q * std::sin(angle));
 
-	return std::make_tuple(vec, angle);
+	return std::make_tuple(vec, angle * t_real(2.));
+}
+
+
+/**
+ * convert a quaternion to an su(2) matrix
+ * @see (Bronstein08), chapter 4, equations (4.163a) and (4.163b)
+ */
+template<class t_quat, class t_vec, class t_mat_cplx,
+	class t_real = typename t_quat::value_type,
+	class t_cplx = typename t_mat_cplx::value_type>
+t_mat_cplx to_su2(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec> && is_mat<t_mat_cplx>
+{
+	constexpr t_cplx c0(0,0);
+	constexpr t_cplx c1(1,0);
+	constexpr t_cplx cI(0,1);
+
+	static const t_mat_cplx base[] =
+	{
+		create<t_mat_cplx>({{  c1,  c0}, {  c0,  c1 }}),	// real part
+		create<t_mat_cplx>({{  c0, -cI}, { -cI,  c0 }}),	// i
+		create<t_mat_cplx>({{  c0,  c1}, { -c1,  c0 }}),	// j
+		create<t_mat_cplx>({{ -cI,  c0}, {  c0,  cI }}),	// k
+	};
+
+	return
+		base[0] * t_cplx(quat.real()) +
+		base[1] * t_cplx(quat.imag1()) +
+		base[2] * t_cplx(quat.imag2()) +
+		base[3] * t_cplx(quat.imag3());
+}
+
+
+/**
+ * convert a quaternion to an so(3) matrix
+ * @see (Bronstein08), chapter 4, equation (4.194)
+ */
+template<class t_quat, class t_vec, class t_mat, class t_real = typename t_quat::value_type>
+t_mat to_so3(const t_quat& quat)
+requires is_quat<t_quat> && is_vec<t_vec> && is_mat<t_mat>
+{
+	t_quat quat_conj = conj<t_quat>(quat);
+
+	t_quat quat1 = mult<t_quat>(mult<t_quat>(quat, t_quat(0, 1, 0, 0)), quat_conj);
+	t_quat quat2 = mult<t_quat>(mult<t_quat>(quat, t_quat(0, 0, 1, 0)), quat_conj);
+	t_quat quat3 = mult<t_quat>(mult<t_quat>(quat, t_quat(0, 0, 0, 1)), quat_conj);
+
+	return create<t_mat, t_vec>({
+		quat1.template imag<t_vec>(),
+		quat2.template imag<t_vec>(),
+		quat3.template imag<t_vec>()
+	});
 }
 
 // ----------------------------------------------------------------------------
