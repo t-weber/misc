@@ -34,6 +34,26 @@ void print(const auto& a, const auto&... rest)
 
 
 // ----------------------------------------------------------------------------
+// explicit templates
+
+template<class T>
+void print2(const T& a)
+{
+	std::cout << "type: " << ty::type_id_with_cvr<T>().pretty_name();
+	std::cout << ", value: " << a << std::endl;
+}
+
+template<class T1, class ...T2>
+void print2(const T1& a, const T2&... rest)
+{
+	print2<T1>(a);
+	print2<T2...>(rest...);
+}
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
 // constrained functions
 
 template<typename T> concept c_onlyint = std::is_integral_v<T>;
@@ -118,7 +138,8 @@ void emulate_concepts(T t)
 
 int main()
 {
-	print("Test", " ", 123, ", ", 4.56);
+	print("Test", " ", 123, ", ", 4.56, "\n");
+	print2("Test", " ", 123, ", ", 4.56, "\n");
 
 	print_constrained(987);
 	print_constrained(987.);
