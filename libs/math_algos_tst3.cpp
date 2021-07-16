@@ -43,20 +43,38 @@ void quat_tests()
 	std::cout << "q1 == 0: ";
 	std::cout << std::boolalpha << m::equals_0<t_quat>(q1) << std::endl;
 
-	t_quat q2 = m::from_rotaxis<t_quat, t_vec>(m::create<t_vec>({1, 2, 1}), 0.123);
+	t_vec axis2 = m::create<t_vec>({1, 2, 1});
+	t_scalar angle2 = 0.123;
+	t_quat q2 = m::from_rotaxis<t_quat, t_vec>(axis2, angle2);
+	t_mat rot2 = m::rotation<t_mat, t_vec>(axis2, angle2, false);
+
 	std::cout << "q2 = ";
 	m_ops::operator<<(std::cout, q2) << std::endl;
-	auto [axis2, angle2] = m::to_rotaxis<t_quat, t_vec>(q2);
+	auto [axis2b, angle2b] = m::to_rotaxis<t_quat, t_vec>(q2);
 	std::cout << "rotation axis: ";
-	m_ops::operator<<(std::cout, axis2) << ", angle: " << angle2 << std::endl;
+	m_ops::operator<<(std::cout, axis2b) << ", angle: " << angle2b << std::endl;
 
-	t_mat_cplx mat1_su2 = m::to_su2<t_quat, t_vec, t_mat_cplx>(q1_norm);
-	std::cout << "su2: ";
-	m_ops::operator<<(std::cout, mat1_su2) << std::endl;
+	std::cout << "axes equal: " << std::boolalpha
+		<< m::equals<t_vec>(axis2/m::norm<t_vec>(axis2), axis2b, 1e-6)
+		<< std::endl;
+	std::cout << "angles equal: " << std::boolalpha
+		<< m::equals<t_scalar>(angle2, angle2b, 1e-6)
+		<< std::endl;
+
+	std::cout << "rot2: ";
+	m_ops::operator<<(std::cout, rot2) << std::endl;
 
 	t_mat mat2_so3 = m::to_so3<t_quat, t_vec, t_mat>(q2);
-	std::cout << "so3: ";
+	std::cout << "so3:  ";
 	m_ops::operator<<(std::cout, mat2_so3) << std::endl;
+
+	t_mat_cplx mat1_su2 = m::to_su2<t_quat, t_vec, t_mat_cplx>(q1_norm);
+	std::cout << "su2:  ";
+	m_ops::operator<<(std::cout, mat1_su2) << std::endl;
+
+	std::cout << "SO(3) matrices equal: " << std::boolalpha
+		<< m::equals<t_mat>(rot2, mat2_so3, 1e-6)
+		<< std::endl;
 
 	for(t_scalar t=0.; t<=1; t+=0.25)
 	{
