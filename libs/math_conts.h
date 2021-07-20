@@ -126,7 +126,7 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
  */
 template<class t_vec>
 t_vec operator*(typename t_vec::value_type d, const t_vec& vec)
-requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec> 
+requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 	//&& !m::is_basic_mat<typename t_vec::value_type>	// hack!
 {
 	return vec * d;
@@ -136,11 +136,22 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
  * vector / scalar
  */
 template<class t_vec>
-t_vec operator/(const t_vec& vec, typename t_vec::value_type d)
+t_vec operator/(const t_vec& vec1, typename t_vec::value_type d)
 requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
+/*
+	// doesn't work for integer value types, because 1/d is always 0 for d>1
 	using T = typename t_vec::value_type;
-	return vec * (T(1)/d);
+	return vec1 * (T(1)/d);
+*/
+
+	using t_size = decltype(t_vec{}.size());
+	t_vec vec(vec1.size());
+
+	for(t_size i=0; i<vec1.size(); ++i)
+		vec[i] = vec1[i] / d;
+
+	return vec;
 }
 
 
