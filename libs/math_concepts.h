@@ -191,11 +191,18 @@ public:
 	// constructors
 	using base_type::base_type;
 	qvec_adapter(const base_type& vec) : base_type{vec} {}
-	qvec_adapter(size_t n=N) : base_type{}, m_n{n} {}
+	qvec_adapter(size_t n = N) : base_type{}, m_n{n} {}
 
 	// copying
-	//qvec_adapter(const qvec_adapter<size_t, N, T, t_mat_base>& other)
-	//	: t_mat_base<1, N, T>(other), m_n{other.m_n} {}
+	qvec_adapter(const qvec_adapter<size_t, N, T, t_mat_base>& other)
+		: t_mat_base<1, N, T>(other), m_n{other.m_n} {}
+
+	const qvec_adapter& operator=(const qvec_adapter<size_t, N, T, t_mat_base>& other)
+	{
+		*(static_cast<t_mat_base<1, N, T>*>(this)) = other;
+		this->m_n = other.m_n;
+		return *this;
+	}
 
 	constexpr size_t size() const { return m_n<N ? m_n : N; }
 
@@ -222,8 +229,16 @@ public:
 	qmat_adapter(size_t rows=ROWS, size_t cols=COLS) : base_type{}, m_rows{rows}, m_cols{cols} {}
 
 	// copying
-	//qmat_adapter(const qmat_adapter<size_t, ROWS, COLS, T, t_mat_base>& other)
-	//	: t_mat_base<COLS, ROWS, T>(other), m_rows{other.m_rows}, m_cols{other.m_cols} {}
+	qmat_adapter(const qmat_adapter<size_t, ROWS, COLS, T, t_mat_base>& other)
+		: t_mat_base<COLS, ROWS, T>(other), m_rows{other.m_rows}, m_cols{other.m_cols} {}
+
+	const qmat_adapter& operator=(const qmat_adapter<size_t, ROWS, COLS, T, t_mat_base>& other)
+	{
+		*(static_cast<t_mat_base<COLS, ROWS, T>*>(this)) = other;
+		this->m_rows = other.m_rows;
+		this->m_cols = other.m_cols;
+		return *this;
+	}
 
 	constexpr size_t size1() const { return m_rows<ROWS ? m_rows : ROWS; }
 	constexpr size_t size2() const { return m_cols<COLS ? m_cols : COLS; }
@@ -248,13 +263,35 @@ public:
 	qvecN_adapter(size_t n=N) : base_type{}, m_n{n} {}
 
 	// copying
-	//qvecN_adapter(const qvecN_adapter<size_t, N, T, t_vec_base>& other)
-	//	: t_vec_base(other), m_n{other.m_n} {}
+	qvecN_adapter(const qvecN_adapter<size_t, N, T, t_vec_base>& other)
+		: t_vec_base(other), m_n{other.m_n} {}
+
+	const qvecN_adapter& operator=(const qvecN_adapter<size_t, N, T, t_vec_base>& other)
+	{
+		*(static_cast<t_vec_base*>(this)) = other;
+		this->m_n = other.m_n;
+		return *this;
+	}
 
 	constexpr size_t size() const { return m_n<N ? m_n : N; }
 
 	T& operator[](size_t i) { return static_cast<base_type&>(*this)[i]; }
 	const T operator[](size_t i) const { return static_cast<const base_type&>(*this)[i]; }
+
+	// TODO
+	/*friend qvecN_adapter operator+(const qvecN_adapter& vec1, const qvecN_adapter& vec2)
+	{
+		qvecN_adapter vecNew(vec1.size());
+		static_cast<t_vec_base&>(vecNew) = static_cast<const t_vec_base&>(vec1) + static_cast<const t_vec_base&>(vec2);
+		return vecNew;
+	}
+
+	friend qvecN_adapter operator-(const qvecN_adapter& vec1, const qvecN_adapter& vec2)
+	{
+		qvecN_adapter vecNew(vec1.size());
+		static_cast<t_vec_base&>(vecNew) = static_cast<const t_vec_base&>(vec1) - static_cast<const t_vec_base&>(vec2);
+		return vecNew;
+	}*/
 
 private:
 	size_t m_n{N};
@@ -276,11 +313,55 @@ public:
 	qmatNN_adapter(size_t rows=ROWS, size_t cols=COLS) : base_type{}, m_rows{rows}, m_cols{cols} {}
 
 	// copying
-	//qmatNN_adapter(const qmatNN_adapter<size_t, ROWS, COLS, T, t_mat_base>& other)
-	//	: t_mat_base(other), m_rows{other.m_rows}, m_cols{other.m_cols} {}
+	qmatNN_adapter(const qmatNN_adapter<size_t, ROWS, COLS, T, t_mat_base>& other)
+		: t_mat_base(other), m_rows{other.m_rows}, m_cols{other.m_cols} {}
+
+	const qmatNN_adapter& operator=(const qmatNN_adapter<size_t, ROWS, COLS, T, t_mat_base>& other)
+	{
+		*(static_cast<t_mat_base*>(this)) = other;
+		this->m_rows = other.m_rows;
+		this->m_cols = other.m_cols;
+		return *this;
+	}
 
 	constexpr size_t size1() const { return m_rows<ROWS ? m_rows : ROWS; }
 	constexpr size_t size2() const { return m_cols<COLS ? m_cols : COLS; }
+
+
+	// these operators are needed, because the size information would be lost
+	// if the base type is constructed and assigned to the adapter class
+	/*friend qmatNN_adapter operator+(const qmatNN_adapter& mat1, const qmatNN_adapter& mat2)
+	{
+		qmatNN_adapter matNew(mat1.size1(), mat1.size2());
+		static_cast<t_mat_base&>(matNew) = static_cast<const t_mat_base&>(mat1) + static_cast<const t_mat_base&>(mat2);
+		return matNew;
+	}
+
+	friend qmatNN_adapter operator-(const qmatNN_adapter& mat1, const qmatNN_adapter& mat2)
+	{
+		qmatNN_adapter matNew(mat1.size1(), mat1.size2());
+		static_cast<t_mat_base&>(matNew) = static_cast<const t_mat_base&>(mat1) - static_cast<const t_mat_base&>(mat2);
+		return matNew;
+	}
+
+	friend qmatNN_adapter operator*(const qmatNN_adapter& mat, T d)
+	{
+		qmatNN_adapter matNew(mat.size1(), mat.size2());
+		static_cast<t_mat_base&>(matNew) = static_cast<const t_mat_base&>(matNew) * d;
+		return matNew;
+	}
+
+	friend qmatNN_adapter operator*(T d, const qmatNN_adapter& mat)
+	{
+		return mat * d;
+	}
+
+	friend qmatNN_adapter operator/(const qmatNN_adapter& mat, T d)
+	{
+		qmatNN_adapter matNew(mat.size1(), mat.size2());
+		static_cast<t_mat_base&>(matNew) = static_cast<const t_mat_base&>(matNew) / d;
+		return matNew;
+	}*/
 
 private:
 	size_t m_rows{ROWS}, m_cols{COLS};

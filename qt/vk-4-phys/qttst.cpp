@@ -1511,13 +1511,13 @@ void VkWnd::keyPressEvent(QKeyEvent *pEvt)
 	if(pEvt->key() == Qt::Key_Q)
 		m_vkrenderer->SetMoving(1, -1.);
 
-	if(pEvt->key() == Qt::Key_Up)
+	if(pEvt->key() == Qt::Key_Up /*|| pEvt->key() == Qt::Key_I*/)
 		m_vkrenderer->SetRotating(0, 1.);
-	if(pEvt->key() == Qt::Key_Down)
+	if(pEvt->key() == Qt::Key_Down /*|| pEvt->key() == Qt::Key_K*/)
 		m_vkrenderer->SetRotating(0, -1.);
-	if(pEvt->key() == Qt::Key_Left)
+	if(pEvt->key() == Qt::Key_Left /*|| pEvt->key() == Qt::Key_J*/)
 		m_vkrenderer->SetRotating(1, -1.);
-	if(pEvt->key() == Qt::Key_Right)
+	if(pEvt->key() == Qt::Key_Right /*|| pEvt->key() == Qt::Key_L*/)
 		m_vkrenderer->SetRotating(1, 1.);
 	if(pEvt->key() == Qt::Key_Y)
 		m_vkrenderer->SetRotating(2, -1.);

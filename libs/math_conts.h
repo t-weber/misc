@@ -50,7 +50,7 @@ t_vec operator-(const t_vec& vec1)
 requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
 	using t_size = decltype(t_vec{}.size());
-	t_vec vec(vec1.size());
+	t_vec vec = m::create<t_vec>(vec1.size());
 
 	for(t_size i=0; i<vec1.size(); ++i)
 		vec[i] = -vec1[i];
@@ -73,7 +73,7 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 	else
 		static_assert(vec1.size() == vec2.size());
 
-	t_vec vec(vec1.size());
+	t_vec vec = m::create<t_vec>(vec1.size());
 
 	for(t_size i=0; i<vec1.size(); ++i)
 		vec[i] = vec1[i] + vec2[i];
@@ -101,7 +101,7 @@ t_vec operator*(const t_vec& vec1, typename t_vec::value_type d)
 requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
 	using t_size = decltype(t_vec{}.size());
-	t_vec vec(vec1.size());
+	t_vec vec = m::create<t_vec>(vec1.size());
 
 	for(t_size i=0; i<vec1.size(); ++i)
 		vec[i] = vec1[i] * d;
@@ -146,7 +146,7 @@ requires m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 */
 
 	using t_size = decltype(t_vec{}.size());
-	t_vec vec(vec1.size());
+	t_vec vec = m::create<t_vec>(vec1.size());
 
 	for(t_size i=0; i<vec1.size(); ++i)
 		vec[i] = vec1[i] / d;
@@ -276,7 +276,7 @@ t_mat operator-(const t_mat& mat1)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
 	using t_size = decltype(t_mat{}.size1());
-	t_mat mat(mat1.size1(), mat1.size2());
+	t_mat mat = m::create<t_mat>(mat1.size1(), mat1.size2());
 
 	for(t_size i=0; i<mat1.size1(); ++i)
 		for(t_size j=0; j<mat1.size2(); ++j)
@@ -300,7 +300,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 	else
 		static_assert(mat1.size1() == mat2.size1() && mat1.size2() == mat2.size2());
 
-	t_mat mat(mat1.size1(), mat1.size2());
+	t_mat mat = m::create<t_mat>(mat1.size1(), mat1.size2());
 
 	for(t_size i=0; i<mat1.size1(); ++i)
 		for(t_size j=0; j<mat1.size2(); ++j)
@@ -329,7 +329,7 @@ t_mat operator*(const t_mat& mat1, typename t_mat::value_type d)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
 	using t_size = decltype(t_mat{}.size1());
-	t_mat mat(mat1.size1(), mat1.size2());
+	t_mat mat = m::create<t_mat>(mat1.size1(), mat1.size2());
 
 	for(t_size i=0; i<mat1.size1(); ++i)
 		for(t_size j=0; j<mat1.size2(); ++j)
@@ -354,11 +354,23 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
  * matrix / scalar
  */
 template<class t_mat>
-t_mat operator/(const t_mat& mat, typename t_mat::value_type d)
+t_mat operator/(const t_mat& mat1, typename t_mat::value_type d)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 {
+/*
+	// doesn't work for integer value types, because 1/d is always 0 for d>1
 	using T = typename t_mat::value_type;
-	return mat * (T(1)/d);
+	return mat1 * (T(1)/d);
+*/
+
+	using t_size = decltype(t_mat{}.size1());
+	t_mat mat = m::create<t_mat>(mat1.size1(), mat1.size2());
+
+	for(t_size i=0; i<mat1.size1(); ++i)
+		for(t_size j=0; j<mat1.size2(); ++j)
+			mat(i,j) = mat1(i,j) / d;
+
+	return mat;
 }
 
 
@@ -376,7 +388,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 	else
 		static_assert(mat1.size2() == mat2.size1());
 
-	t_mat matRet(mat1.size1(), mat2.size2());
+	t_mat matRet = m::create<t_mat>(mat1.size1(), mat2.size2());
 
 	for(t_size row=0; row<matRet.size1(); ++row)
 	{
@@ -685,7 +697,7 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 		static_assert(mat.size2() == t_size(vec.size()));
 
 
-	t_vec vecRet(mat.size1());
+	t_vec vecRet = m::create<t_vec>(mat.size1());
 
 	for(t_size row=0; row<mat.size1(); ++row)
 	{
@@ -823,7 +835,7 @@ public:
 	template<class t_vec> requires is_vec<t_vec>
 	t_vec imag() const
 	{
-		return create<t_vec>({ imag1(), imag2(), imag3() });
+		return m::create<t_vec>({ imag1(), imag2(), imag3() });
 	}
 
 	void real(value_type val) { m_data[0] = val; }

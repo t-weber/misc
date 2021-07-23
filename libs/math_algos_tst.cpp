@@ -4,7 +4,7 @@
  * @date 9-dec-17
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -fPIC -I/usr/include/qt5 -o math_algos_tst math_algos_tst.cpp -std=c++20 -lQt5Core -lQt5Gui
+ * g++ -std=c++20 -Wall -Wextra -fPIC -I/usr/include/qt5 -o math_algos_tst math_algos_tst.cpp -lQt5Core -lQt5Gui
  */
 
 #include <iostream>
@@ -93,6 +93,7 @@ void vecmat_tsts()
 	std::cout << matInv(1,0) << " " << matInv(1,1) << " " << matInv(1,2) << "\n";
 	std::cout << matInv(2,0) << " " << matInv(2,1) << " " << matInv(2,2) << "\n";
 
+	std::cout << "sizes: " << mat3.size1() << " " << mat3.size2() << "; " << matInv.size1() << " " << matInv.size2() << std::endl;
 	t_mat matE = mat3*matInv;
 	std::cout << matE(0,0) << " " << matE(0,1) << " " << matE(0,2) << "\n";
 	std::cout << matE(1,0) << " " << matE(1,1) << " " << matE(1,2) << "\n";
@@ -285,6 +286,23 @@ void vecmat_tsts()
 
 
 template<class t_vec, class t_mat>
+void vecmat_tsts2()
+{
+	using t_real = typename t_vec::value_type;
+
+	t_vec vec = create<t_vec>({1, 2});
+	t_mat mat = create<t_mat>({1, 2, 3, 4});
+	t_vec res = mat * vec;
+	t_real len = norm<t_vec>(res);
+
+	std::cout << vec << std::endl;
+	std::cout << mat << std::endl;
+	std::cout << res << std::endl;
+	std::cout << len << std::endl;
+}
+
+
+template<class t_vec, class t_mat>
 void vecmat_tsts_hom()
 {
 	std::cout << "\nviewport\n";
@@ -392,6 +410,23 @@ void complex_tsts()
 		std::cout << "Fn = " << Fn << "\n";
 	}
 }
+
+
+template<class T, std::size_t N>
+class Arr : public std::array<T, N>
+{
+	public:
+		Arr() = default;
+
+		// dummy constructor to fulfull interface requirements
+		Arr(std::size_t) {};
+
+		~Arr() = default;
+};
+
+
+template<class T> using t_array2 = Arr<T, 2>;
+template<class T> using t_array4 = Arr<T, 4>;
 
 
 int main()
@@ -523,6 +558,24 @@ int main()
 		vecmat_tsts_hom<t_vec, t_mat>();
 		vecmat_tsts_nonsquare<t_vec, t_mat>();
 		complex_tsts<t_vec_cplx, t_mat_cplx>();
+
+		std::cout << "----------------------------------------\n";
+		std::cout << "\n\n";
+	}
+
+
+	// using internal classes
+	if constexpr(bUseInternals)
+	{
+		using t_real = double;
+		using t_vec2 = vec<t_real, t_array2>;
+		using t_mat22 = mat<t_real, t_array4>;
+		using t_vec = vec<t_real, std::vector>;
+		using t_mat = mat<t_real, std::vector>;
+
+		vecmat_tsts2<t_vec2, t_mat22>();
+		std::cout << "\n";
+		vecmat_tsts2<t_vec, t_mat>();
 
 		std::cout << "----------------------------------------\n";
 		std::cout << "\n\n";
