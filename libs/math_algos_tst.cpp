@@ -418,7 +418,7 @@ class Arr : public std::array<T, N>
 	public:
 		Arr() = default;
 
-		// dummy constructor to fulfull interface requirements
+		// dummy constructor to fulfill interface requirements
 		Arr(std::size_t) {};
 
 		~Arr() = default;
