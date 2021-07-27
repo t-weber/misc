@@ -898,8 +898,9 @@ requires is_mat<t_mat>
  * matrix-vector product using only a portion of the matrix
  */
 template<class t_mat, class t_vec>
-t_vec mult(const t_mat& mat, const t_vec& vec, std::size_t outsize,
-	std::size_t row_begin=0, std::size_t col_begin=0)
+t_vec mult(const t_mat& mat, const t_vec& vec,
+	std::size_t outsize = std::numeric_limits<std::size_t>::max(),
+	std::size_t row_begin = 0, std::size_t col_begin = 0)
 requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 && m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
 {
@@ -4193,6 +4194,23 @@ requires m::is_quat<t_quat>
 		-quat.imag2(),
 		-quat.imag3()
 	};
+}
+
+
+/**
+ * quat * vec
+ * @see (Kuipers02), p. 127
+ */
+template<class t_quat, class t_vec>
+t_vec mult(const t_quat& quat, const t_vec& vec)
+requires m::is_quat<t_quat> && m::is_vec<t_vec>
+{
+	t_quat q_vec{0., vec[0], vec[1], vec[2]};
+
+	t_quat q1 = mult<t_quat>(quat, q_vec);
+	t_quat quat_rot = mult<t_quat>(q1, conj<t_quat>(quat));
+
+	return quat_rot.template imag<t_vec>();
 }
 
 

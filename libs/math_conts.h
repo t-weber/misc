@@ -727,6 +727,17 @@ requires m::is_basic_mat<t_mat> && m::is_dyn_mat<t_mat>
 
 	return vecRet;
 }
+
+
+/**
+ * quaternion-vector product
+ */
+template<class t_quat, class t_vec>
+t_vec operator*(const t_quat& quat, const t_vec& vec)
+requires m::is_basic_quat<t_quat> && m::is_basic_vec<t_vec> && m::is_dyn_vec<t_vec>
+{
+	return m::mult<t_quat, t_vec>(quat, vec);
+}
 // ----------------------------------------------------------------------------
 
 }
@@ -818,6 +829,7 @@ public:
 	mat& operator*=(value_type d) { return m_ops::operator*=(*this, d); }
 	mat& operator/=(value_type d) { return m_ops::operator/=(*this, d); }
 
+
 private:
 	container_type m_data{};
 	std::size_t m_rowsize{}, m_colsize{};
@@ -885,11 +897,15 @@ public:
 	friend quat operator*(const quat& quat, value_type d) { return m_ops::operator*(quat, d); }
 	friend quat operator/(const quat& quat, value_type d) { return m_ops::operator/(quat, d); }
 
+	template<class t_vec> requires is_vec<t_vec>
+	friend t_vec operator*(const quat& quat, const t_vec& vec) { return m_ops::operator*(quat, vec); }
+
 	quat& operator*=(const quat& quat2) { return m_ops::operator*=(*this, quat2); }
 	quat& operator+=(const quat& quat2) { return m_ops::operator+=(*this, quat2); }
 	quat& operator-=(const quat& quat2) { return m_ops::operator-=(*this, quat2); }
 	quat& operator*=(value_type d) { return m_ops::operator*=(*this, d); }
 	quat& operator/=(value_type d) { return m_ops::operator/=(*this, d); }
+
 
 private:
 	container_type m_data{};

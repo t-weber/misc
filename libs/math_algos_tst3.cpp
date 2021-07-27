@@ -97,6 +97,19 @@ void quat_tests()
 		<< std::endl;
 
 
+	// rotate the same vector with a matrix and a quaternion operator
+	t_vec vec2 = m::create<t_vec>({1, 2, 3});
+	t_vec vec2_rot1 = rot2 * vec2;
+	t_vec vec2_rot2 = q2 * vec2;
+
+	std::cout << "rotated vectors equal: " << std::boolalpha
+		<< m::equals<t_vec>(vec2_rot1, vec2_rot2, 1e-6)
+		<< std::endl;
+
+	//m_ops::operator<<(std::cout, m::mult<t_mat, t_vec>(rot2, vec2)) << std::endl;
+	//m_ops::operator<<(std::cout, m::mult<t_quat, t_vec>(q2, vec2)) << std::endl;
+
+
 	for(t_scalar t=0.; t<=1; t+=0.25)
 	{
 		t_quat qs = slerp<t_quat, t_vec>(q1_norm, q2, t);
