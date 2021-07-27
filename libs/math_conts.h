@@ -6,6 +6,7 @@
  *
  * @see general references for algorithms:
  *	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its html version "Desktop Bronstein"].
+ *	- (Kuipers02): J. B. Kuipers, ISBN: 0-691-05872-5 (2002).
  */
 
 #ifndef __MATH_CONTS_H__
@@ -504,6 +505,7 @@ requires m::is_basic_quat<t_quat>
 
 /**
  * unary -
+ * @see (Kuipers02), p. 105
  */
 template<class t_quat>
 t_quat operator-(const t_quat& quat)
@@ -522,6 +524,7 @@ requires m::is_basic_quat<t_quat>
 /**
  * binary +
  * @see https://en.wikipedia.org/wiki/Quaternion#Scalar_and_vector_parts
+ * @see (Kuipers02), p. 105
  */
 template<class t_quat>
 t_quat operator+(const t_quat& quat1, const t_quat& quat2)
@@ -539,6 +542,7 @@ requires m::is_basic_quat<t_quat>
 
 /**
  * binary -
+ * @see (Kuipers02), p. 105
  */
 template<class t_quat>
 t_quat operator-(const t_quat& quat1, const t_quat& quat2)
@@ -580,28 +584,40 @@ requires m::is_basic_quat<t_quat>
 
 /**
  * quat * scalar
+ * @see (Kuipers02), p. 106
  */
 template<class t_quat>
 t_quat operator*(const t_quat& quat, typename t_quat::value_type scalar)
 requires m::is_basic_quat<t_quat>
 {
-	return quat * t_quat{ scalar, 0, 0, 0 };
+	//return quat * t_quat{ scalar, 0, 0, 0 };
+
+	return t_quat
+	{
+		scalar * quat.real(),
+		scalar * quat.imag1(),
+		scalar * quat.imag2(),
+		scalar * quat.imag3(),
+	};
 }
 
 
 /**
  * scalar * quat
+ * @see (Kuipers02), p. 106
  */
 template<class t_quat>
 t_quat operator*(typename t_quat::value_type scalar, const t_quat& quat)
 requires m::is_basic_quat<t_quat>
 {
-	return t_quat{ scalar, 0, 0, 0 } * quat;
+	//return t_quat{ scalar, 0, 0, 0 } * quat;
+	return quat * scalar;
 }
 
 
 /**
  * quat / scalar
+ * @see (Kuipers02), p. 106
  */
 template<class t_quat>
 t_quat operator/(const t_quat& quat, typename t_quat::value_type scalar)
@@ -850,6 +866,11 @@ public:
 		imag2(vec[1]);
 		imag3(vec[2]);
 	}
+
+
+	// careful with operator[], otherwise this will also fulfill the vector template constraints
+	const T& operator()(std::size_t i) const { return m_data[i]; }
+	T& operator()(std::size_t i) { return m_data[i]; }
 
 
 	friend quat operator+(const quat& quat1, const quat& quat2) { return m_ops::operator+(quat1, quat2); }

@@ -4,13 +4,14 @@
  * @date dec-17
  * @license see 'LICENSE.EUPL' file
  *
- * @see general references for algorithms:
+ * @see references for algorithms:
  * 	- (Arens15): T. Arens et al., ISBN: 978-3-642-44919-2, DOI: 10.1007/978-3-642-44919-2 (2015).
  * 	- (Arfken13): G. B. Arfken et al., ISBN: 978-0-12-384654-9, DOI: 10.1016/C2009-0-30629-7 (2013).
  * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its html version "Desktop Bronstein"].
  * 	- (Merziger06): G. Merziger and T. Wirth, ISBN: 3923923333 (2006).
  * 	- (Scarpino11): M. Scarpino, ISBN: 978-1-6172-9017-6 (2011).
  * 	- (Shirane02): G. Shirane et al., ISBN: 978-0-5214-1126-4 (2002).
+ * 	- (Kuipers02): J. B. Kuipers, ISBN: 0-691-05872-5 (2002).
  * 	- (FUH 2021): "Effiziente Algorithmen" (2021), Kurs 1684, Fernuni Hagen (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/01684).
  */
 
@@ -196,6 +197,7 @@ requires is_mat<t_mat>
 
 /**
  * are two quaternions equal within an epsilon range?
+ * @see (Kuipers02), p. 105
  */
 template<class t_quat>
 bool equals(const t_quat& quat1, const t_quat& quat2,
@@ -3308,6 +3310,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
  * set bZ01=false for gl (near and far planes at -1 and +1), and bZ01=true for vk (planes at 0 and 1)
  * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluPerspective.xml
  * @see https://github.com/PacktPublishing/Vulkan-Cookbook/blob/master/Library/Source%20Files/10%20Helper%20Recipes/04%20Preparing%20a%20perspective%20projection%20matrix.cpp
+ * @see (Kuipers02), pp. 350-351 for a simplified version of the perspective trafo
  */
 template<class t_mat>
 t_mat hom_perspective(
@@ -4126,31 +4129,50 @@ requires is_mat<t_mat> && is_vec<t_vec>
 // ----------------------------------------------------------------------------
 
 /**
- * quat * quat
+ * quat1 * quat2
  * @see https://en.wikipedia.org/wiki/Quaternion#Scalar_and_vector_parts
+ * @see (Kuipers02), pp. 106-110
  */
 template<class t_quat>
 t_quat mult(const t_quat& quat1, const t_quat& quat2)
 requires m::is_quat<t_quat>
 {
+	/*using T = typename t_quat::value_type;
+	using t_vec = std::vector<T>;
+
+	const T r1 = quat1.real();
+	//const t_vec v1 = quat1.template imag<t_vec>();
+	const t_vec v1{{ quat1(1), quat1(2), quat1(3) }};
+	const T r2 = quat2.real();
+	//const t_vec v2 = quat2.template imag<t_vec>();
+	const t_vec v2{{ quat2(1), quat2(2), quat2(3) }};
+
+	t_quat result(r1*r2 - inner<t_vec>(v1, v2), 0, 0, 0);
+	t_vec v_c = cross<t_vec>({v1, v2});
+
+	for(int i=0; i<3; ++i)
+		result(i+1) = v_c[i] + r1*v2[i] + r2*v1[i];
+
+	return result;*/
+
 	using T = typename t_quat::value_type;
 
-	T r1 = quat1.real();
-	T i1 = quat1.imag1();
-	T j1 = quat1.imag2();
-	T k1 = quat1.imag3();
+	const T r1 = quat1.real();
+	const T i1 = quat1.imag1();
+	const T j1 = quat1.imag2();
+	const T k1 = quat1.imag3();
 
-	T r2 = quat2.real();
-	T i2 = quat2.imag1();
-	T j2 = quat2.imag2();
-	T k2 = quat2.imag3();
+	const T r2 = quat2.real();
+	const T i2 = quat2.imag1();
+	const T j2 = quat2.imag2();
+	const T k2 = quat2.imag3();
 
 	return t_quat
 	{
 		r1*r2 - (i1*i2 + j1*j2 + k1*k2),
-		r1*i2 + r2*i1 + j1*k2 - k1*j2,
-		r1*j2 + r2*j1 + k1*i2 - i1*k2,
-		r1*k2 + r2*k1 + i1*j2 - j1*i2
+		i1*r2 + r1*i2 - k1*j2 + j1*k2,
+		j1*r2 + k1*i2 + r1*j2 - i1*k2,
+		k1*r2 - j1*i2 + i1*j2 + r1*k2
 	};
 }
 
@@ -4158,6 +4180,7 @@ requires m::is_quat<t_quat>
 /**
  * conjugate quaternion
  * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ * @see also (Kuipers02), pp. 110-111
  */
 template<class t_quat>
 t_quat conj(const t_quat& quat)
@@ -4176,6 +4199,7 @@ requires m::is_quat<t_quat>
 /**
  * squared quaternion norm
  * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ * @see also (Kuipers02), pp. 111-112
  */
 template<class t_quat>
 typename t_quat::value_type norm_sq(const t_quat& quat)
@@ -4195,6 +4219,7 @@ requires m::is_quat<t_quat>
 /**
  * quaternion norm
  * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ * @see also (Kuipers02), pp. 111-112
  */
 template<class t_quat>
 typename t_quat::value_type norm(const t_quat& quat)
@@ -4222,6 +4247,7 @@ requires m::is_quat<t_quat>
 /**
  * inverted quaternion
  * @see https://en.wikipedia.org/wiki/Quaternion#Conjugation,_the_norm,_and_reciprocal
+ * @see also (Kuipers02), p. 112
  */
 template<class t_quat>
 t_quat inv(const t_quat& quat)
@@ -4239,6 +4265,7 @@ requires is_quat<t_quat>
 /**
  * quat / quat
  * @see (Bronstein08), chapter 4, equation (4.168)
+ * @see also (Kuipers02), p. 112
  */
 template<class t_quat>
 t_quat div(const t_quat& quat1, const t_quat& quat2)

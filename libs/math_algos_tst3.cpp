@@ -4,6 +4,9 @@
  * @date jul-2021
  * @license: see 'LICENSE.EUPL' file
  *
+ * @see references for algorithms:
+ * 	- (Kuipers02): J. B. Kuipers, ISBN: 0-691-05872-5 (2002).
+ *
  * g++ -std=c++20 -Wall -Wextra -Weffc++ -o math_algos_tst3 math_algos_tst3.cpp
  */
 
@@ -17,6 +20,22 @@ using namespace m_ops;
 template<class t_scalar, class t_quat, class t_vec, class t_mat, class t_mat_cplx>
 void quat_tests()
 {
+	// test basic algebraic properties, see: (Kuipers02), p. 106
+	t_quat qi{0., 1., 0., 0.};
+	t_quat qj{0., 0., 1., 0.};
+	t_quat qk{0., 0., 0., 1.};
+	std::cout << std::boolalpha << m::equals<t_quat>(qi*qi, t_quat(-1., 0., 0., 0.)) << std::endl;
+	std::cout << std::boolalpha << m::equals<t_quat>(qj*qj, t_quat(-1., 0., 0., 0.)) << std::endl;
+	std::cout << std::boolalpha << m::equals<t_quat>(qk*qk, t_quat(-1., 0., 0., 0.)) << std::endl;
+	std::cout << std::boolalpha << m::equals<t_quat>(qi*qj*qk, t_quat(-1., 0., 0., 0.)) << std::endl;
+	std::cout << std::boolalpha << m::equals<t_quat>(qi*qj, qk) << std::endl;
+	std::cout << std::boolalpha << m::equals<t_quat>(qj*qk, qi) << std::endl;
+	std::cout << std::boolalpha << m::equals<t_quat>(qk*qi, qj) << std::endl;
+	std::cout << std::boolalpha << m::equals<t_quat>(qj*qi, -qk) << std::endl;
+	std::cout << std::boolalpha << m::equals<t_quat>(qk*qj, -qi) << std::endl;
+	std::cout << std::boolalpha << m::equals<t_quat>(qi*qk, -qj) << std::endl;
+
+
 	t_quat q1{2., 1., 3., 5.};
 	t_vec vec1 = q1.template imag<t_vec>();
 	t_quat q1_inv = inv(q1);
@@ -42,6 +61,7 @@ void quat_tests()
 	m_ops::operator<<(std::cout, q1_inv*q1) << std::endl;
 	std::cout << "q1 == 0: ";
 	std::cout << std::boolalpha << m::equals_0<t_quat>(q1) << std::endl;
+
 
 	t_vec axis2 = m::create<t_vec>({1, 2, 1});
 	t_scalar angle2 = 0.123;
@@ -75,6 +95,7 @@ void quat_tests()
 	std::cout << "SO(3) matrices equal: " << std::boolalpha
 		<< m::equals<t_mat>(rot2, mat2_so3, 1e-6)
 		<< std::endl;
+
 
 	for(t_scalar t=0.; t<=1; t+=0.25)
 	{
