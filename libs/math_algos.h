@@ -1310,7 +1310,7 @@ requires is_vec<t_vec>
 
 /**
  * find orthonormal substitute basis for vector space (Gram-Schmidt algo)
- * remove orthogonal projections to all other base vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
+ * remove orthogonal projections to all other basis vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
  * @see (Arens15), p. 744
  * @see https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process
  */
@@ -1343,7 +1343,7 @@ requires is_vec<t_vec>
 
 /**
  * find orthonormal substitute basis for vector space (Gram-Schmidt algo)
- * remove orthogonal projections to all other base vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
+ * remove orthogonal projections to all other basis vectors: |i'> = (1 - sum_{j<i} |j><j|) |i>
  * @see (Arens15), p. 744
  * @see https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process
  */
