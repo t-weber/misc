@@ -4377,6 +4377,32 @@ requires is_quat<t_quat> && is_vec<t_vec>
  * rotation normalised axis and angle from unit quaternion (quaternion version of Euler formula)
  * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
  * @see https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
+ *
+ * verifying equivalence with rodrigues formula (function rotation()) by applying a test vector x
+ *
+ * (a) rodrigues with (normalised) rotation axis v and angle alpha:
+ * 	(|v><v| + (1-|v><v|) cos(alpha) + Px sin(alpha)) |x> =
+ * 	|v><v|x> + |x> cos(alpha) - |v><v|x> cos(alpha) + v⨯x sin(alpha) =
+ * 	(1 - cos(alpha)) |v><v|x> + |x> cos(alpha) + v⨯x sin(alpha)
+ *
+ * (b) quaternion
+ * 	(cos(alpha/2), v sin(alpha/2)) * (0, x) * (cos(alpha/2), -v sin(alpha/2)) =
+ * 	(-v*x sin(alpha/2), v⨯x sin(alpha/2) + cos(alpha/2)*x) * (cos(alpha/2), -v sin(alpha/2))
+ *
+ * 	scalar part:
+ * 		-v*x sin(alpha/2)*cos(alpha/2) + (v⨯x sin(alpha/2) + cos(alpha/2)*x)*v sin(alpha/2) =
+ * 		-v*x sin(alpha/2)*cos(alpha/2) + v⨯x*v sin^2(alpha/2) + cos(alpha/2)*sin(alpha/2) x*v =
+ * 		v⨯x*v sin^2(alpha/2) = 0
+ *
+ * 	vector part:
+ * 		(v⨯x sin(alpha/2) + cos(alpha/2)*x) ⨯ (-v sin(alpha/2)) + (-v*x sin(alpha/2))*(-v sin(alpha/2)) + cos(alpha/2)*(v⨯x sin(alpha/2) + cos(alpha/2)*x) =
+ * 		- v⨯x⨯v sin^2(alpha/2) - x⨯v cos(alpha/2)*sin(alpha/2) + v*x*v sin^2(alpha/2) + v⨯x sin(alpha/2)*cos(alpha/2) + x cos^2(alpha/2) =
+ * 		- v⨯x⨯v sin^2(alpha/2) - 2 x⨯v cos(alpha/2)*sin(alpha/2) + v*x*v sin^2(alpha/2) + x cos^2(alpha/2) =
+ * 		0.5 * (- v⨯x⨯v + v*x*v) - 0.5 *cos(alpha) * (- v⨯x⨯v + v*x*v) - x⨯v sin(alpha) + 0.5*x + 0.5*x cos(alpha) =
+ * 		- 0.5*v⨯x⨯v + 0.5*v*x*v + 0.5 v⨯x⨯v cos(alpha) - 0.5*v*x*v cos(alpha) - x⨯v sin(alpha) + 0.5*x + 0.5*x cos(alpha) =
+ * 		- 0.5*(x*(v*v) - v*(v*x)) + 0.5*v*x*v + 0.5 (x*(v*v) - v*(v*x)) cos(alpha) - 0.5*v*x*v cos(alpha) - x⨯v sin(alpha) + 0.5*x + 0.5*x cos(alpha) =
+ * 		v*x*v - v*x*v cos(alpha) + v⨯x sin(alpha) + x cos(alpha) =
+ * 		(1 - cos(alpha)) |v><v|x> + |x> cos(alpha) + v⨯x sin(alpha) ∎
  */
 template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
 std::tuple<t_vec, t_real> to_rotaxis(const t_quat& quat)

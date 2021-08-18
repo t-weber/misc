@@ -22,7 +22,8 @@ void quat_tests()
 {
 	t_scalar eps = 1e-6;
 
-	// test basic algebraic properties, see: (Kuipers02), p. 106
+	// basic algebraic properties, see: (Kuipers02), p. 106
+	std::cout << "testing basic algebraic properties\n";
 	t_quat qi{0., 1., 0., 0.};
 	t_quat qj{0., 0., 1., 0.};
 	t_quat qk{0., 0., 0., 1.};
@@ -65,7 +66,7 @@ void quat_tests()
 	std::cout << std::boolalpha << m::equals_0<t_quat>(q1, eps) << std::endl;
 
 
-	// calculate quaternion and rotation matrix representing the same rotation
+	std::cout << "\ncalculating quaternion and rotation matrix representing the same rotation\n";
 	t_vec axis2 = m::create<t_vec>({1, 2, 1});
 	t_scalar angle2 = 0.123;
 	t_quat q2 = m::from_rotaxis<t_quat, t_vec>(axis2, angle2);
@@ -92,7 +93,7 @@ void quat_tests()
 	std::cout << "so3:  ";
 	m_ops::operator<<(std::cout, mat2_so3) << std::endl;
 
-	// directly calculate the trafo matrix from the canonical basis vector system
+	std::cout << "\ndirectly calculating the trafo matrix from the canonical basis vector system\n";
 	t_vec base1 = m::mult<t_quat, t_vec>(q2, m::create<t_vec>({1, 0, 0}));
 	t_vec base2 = m::mult<t_quat, t_vec>(q2, m::create<t_vec>({0, 1, 0}));
 	t_vec base3 = m::mult<t_quat, t_vec>(q2, m::create<t_vec>({0, 0, 1}));
@@ -112,7 +113,7 @@ void quat_tests()
 		m::equals<t_scalar>(base3[2], mat2_so3(2,2), eps);
 		std::cout << "basis equals so3 matrix: " << std::boolalpha << basis_equal << std::endl;
 
-	// convert quaternion to SU(2) matrix
+	std::cout << "\nconvertint quaternion to SU(2) matrix\n";
 	t_mat_cplx mat1_su2 = m::to_su2<t_quat, t_vec, t_mat_cplx>(q1_norm);
 	std::cout << "su2:  ";
 	m_ops::operator<<(std::cout, mat1_su2) << std::endl;
@@ -122,19 +123,52 @@ void quat_tests()
 		<< std::endl;
 
 
-	// rotate the same vector with a matrix and a quaternion operator
+	std::cout << "\nrotating the same vector with a matrix and a quaternion operator\n";
 	t_vec vec2 = m::create<t_vec>({1, 2, 3});
 	t_vec vec2_rot1 = rot2 * vec2;
 	t_vec vec2_rot2 = q2 * vec2;
+	std::cout << "result: ";
+	m_ops::operator<<(std::cout, vec2_rot1) << std::endl;
 
 	std::cout << "rotated vectors equal: " << std::boolalpha
 		<< m::equals<t_vec>(vec2_rot1, vec2_rot2, eps)
+		<< std::endl;
+
+	// direct calculation
+	t_vec axis2_n = axis2/m::norm<t_vec>(axis2);
+	t_vec vec2_rot1b = (1 - std::cos(angle2)) * m::inner<t_vec>(axis2_n, vec2)*axis2_n +
+		vec2 * std::cos(angle2) + m::cross<t_vec>({axis2_n, vec2}) * std::sin(angle2);
+	//m_ops::operator<<(std::cout, vec2_rot1b) << std::endl;
+
+	/*t_scalar c2 = std::cos(0.5*angle2);
+	t_scalar s2 = std::sin(0.5*angle2);
+	t_vec vec2_rot2b = - m::cross<t_vec>({m::cross<t_vec>({axis2_n, vec2}), axis2_n}) * s2*s2
+		- 2. * m::cross<t_vec>({vec2, axis2_n}) * c2*s2
+		+ m::inner<t_vec>(axis2_n, vec2) * axis2_n * s2*s2
+		+ vec2 * c2*c2
+		//+ 0.5*vec2 + 0.5 * vec2 * std::cos(angle2)
+		;*/
+
+	t_vec vec2_rot2b =
+		0.5 * (- m::cross<t_vec>({m::cross<t_vec>({axis2_n, vec2}), axis2_n}) + m::inner<t_vec>(axis2_n, vec2) * axis2_n)
+		- 0.5 * (- m::cross<t_vec>({m::cross<t_vec>({axis2_n, vec2}), axis2_n}) + m::inner<t_vec>(axis2_n, vec2) * axis2_n) * std::cos(angle2)
+		- m::cross<t_vec>({vec2, axis2_n}) * std::sin(angle2)
+		+ 0.5*vec2 + 0.5 * vec2 * std::cos(angle2)
+		;
+	//m_ops::operator<<(std::cout, vec2_rot2b) << std::endl;
+
+	std::cout << "rotated vectors equal with direct calculation 1: " << std::boolalpha
+		<< m::equals<t_vec>(vec2_rot1, vec2_rot1b, eps)
+		<< std::endl;
+	std::cout << "rotated vectors equal with direct calculation 2: " << std::boolalpha
+		<< m::equals<t_vec>(vec2_rot2, vec2_rot2b, eps)
 		<< std::endl;
 
 	//m_ops::operator<<(std::cout, m::mult<t_mat, t_vec>(rot2, vec2)) << std::endl;
 	//m_ops::operator<<(std::cout, m::mult<t_quat, t_vec>(q2, vec2)) << std::endl;
 
 
+	std::cout << "\ntesting slerp\n";
 	for(t_scalar t=0.; t<=1; t+=0.25)
 	{
 		t_quat qs = slerp<t_quat, t_vec>(q1_norm, q2, t);
