@@ -4385,7 +4385,7 @@ requires is_quat<t_quat> && is_vec<t_vec>
  * 	|v><v|x> + |x> cos(alpha) - |v><v|x> cos(alpha) + v⨯x sin(alpha) =
  * 	(1 - cos(alpha)) |v><v|x> + |x> cos(alpha) + v⨯x sin(alpha)
  *
- * (b) quaternion
+ * (b) quaternion:
  * 	(cos(alpha/2), v sin(alpha/2)) * (0, x) * (cos(alpha/2), -v sin(alpha/2)) =
  * 	(-v*x sin(alpha/2), v⨯x sin(alpha/2) + cos(alpha/2)*x) * (cos(alpha/2), -v sin(alpha/2))
  *
