@@ -5,7 +5,8 @@
  * @license: see 'LICENSE.EUPL' file
  *
  * @see general references for algorithms:
- *	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its html version "Desktop Bronstein"].
+ *	- (DesktopBronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its HTML version "Desktop Bronstein"].
+ * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its paperback version].
  *	- (Kuipers02): J. B. Kuipers, ISBN: 0-691-05872-5 (2002).
  */
 
@@ -572,7 +573,8 @@ requires m::is_basic_quat<t_quat>
 
 /**
  * quat / quat
- * @see (Bronstein08), chapter 4, equation (4.168)
+ * @see (DesktopBronstein08), chapter 4, equation (4.168)
+ * @see (Bronstein08), chapter 4, p. 297, equation (4.115)
  */
 template<class t_quat>
 t_quat operator/(const t_quat& quat1, const t_quat& quat2)

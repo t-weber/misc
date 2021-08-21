@@ -7,7 +7,8 @@
  * @see references for algorithms:
  * 	- (Arens15): T. Arens et al., ISBN: 978-3-642-44919-2, DOI: 10.1007/978-3-642-44919-2 (2015).
  * 	- (Arfken13): G. B. Arfken et al., ISBN: 978-0-12-384654-9, DOI: 10.1016/C2009-0-30629-7 (2013).
- * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its html version "Desktop Bronstein"].
+ *	- (DesktopBronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its HTML version "Desktop Bronstein"].
+ * 	- (Bronstein08): I. N. Bronstein et al., ISBN: 978-3-8171-2017-8 (2008) [in its paperback version].
  * 	- (Merziger06): G. Merziger and T. Wirth, ISBN: 3923923333 (2006).
  * 	- (Scarpino11): M. Scarpino, ISBN: 978-1-6172-9017-6 (2011).
  * 	- (Shirane02): G. Shirane et al., ISBN: 978-0-5214-1126-4 (2002).
@@ -3549,7 +3550,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 /**
  * phase gate
  * @see (FUH 2021), p. 12
- * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
+ * @see (DesktopBronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
  */
 template<class t_mat, class t_cplx = typename t_mat::value_type, class t_real = typename t_cplx::value_type>
 const t_mat& phasegate(t_cplx phase = pi<t_real>/t_real(2))
@@ -3568,7 +3569,7 @@ requires is_mat<t_mat> && is_complex<t_cplx>
 
 /**
  * discrete phase gate
- * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
+ * @see (DesktopBronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 25
  */
 template<class t_mat, class t_cplx = typename t_mat::value_type, class t_real = typename t_cplx::value_type>
 const t_mat& phasegate_discrete(t_real k = 1)
@@ -3615,7 +3616,7 @@ requires is_mat<t_mat> && is_complex<typename t_mat::value_type>
 
 /**
  * controlled unitary gate
- * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 27
+ * @see (DesktopBronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 27
  */
 template<class t_mat>
 t_mat cunitary(const t_mat& U22, bool flipped = false)
@@ -3986,7 +3987,7 @@ requires is_basic_mat<t_mat>
  * <A> = tr( A * rho )
  * polarisation density matrix: rho = 0.5 * (1 + <P|sigma>)
  *
- * @see (Bronstein08), Ch. 21 (Zusatzkapitel.pdf), pp. 11-12, p. 24
+ * @see (DesktopBronstein08), Ch. 21 (Zusatzkapitel.pdf), pp. 11-12, p. 24
  * @see https://doi.org/10.1016/B978-044451050-1/50006-9
  */
 template<class t_vec, class t_mat>
@@ -3999,7 +4000,7 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * bloch vector
- * @see (Bronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 24
+ * @see (DesktopBronstein08), Ch. 22 (Zusatzkapitel.pdf), p. 24
  */
 template<class t_vec, class t_mat>
 t_vec bloch_vector(const t_mat& state_density)
@@ -4282,7 +4283,8 @@ requires is_quat<t_quat>
 
 /**
  * quat / quat
- * @see (Bronstein08), chapter 4, equation (4.168)
+ * @see (DesktopBronstein08), chapter 4, equation (4.168)
+ * @see (Bronstein08), chapter 4, p. 297, equation (4.115)
  * @see also (Kuipers02), p. 112
  */
 template<class t_quat>
@@ -4297,7 +4299,8 @@ requires m::is_quat<t_quat>
 /**
  * quaternion exponential
  * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
- * @see (Bronstein08), chapter 4, equation (4.170)
+ * @see (DesktopBronstein08), chapter 4, equation (4.170)
+ * @see (Bronstein08), chapter 4, p. 297, equation (4.117)
  */
 template<class t_quat, class t_vec>
 t_quat exp(const t_quat& quat)
@@ -4344,7 +4347,8 @@ requires is_quat<t_quat> && is_vec<t_vec>
 
 /**
  * quaternion power
- * @see (Bronstein08), chapter 4, equation (4.180)
+ * @see (DesktopBronstein08), chapter 4, equation (4.180)
+ * @see (Bronstein08), chapter 4, p. 298, equation (4.127)
  */
 template<class t_quat, class t_vec>
 t_quat pow(const t_quat& quat, typename t_quat::value_type x)
@@ -4359,6 +4363,7 @@ requires is_quat<t_quat> && is_vec<t_vec>
  * unit quaternion from rotation axis and angle (quaternion version of Euler formula)
  * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
  * @see https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
+ * @see (Bronstein08), chapter 4, pp. 301-302
  */
 template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
 t_quat from_rotaxis(const t_vec& vec, t_real angle)
@@ -4377,6 +4382,7 @@ requires is_quat<t_quat> && is_vec<t_vec>
  * rotation normalised axis and angle from unit quaternion (quaternion version of Euler formula)
  * @see https://en.wikipedia.org/wiki/Quaternion#Exponential,_logarithm,_and_power_functions
  * @see https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
+ * @see (Bronstein08), chapter 4, pp. 301-302
  *
  * verifying equivalence with rodrigues formula (function rotation()) by applying a test vector x
  *
@@ -4421,7 +4427,8 @@ requires is_quat<t_quat> && is_vec<t_vec>
 
 /**
  * convert a quaternion to an su(2) matrix
- * @see (Bronstein08), chapter 4, equations (4.163a) and (4.163b)
+ * @see (DesktopBronstein08), chapter 4, equations (4.163a) and (4.163b)
+ * @see (Bronstein08), chapter 4, p. 296, equation (4.110a) and (4.110b)
  */
 template<class t_quat, class t_vec, class t_mat_cplx,
 	class t_real = typename t_quat::value_type,
@@ -4451,7 +4458,8 @@ requires is_quat<t_quat> && is_vec<t_vec> && is_mat<t_mat_cplx>
 
 /**
  * convert a quaternion to an so(3) matrix
- * @see (Bronstein08), chapter 4, equation (4.194)
+ * @see (DesktopBronstein08), chapter 4, equation (4.194)
+ * @see (Bronstein08), chapter 4, p. 301, equation (4.142)
  */
 template<class t_quat, class t_vec, class t_mat, class t_real = typename t_quat::value_type>
 t_mat to_so3(const t_quat& quat)
@@ -4473,7 +4481,8 @@ requires is_quat<t_quat> && is_vec<t_vec> && is_mat<t_mat>
 
 /**
  * linear interpolation
- * @see (Bronstein08), chapter 4, equation (4.206)
+ * @see (DesktopBronstein08), chapter 4, equation (4.206)
+ * @see (Bronstein08), chapter 4, p. 306, equation (4.154)
  */
 template<class t_quat, class t_real = typename t_quat::value_type>
 t_quat lerp(const t_quat& quat1, const t_quat& quat2, t_real t)
@@ -4485,7 +4494,8 @@ requires is_quat<t_quat>
 
 /**
  * spherical linear interpolation
- * @see (Bronstein08), chapter 4, equation (4.207)
+ * @see (DesktopBronstein08), chapter 4, equation (4.207)
+ * @see (Bronstein08), chapter 4, p. 306, equation (4.155)
  */
 template<class t_quat, class t_vec, class t_real = typename t_quat::value_type>
 t_quat slerp(const t_quat& quat1, const t_quat& quat2, t_real t)
