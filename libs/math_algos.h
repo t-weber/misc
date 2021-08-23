@@ -3335,10 +3335,31 @@ requires is_mat<t_mat>
 	// P * x = ( z*(n0+f)/(n-f) + w*sc*n*f/(n-f) )  =>  ( -(n0+f)/(n-f) - w/z*sc*n*f/(n-f) )
 	//         ( -z                              )      ( 1                                )
 	return create<t_mat>({
-		c*ratio,    0.,     0.,                 0.,
-		0,          ys*c,   0.,                 0.,
-		0.,         0.,     zs*(n0+f)/(n-f),    sc*n*f/(n-f),
-		0.,         0.,     -zs,                0.
+		c*ratio,    0.,     0.,                         0. /* t_x = 0, because it's already centred */,
+		0.,         ys*c,   0.,                         0. /* t_y = 0, because it's already centred */,
+		0.,         0.,     zs*(n0+f)/(n-f),            sc*n*f/(n-f),
+		0.,         0.,     -zs /* persp. division */,  0.
+	});
+}
+
+
+/**
+ * simple perspective projection matrix (homogeneous 4x4), without normalising the ranges
+ * @see (Kuipers02), pp. 350-351 for a simplified version of the perspective trafo
+ */
+template<class t_mat>
+t_mat hom_perspective_no_normalisation(typename t_mat::value_type n = 0.01)
+requires is_mat<t_mat>
+{
+	//         ( nx )    ( nx/z )
+	//         ( ny )    ( ny/z )
+	// P * x = ( nz ) => (  n   )
+	//         (  z )    (  1   )
+	return create<t_mat>({
+		n,  0,  0,  0,
+		0,  n,  0,  0,
+		0,  0,  n,  0,
+		0,  0,  1,  0
 	});
 }
 
