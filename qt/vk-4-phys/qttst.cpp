@@ -1206,8 +1206,8 @@ void VkRenderer::UpdatePerspective()
 	// orthogonal projection
 	else
 	{
-		m_matPerspective = m::hom_parallel<t_mat>(
-			0.01, 100., -4., 4., -4, 4., false, true, true);
+		m_matPerspective = m::hom_parallel_sym<t_mat>(
+			0.01, 100., 4., 4., false, true, true);
 	}
 
 	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matPerspective);
