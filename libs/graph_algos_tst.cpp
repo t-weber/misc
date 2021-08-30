@@ -32,6 +32,7 @@ void tst()
 
 	print_graph<t_graph>(graph, std::cout);
 	auto predecessors = dijk<t_graph>(graph, "A");
+	auto predecessors_mod = dijk_mod<t_graph>(graph, "A");
 	auto distvecs = bellman<t_graph>(graph, "A");
 	auto distvecs2 = floyd<t_graph>(graph);
 
@@ -39,6 +40,20 @@ void tst()
 	for(std::size_t i=0; i<graph.GetNumVertices(); ++i)
 	{
 		const auto& _predidx = predecessors[i];
+		if(!_predidx)
+			continue;
+
+		std::size_t predidx = *_predidx;
+		const std::string& vert = graph.GetVertexIdent(i);
+		const std::string& pred = graph.GetVertexIdent(predidx);
+
+		std::cout << "predecessor of " << vert << ": " << pred << "." << std::endl;
+	}
+
+	std::cout << "\ndijkstra (mod):" << std::endl;
+	for(std::size_t i=0; i<graph.GetNumVertices(); ++i)
+	{
+		const auto& _predidx = predecessors_mod[i];
 		if(!_predidx)
 			continue;
 

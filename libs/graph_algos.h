@@ -7,6 +7,8 @@
  * references:
  *   - (FUH 2021) "Effiziente Algorithmen" (2021), Kurs 1684, Fernuni Hagen
  *                (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/01684).
+ *   - (Erickson 2019) "Algorithms" (2019), ISBN: 978-1-792-64483-2
+ *                (http://jeffe.cs.illinois.edu/teaching/algorithms/).
  */
 
 #ifndef __GRAPH_ALGOS_H__
@@ -18,8 +20,8 @@
 #include <concepts>
 #include <iostream>
 
-#include "math_conts.h"
 #include "math_algos.h"
+#include "math_conts.h"
 
 
 // ----------------------------------------------------------------------------
@@ -130,6 +132,7 @@ void print_graph(const t_graph& graph, std::ostream& ostr = std::cout)
 /**
  * dijkstra algorithm
  * @see (FUH 2021), Kurseinheit 4, p. 17
+ * @see (Erickson 2019), p. 288
  */
 template<class t_graph> requires is_graph<t_graph>
 std::vector<std::optional<std::size_t>>
@@ -213,6 +216,7 @@ dijk(const t_graph& graph, const std::string& startvert, bool use_weights = true
 				dists[neighbouridx] = dists[vertidx] + w;
 				predecessors[neighbouridx] = vertidx;
 
+				// change distance of node neighbouridx
 #if __DIJK_IMPL_SORT__ == 1
 				// add another node with the same index but the changed distances
 				prio.push(neighbouridx);
@@ -246,6 +250,114 @@ dijk(const t_graph& graph, const std::string& startvert, bool use_weights = true
 
 		std::cout << "predecessor of " << vert << ": " << pred << "." << std::endl;
 	}*/
+
+	return predecessors;
+}
+
+
+/**
+ * dijkstra algorithm (version which also works for negative weights)
+ * @see (Erickson 2019), p. 285
+ */
+template<class t_graph> requires is_graph<t_graph>
+std::vector<std::optional<std::size_t>>
+dijk_mod(const t_graph& graph, const std::string& startvert, bool use_weights = true)
+{
+	// start index
+	auto _startidx = graph.GetVertexIndex(startvert);
+	if(!_startidx)
+		return {};
+	const std::size_t startidx = *_startidx;
+
+	// distances
+	const std::size_t N = graph.GetNumVertices();
+	using t_weight = typename t_graph::t_weight;
+
+	std::vector<t_weight> dists;
+	std::vector<std::optional<std::size_t>> predecessors;
+	dists.resize(N);
+	predecessors.resize(N);
+
+	// don't use the full maximum to prevent overflows when we're adding the weight afterwards
+	const t_weight infinity = std::numeric_limits<t_weight>::max() / 2;
+	for(std::size_t vertidx=0; vertidx<N; ++vertidx)
+		dists[vertidx] = (vertidx==startidx ? 0 : infinity);
+
+	// distance priority queue and comparator
+	auto vert_cmp = [&dists](std::size_t idx1, std::size_t idx2) -> bool
+	{
+		// sort by ascending value: !operator<
+		return dists[idx1] >= dists[idx2];
+	};
+
+#if __DIJK_IMPL_SORT__ == 1
+	std::priority_queue<std::size_t, std::vector<std::size_t>, decltype(vert_cmp)>
+		prio{vert_cmp};
+#elif __DIJK_IMPL_SORT__ == 2 || __DIJK_IMPL_SORT__ == 3
+	std::vector<std::size_t> prio;
+	prio.reserve(N);
+#endif
+
+	// push only start index, not all indices
+#if __DIJK_IMPL_SORT__ == 1
+	prio.push(startidx);
+#elif __DIJK_IMPL_SORT__ == 2 || __DIJK_IMPL_SORT__ == 3
+	prio.push_back(startidx);
+#endif
+
+/*#if __DIJK_IMPL_SORT__ == 2
+	std::make_heap(prio.begin(), prio.end(), vert_cmp);
+#elif __DIJK_IMPL_SORT__ == 3
+	std::sort(prio.begin(), prio.end(), vert_cmp);
+#endif*/
+
+	while(prio.size())
+	{
+#if __DIJK_IMPL_SORT__ == 1
+		std::size_t vertidx = prio.top();
+		prio.pop();
+#elif __DIJK_IMPL_SORT__ == 2
+		std::size_t vertidx = *prio.begin();
+		std::pop_heap(prio.begin(), prio.end(), vert_cmp);
+		prio.pop_back();
+#elif __DIJK_IMPL_SORT__ == 3
+		std::size_t vertidx = *prio.rbegin();
+		prio.pop_back();
+#endif
+
+		std::vector<std::size_t> neighbours = graph.GetNeighbours(vertidx);
+		for(std::size_t neighbouridx : neighbours)
+		{
+			t_weight w = use_weights ? graph.GetWeight(vertidx, neighbouridx) : t_weight{1};
+
+			// is the path from startidx to neighbouridx over vertidx shorter than from startidx to neighbouridx?
+			if(dists[vertidx] + w < dists[neighbouridx])
+			{
+				dists[neighbouridx] = dists[vertidx] + w;
+				predecessors[neighbouridx] = vertidx;
+
+				// insert new node or change distance of node neighbouridx
+#if __DIJK_IMPL_SORT__ == 1
+				// add another node with the same index but the changed distances
+				prio.push(neighbouridx);
+#elif __DIJK_IMPL_SORT__ == 2
+				// resort the priority queue heap after the distance changes
+				if(std::find(prio.begin(), prio.end(), neighbouridx) != prio.end())
+					std::make_heap(prio.begin(), prio.end(), vert_cmp);
+				// ... or insert the new node index if it's not in the queue yet
+				else
+					prio.push_back(neighbouridx);
+#elif __DIJK_IMPL_SORT__ == 3
+				// resort with changed distances
+				if(std::find(prio.begin(), prio.end(), neighbouridx) != prio.end())
+					std::sort(prio.begin(), prio.end(), vert_cmp);
+				// ... or insert the new node index if it's not in the queue yet
+				else
+					prio.push_back(neighbouridx);
+#endif
+			}
+		}
+	}
 
 	return predecessors;
 }

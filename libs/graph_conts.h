@@ -18,8 +18,8 @@
 #include <optional>
 #include <type_traits>
 
-#include "math_conts.h"
 #include "math_algos.h"
+#include "math_conts.h"
 
 
 template<class T, class t_val = typename std::tuple_element<0, T>::type>
