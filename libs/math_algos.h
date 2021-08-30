@@ -14,6 +14,7 @@
  * 	- (Shirane02): G. Shirane et al., ISBN: 978-0-5214-1126-4 (2002).
  * 	- (Kuipers02): J. B. Kuipers, ISBN: 0-691-05872-5 (2002).
  * 	- (FUH 2021): "Effiziente Algorithmen" (2021), Kurs 1684, Fernuni Hagen (https://vu.fernuni-hagen.de/lvuweb/lvu/app/Kurs/01684).
+ * 	- (Sellers 2014): G. Sellers et al., ISBN: 978-0-321-90294-8 (2014).
  */
 
 #ifndef __MATH_ALGOS_H__
@@ -700,7 +701,7 @@ requires is_mat<t_mat> && is_basic_vec<t_vec>
 {
 	using t_size = decltype(mat.size1());
 
-	for(t_size i=0; i<mat.size1(); ++i)
+	for(t_size i=0; i<std::min(mat.size1(), vec.size()); ++i)
 		mat(i, col) = vec[i];
 }
 
@@ -714,7 +715,7 @@ requires is_mat<t_mat> && is_basic_vec<t_vec>
 {
 	using t_size = decltype(mat.size2());
 
-	for(t_size i=0; i<mat.size2(); ++i)
+	for(t_size i=0; i<std::min(mat.size2(), vec.size()); ++i)
 		mat(row, i) = vec[i];
 }
 
@@ -3441,10 +3442,10 @@ requires is_mat<t_mat>
 	using T = typename t_mat::value_type;
 
 	return create<t_mat>({
-		T(0.5)*w, 	0., 		0., 			T(0.5)*w,
-		0, 			T(0.5)*h, 	0., 			T(0.5)*h,
-		0.,			0.,			T(0.5)*(f-n), 	T(0.5)*(f+n),
-		0.,			0.,			0.,				1.
+		T(0.5)*w,  0.,        0.,            T(0.5)*w,
+		0,         T(0.5)*h,  0.,            T(0.5)*h,
+		0.,        0.,        T(0.5)*(f-n),  T(0.5)*(f+n),
+		0.,        0.,        0.,            1.
 	});
 }
 
@@ -3457,11 +3458,23 @@ t_mat hom_translation(t_real x, t_real y, t_real z)
 requires is_mat<t_mat>
 {
 	return create<t_mat>({
-		1., 	0., 	0., 	x,
-		0., 	1., 	0., 	y,
-		0.,		0.,		1., 	z,
-		0.,		0.,		0.,		1.
+		1.,  0.,  0.,  x,
+		0.,  1.,  0.,  y,
+		0.,  0.,  1.,  z,
+		0.,  0.,  0.,  1.
 	});
+}
+
+
+/**
+ * translation matrix in homogeneous coordinates
+ */
+template<class t_mat, class t_vec>
+t_mat hom_translation(const t_vec& vec)
+requires is_mat<t_mat> && is_vec<t_vec>
+{
+	return hom_translation<t_mat, typename t_mat::value_type>(
+		vec[0], vec[1], vec[2]);
 }
 
 
@@ -3473,14 +3486,29 @@ t_mat hom_scaling(t_real x, t_real y, t_real z)
 requires is_mat<t_mat>
 {
 	return create<t_mat>({
-		x, 		0., 	0., 	0.,
-		0., 	y, 		0., 	0.,
-		0.,		0.,		z, 		0.,
-		0.,		0.,		0.,		1.
+		x,   0.,  0.,  0.,
+		0.,  y,   0.,  0.,
+		0.,  0.,  z,   0.,
+		0.,  0.,  0.,  1.
 	});
 }
 
 
+/**
+ * scaling matrix in homogeneous coordinates
+ */
+template<class t_mat, class t_vec>
+t_mat hom_scaling(const t_vec& vec)
+requires is_mat<t_mat> && is_vec<t_vec>
+{
+	return hom_scaling<t_mat, typename t_mat::value_type>(
+		vec[0], vec[1], vec[2]);
+}
+
+
+/**
+ * rotation matrix in homogeneous coordinates
+ */
 template<class t_mat, class t_vec>
 t_mat hom_rotation(const t_vec& axis, const typename t_vec::value_type angle, bool is_normalised=1)
 requires is_vec<t_vec> && is_mat<t_mat>
@@ -3491,6 +3519,50 @@ requires is_vec<t_vec> && is_mat<t_mat>
 	m::convert<t_mat, t_mat>(rot_hom, rot);
 
 	return rot_hom;
+}
+
+
+/**
+ * "look at" matrix in homogeneous coordinates
+ * @see (Sellers 2014), pp. 78-79
+ * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluLookAt.xml
+ */
+template<class t_mat, class t_vec>
+t_mat hom_lookat(const t_vec& pos, const t_vec& target, const t_vec& _up)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	//using t_real = typename t_mat::value_type;
+
+	// right-hand system
+	t_vec front = -(target - pos);
+	t_vec side = cross<t_vec>({_up, front});
+	t_vec up = cross<t_vec>({front, side});
+
+	// unit vectors
+	front = front / norm<t_vec>(front);
+	up = up / norm<t_vec>(up);
+	side = side / norm<t_vec>(side);
+
+	// rotation matrix
+	t_mat rot = unit<t_mat>(4);
+	set_col<t_mat, t_vec>(rot, side, 0);
+	set_col<t_mat, t_vec>(rot, up, 1);
+	set_col<t_mat, t_vec>(rot, front, 2);
+
+	// inverted rotation matrix
+	t_mat rot_inv = trans<t_mat>(rot);
+
+	/*t_vec pos_newsys = create<t_vec>({
+		inner<t_vec>(pos, side),
+		inner<t_vec>(pos, up),
+		inner<t_vec>(pos, front)
+	});*/
+
+	// inverted translation matrix
+	t_mat trans_inv = hom_translation<t_mat, t_vec>(-pos);
+
+	// (trans * rot)^(-1)
+	return rot_inv * trans_inv;
 }
 
 

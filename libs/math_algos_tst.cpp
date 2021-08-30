@@ -320,6 +320,18 @@ void vecmat_tsts_hom()
 	std::cout << matPersp(2,0) << " " << matPersp(2,1) << " " << matPersp(2,2) << " " << matPersp(2,3) << "\n";
 	std::cout << matPersp(3,0) << " " << matPersp(3,1) << " " << matPersp(3,2) << " " << matPersp(3,3) << "\n";
 
+	std::cout << "\nlook at\n";
+	t_vec pos = m::create<t_vec>({0, 0, 5});
+	t_vec target = m::create<t_vec>({0, 0, 0});
+	t_vec up = m::create<t_vec>({0, 1, 0});
+	t_mat matL = hom_lookat<t_mat>(pos, target, up);
+	std::cout << matL(0,0) << " " << matL(0,1) << " " << matL(0,2) << " " << matL(0,3) << "\n";
+	std::cout << matL(1,0) << " " << matL(1,1) << " " << matL(1,2) << " " << matL(1,3) << "\n";
+	std::cout << matL(2,0) << " " << matL(2,1) << " " << matL(2,2) << " " << matL(2,3) << "\n";
+	std::cout << matL(3,0) << " " << matL(3,1) << " " << matL(3,2) << " " << matL(3,3) << "\n";
+
+
+	std::cout << std::endl;
 	auto fktProj = [&matPersp](const t_vec& vec1)
 	{
 		t_vec vec1p = matPersp * vec1;

@@ -1207,7 +1207,7 @@ void VkRenderer::UpdatePerspective()
 	else
 	{
 		m_matPerspective = m::hom_parallel_sym<t_mat>(
-			0.01, 100., 4., 4., false, true, true);
+			0.01, 100., 8., 8., false, true, true);
 	}
 
 	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matPerspective);
