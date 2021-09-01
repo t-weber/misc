@@ -343,17 +343,27 @@ dijk_mod(const t_graph& graph, const std::string& startvert, bool use_weights = 
 #elif __DIJK_IMPL_SORT__ == 2
 				// resort the priority queue heap after the distance changes
 				if(std::find(prio.begin(), prio.end(), neighbouridx) != prio.end())
+				{
 					std::make_heap(prio.begin(), prio.end(), vert_cmp);
+				}
 				// ... or insert the new node index if it's not in the queue yet
 				else
+				{
 					prio.push_back(neighbouridx);
+					std::make_heap(prio.begin(), prio.end(), vert_cmp);
+				}
 #elif __DIJK_IMPL_SORT__ == 3
 				// resort with changed distances
 				if(std::find(prio.begin(), prio.end(), neighbouridx) != prio.end())
+				{
 					std::sort(prio.begin(), prio.end(), vert_cmp);
+				}
 				// ... or insert the new node index if it's not in the queue yet
 				else
+				{
 					prio.push_back(neighbouridx);
+					std::sort(prio.begin(), prio.end(), vert_cmp);
+				}
 #endif
 			}
 		}
