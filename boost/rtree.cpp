@@ -27,13 +27,10 @@
 
 #include <boost/function_output_iterator.hpp>
 #include <boost/geometry.hpp>
-#include <boost/geometry/strategies/transform.hpp>
 #include <boost/type_index.hpp>
 
 namespace geo = boost::geometry;
-namespace trafo = geo::strategy::transform;
 namespace geoidx = geo::index;
-namespace strat = geo::strategy::buffer;
 namespace ty = boost::typeindex;
 
 
@@ -42,8 +39,6 @@ using t_real = double;
 template<class T = t_real>
 using t_vertex = geo::model::point<T, 2, geo::cs::cartesian>;
 
-template<class T = t_real>
-constexpr std::size_t g_iDim = geo::traits::dimension<t_vertex<T>>::value;
 template<class T = t_real> using t_box = geo::model::box<t_vertex<T>>;
 template<class T = t_real> using t_svg = geo::svg_mapper<t_vertex<T>>;
 
@@ -121,7 +116,8 @@ int main()
 		t_vertex<t_real>{1., 2.},
 		t_vertex<t_real>{5., 8.},
 		t_vertex<t_real>{7., 4.},
-		t_vertex<t_real>{10., 8.},
+		t_vertex<t_real>{9., 1.},
+		t_vertex<t_real>{10., 1.},
 		t_vertex<t_real>{10., 3.}
 	}};
 
@@ -130,8 +126,9 @@ int main()
 	t_rtree<t_real> rt1(typename t_rtree<t_real>::parameters_type(2));
 
 	// insert points
+	std::size_t cur_idx = 0;
 	for(const auto& pt : points)
-		rt1.insert(std::make_tuple(pt, 1, nullptr));
+		rt1.insert(std::make_tuple(pt, cur_idx++, nullptr));
 
 
 	std::size_t level = rt1.m_members.leafs_level;
@@ -149,14 +146,15 @@ int main()
 	geoidx::detail::rtree::apply_visitor(visitor, *rt1.m_members.root);
 
 
-	// box
-	t_rtreebox<t_real> globalbounds = rt1.bounds();
-
-
 	{
 		// svg
 		std::ofstream ofstr("rtree.svg");
 		t_svg<t_real> svg1(ofstr, 100, 100, "width=\"200px\" height=\"200px\"");
+
+		// global bounds: have to be inserted before points to avoid NaNs!
+		t_rtreebox<t_real> globalbounds = rt1.bounds();
+		svg1.add(globalbounds);
+		svg1.map(globalbounds, "stroke:#000000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
 
 		// points
 		for(const t_vertex<t_real>& pt : points)
@@ -179,9 +177,6 @@ int main()
 			svg1.add(bounds);
 			svg1.map(bounds, "stroke:#000000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
 		}
-
-		svg1.add(globalbounds);
-		svg1.map(globalbounds, "stroke:#000000; stroke-width:1px; fill:none; stroke-linecap:round; stroke-linejoin:round;", 1.);
 	}
 
 
