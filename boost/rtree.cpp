@@ -9,6 +9,8 @@
  *  * http://www.boost.org/doc/libs/1_65_1/libs/geometry/doc/html/geometry/spatial_indexes/rtree_examples.html
  *  * https://www.boost.org/doc/libs/1_76_0/libs/geometry/doc/html/geometry/reference/algorithms/buffer/buffer_7_with_strategies.html
  *  * https://github.com/boostorg/geometry/tree/develop/example
+ *  * https://github.com/boostorg/geometry/blob/develop/include/boost/geometry/index/detail/rtree/visitors/iterator.hpp
+ *  * https://github.com/boostorg/geometry/blob/develop/include/boost/geometry/index/detail/rtree/node/weak_visitor.hpp
  *
  * g++ -Wall -Wextra -Weffc++ -std=c++20 -o rtree rtree.cpp
  */
