@@ -10,7 +10,7 @@
  *  * https://www.boost.org/doc/libs/1_76_0/libs/geometry/doc/html/geometry/reference/algorithms/buffer/buffer_7_with_strategies.html
  *  * https://github.com/boostorg/geometry/tree/develop/example
  *
- * g++ -o geo geo.cpp -std=c++17
+ * g++ -std=c++17 -o geo geo.cpp
  */
 
 #include <iostream>
