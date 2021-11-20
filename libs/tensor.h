@@ -135,9 +135,10 @@ public:
 
 
 public:
-	Tensor()
+	constexpr Tensor(bool zero = true) noexcept
 	{
-		set_zero<t_cont>(m_elems);
+		if(zero)
+			set_zero<t_cont>(m_elems);
 	}
 
 
@@ -145,9 +146,47 @@ public:
 
 
 	/**
+	 * copy constructor
+	 */
+	constexpr Tensor(const Tensor<t_scalar, SIZES...>& other) noexcept
+	{
+		operator=(other);
+	}
+
+
+	/**
+	 * move constructor
+	 */
+	constexpr Tensor(Tensor<t_scalar, SIZES...>&& other) noexcept
+	{
+		operator=(std::forward<Tensor<t_scalar, SIZES...>&&>(other));
+	}
+
+
+	/**
+	 * assignment
+	 */
+	constexpr const Tensor& operator=(const Tensor<t_scalar, SIZES...>& other) noexcept
+	{
+		m_elems = other.m_elems;
+		return *this;
+	}
+
+
+	/**
+	 * movement
+	 */
+	constexpr const Tensor& operator=(Tensor<t_scalar, SIZES...>&& other) noexcept
+	{
+		m_elems = std::forward<t_cont&&>(other.m_elems);
+		return *this;
+	}
+
+
+	/**
 	 * get the total number of elements
 	 */
-	constexpr t_size size() const
+	constexpr t_size size() const noexcept
 	{
 		return m_elems.size();
 	}
@@ -203,6 +242,150 @@ public:
 			std::forward_as_tuple(dims...),
 			std::forward_as_tuple(SIZES...)));
 	}
+
+
+
+	// ------------------------------------------------------------------------
+	// operators
+
+	/**
+	 * unary +
+	 */
+	friend constexpr const Tensor<t_scalar, SIZES...>& operator+(
+		const Tensor<t_scalar, SIZES...>& t) noexcept
+	{
+		return t;
+	}
+
+
+	/**
+	 * unary -
+	 */
+	friend constexpr Tensor<t_scalar, SIZES...> operator-(
+		const Tensor<t_scalar, SIZES...>& t) noexcept
+	{
+		using t_size = decltype(t.size());
+		Tensor<t_scalar, SIZES...> t2;
+
+		for(t_size i=0; i<t.size(); ++i)
+			t2[i] = -t[i];
+
+		return t2;
+	}
+
+
+	/**
+	 * binary +
+	 */
+	friend constexpr Tensor<t_scalar, SIZES...> operator+(
+		const Tensor<t_scalar, SIZES...>& t1, const Tensor<t_scalar, SIZES...>& t2) noexcept
+	{
+		using t_size = decltype(t1.size());
+		Tensor<t_scalar, SIZES...> tret;
+
+		for(t_size i=0; i<t1.size(); ++i)
+			tret[i] = t1[i] + t2[i];
+
+		return tret;
+	}
+
+
+	/**
+	 * binary -
+	 */
+	friend constexpr Tensor<t_scalar, SIZES...> operator-(
+		const Tensor<t_scalar, SIZES...>& t1, const Tensor<t_scalar, SIZES...>& t2) noexcept
+	{
+		using t_size = decltype(t1.size());
+		Tensor<t_scalar, SIZES...> tret;
+
+		for(t_size i=0; i<t1.size(); ++i)
+			tret[i] = t1[i] - t2[i];
+
+		return tret;
+	}
+
+
+	/**
+	 * scalar multiplication
+	 */
+	friend constexpr Tensor<t_scalar, SIZES...> operator*(
+		const Tensor<t_scalar, SIZES...>& t1, const t_scalar& s) noexcept
+	{
+		using t_size = decltype(t1.size());
+		Tensor<t_scalar, SIZES...> tret;
+
+		for(t_size i=0; i<t1.size(); ++i)
+			tret[i] = t1[i] * s;
+
+		return tret;
+	}
+
+
+	/**
+	 * scalar multiplication
+	 */
+	friend constexpr Tensor<t_scalar, SIZES...> operator*(
+		const t_scalar& s, const Tensor<t_scalar, SIZES...>& t1) noexcept
+	{
+		return operator*(t1, s);
+	}
+
+
+	/**
+	 * scalar division
+	 */
+	friend constexpr Tensor<t_scalar, SIZES...> operator/(
+		const Tensor<t_scalar, SIZES...>& t1, const t_scalar& s) noexcept
+	{
+		return operator*(t1, t_scalar(1)/s);
+	}
+
+
+	/**
+	 * addition
+	 */
+	constexpr Tensor<t_scalar, SIZES...>& operator+=(const Tensor<t_scalar, SIZES...>& t) noexcept
+	{
+		for(t_size i=0; i<size(); ++i)
+			operator[](i) += t[i];
+
+		return *this;
+	}
+
+
+	/**
+	 * subtraction
+	 */
+	constexpr Tensor<t_scalar, SIZES...>& operator-=(const Tensor<t_scalar, SIZES...>& t) noexcept
+	{
+		for(t_size i=0; i<size(); ++i)
+			operator[](i) -= t[i];
+
+		return *this;
+	}
+
+
+	/**
+	 * scalar multiplication
+	 */
+	constexpr Tensor<t_scalar, SIZES...>& operator*=(const t_scalar& s) noexcept
+	{
+		for(t_size i=0; i<size(); ++i)
+			operator[](i) *= s;
+
+		return *this;
+	}
+
+
+	/**
+	 * scalar division
+	 */
+	constexpr Tensor<t_scalar, SIZES...>& operator/=(const t_scalar& s) noexcept
+	{
+		return operator*=(t_scalar(1)/s);
+	}
+	// ------------------------------------------------------------------------
 
 
 private:
