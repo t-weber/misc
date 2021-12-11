@@ -89,6 +89,48 @@ int main()
 				std::cerr << "Error: Function \"lib_print\" was not found." << std::endl;
 			}
 
+
+			// import function
+			if(lib->has("lib_print_str"))
+			{
+				using t_fkt = void(*)(const std::string&);
+				using t_fkt_direct = std::remove_pointer_t<t_fkt>;
+
+#ifndef __MINGW32__
+				t_fkt funcPrint = lib->get<t_fkt>("lib_print_str");
+#else
+				// mingw needs to have function pointers removed:
+				t_fkt funcPrint = lib->get<t_fkt_direct>("lib_print_str");
+#endif
+				funcPrint("Test-String");
+			}
+			else
+			{
+				std::cerr << "Error: Function \"lib_print_str\" was not found." << std::endl;
+			}
+
+
+			// import function
+			if(lib->has("lib_get_vec"))
+			{
+				using t_fkt = std::vector<int>(*)();
+				using t_fkt_direct = std::remove_pointer_t<t_fkt>;
+
+#ifndef __MINGW32__
+				t_fkt funcPrint = lib->get<t_fkt>("lib_get_vec");
+#else
+				// mingw needs to have function pointers removed:
+				t_fkt funcPrint = lib->get<t_fkt_direct>("lib_get_vec");
+#endif
+				std::vector<int> vec = funcPrint();
+				for(int i : vec)
+					std::cout << "vector component: " << i << std::endl;
+			}
+			else
+			{
+				std::cerr << "Error: Function \"lib_print\" was not found." << std::endl;
+			}
+
 			// import function
 			if(lib->has("lib_calc_i"))
 			{
@@ -124,7 +166,7 @@ int main()
 #ifndef __MINGW32__
 	// direct usage of function
 	{
-		auto func = dll::import<void(*)()>(pathLib, "lib_print", loadmode);
+		auto func = dll::import_symbol<void(*)()>(pathLib, "lib_print", loadmode);
 		if(func)
 		{
 			(*func)();
