@@ -91,7 +91,7 @@ public:
 		std::shared_ptr<btDynamicsWorld> world, VkWnd* wnd);
 	virtual ~VkRenderer();
 	
-	void CreateObjects();
+	void AddObject(const PolyObject& obj);
 
 	virtual void preInitResources() override;
 	virtual void initResources() override;

@@ -115,7 +115,9 @@ void PolyObject::CreatePlaneGeometry(
 
 void PolyObject::CreateCubeGeometry(
 	const t_mat& mat,
-	t_real size, t_real r, t_real g, t_real b)
+	t_real size, 
+	t_real r, t_real g, t_real b,
+	t_real m)
 {
 	// 3d object
 	auto solid = m::create_cube<t_vec3>(size);
@@ -136,7 +138,7 @@ void PolyObject::CreateCubeGeometry(
 	m_mat = mat;
 
 	// rigid body
-	btScalar mass{1.f};
+	btScalar mass = btScalar(m);
 	btVector3 com{0, 0, 0};
 	m_shape = std::make_shared<btBoxShape>(btVector3{size, size, size});
 	m_shape->calculateLocalInertia(mass, com);
@@ -148,7 +150,9 @@ void PolyObject::CreateCubeGeometry(
 
 void PolyObject::CreateSphereGeometry(
 	const t_mat& mat,
-	t_real rad, t_real r, t_real g, t_real b)
+	t_real rad, 
+	t_real r, t_real g, t_real b, 
+	t_real m)
 {
 	// 3d object
 	auto solid = m::create_icosahedron<t_vec3>(1);
@@ -173,7 +177,7 @@ void PolyObject::CreateSphereGeometry(
 	m_mat = mat;
 
 	// rigid body
-	btScalar mass{1.f};
+	btScalar mass = btScalar(m);
 	btVector3 com{0, 0, 0};
 	m_shape = std::make_shared<btSphereShape>(rad);
 	m_shape->calculateLocalInertia(mass, com);
@@ -186,7 +190,8 @@ void PolyObject::CreateSphereGeometry(
 void PolyObject::CreateCylinderGeometry(
 	const t_mat& mat,
 	t_real rad, t_real height,
-	t_real r, t_real g, t_real b)
+	t_real r, t_real g, t_real b,
+	t_real m)
 {
 	// 3d object
 	auto solid = m::create_cylinder<t_vec3>(rad, height, 1, 32);
@@ -207,12 +212,14 @@ void PolyObject::CreateCylinderGeometry(
 		m_vecCols.push_back(b); m_vecCols.push_back(1);
 	}
 	m_mat = mat;
+	//t_mat mat_rot = m_mat * m::rotation<t_mat, t_vec>(
+	//	m::create<t_vec>({1,0,0}), m::pi<t_real>*0.5);
 
 	// rigid body
-	btScalar mass{1.f};
+	btScalar mass = btScalar(m);
 	btVector3 com{0, 0, 0};
 	// TODO: get correct axis
-	m_shape = std::make_shared<btCylinderShape>(btVector3{height*0.5, rad, rad});
+	m_shape = std::make_shared<btCylinderShapeZ>(btVector3{rad, 0, height*0.5});
 	m_shape->calculateLocalInertia(mass, com);
 	m_state = std::make_shared<btDefaultMotionState>(to_bttrafo(m_mat));
 	m_rigid_body = std::make_shared<btRigidBody>(

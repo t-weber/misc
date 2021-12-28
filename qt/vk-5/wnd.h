@@ -48,6 +48,9 @@ public:
 	virtual void keyPressEvent(QKeyEvent *pEvt) override;
 	virtual void keyReleaseEvent(QKeyEvent *pEvt) override;
 
+	void CreateObjects();
+	VkRenderer* GetRenderer() { return m_vkrenderer; }
+
 signals:
 	void EmitStatusMsg(const QString& msg);
 };
@@ -68,6 +71,8 @@ protected:
 public:
 	Wnd(VkWnd *vkwnd, QWidget *parent=nullptr);
 	virtual ~Wnd();
+
+	VkWnd* GetVkWnd() { return m_vkwnd; }
 };
 
 #endif

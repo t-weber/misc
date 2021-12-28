@@ -27,6 +27,30 @@
 
 
 // ----------------------------------------------------------------------------
+// helper functions
+// ----------------------------------------------------------------------------
+
+template<class t_num>
+t_num get_rand(t_num min=1, t_num max=-1)
+{
+	static std::mt19937 rng{std::random_device{}()};
+
+	if(max <= min)
+	{
+		min = std::numeric_limits<t_num>::lowest() / 10.;
+		max = std::numeric_limits<t_num>::max() / 10.;
+	}
+
+	if constexpr(std::is_integral_v<t_num>)
+		return std::uniform_int_distribution<t_num>(min, max)(rng);
+	else
+		return std::uniform_real_distribution<t_num>(min, max)(rng);
+}
+// ----------------------------------------------------------------------------
+
+
+
+// ----------------------------------------------------------------------------
 // vk window
 // ----------------------------------------------------------------------------
 
@@ -72,7 +96,114 @@ QVulkanWindowRenderer* VkWnd::createRenderer()
 	if(m_vkrenderer)
 		delete m_vkrenderer;
 
-	return m_vkrenderer = new VkRenderer(m_vkinst, m_world, this);
+	m_vkrenderer = new VkRenderer(m_vkinst, m_world, this);	
+
+	CreateObjects();
+	return m_vkrenderer;
+}
+
+
+void VkWnd::CreateObjects()
+{
+	// ------------------------------------------------------------------------
+	// add objects
+	// ------------------------------------------------------------------------
+	VkRenderer *renderer = GetRenderer();
+
+	// planes
+	t_real plane_size = 10.;
+
+	PolyObject plane;
+	plane.CreatePlaneGeometry(
+		m::hom_translation<t_mat, t_real>(0, -2, 0)*
+			m::rotation<t_mat, t_vec>(m::create<t_vec>({1,1,0}), m::pi<t_real>*0.01),
+		m::create<t_vec3>({0, -1, 0}), plane_size, 0.5, 0.5, 0.5);
+	renderer->AddObject(plane);
+
+	PolyObject plane2;
+	plane2.CreatePlaneGeometry(
+		m::hom_translation<t_mat, t_real>(-plane_size*1.5, -8, 0),
+		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
+	renderer->AddObject(plane2);
+
+	PolyObject plane3;
+	plane3.CreatePlaneGeometry(
+		m::hom_translation<t_mat, t_real>(plane_size*1.5, -8, 0),
+		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
+	renderer->AddObject(plane3);
+
+	PolyObject plane4;
+	plane4.CreatePlaneGeometry(
+		m::hom_translation<t_mat, t_real>(0., -8, -plane_size*1.5),
+		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
+	renderer->AddObject(plane4);
+
+	PolyObject plane5;
+	plane5.CreatePlaneGeometry(
+		m::hom_translation<t_mat, t_real>(0., -8, plane_size*1.5),
+		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
+	renderer->AddObject(plane5);
+
+	// cubes
+	for(std::size_t idx=0; idx<50; ++idx)
+	{
+		t_real x = get_rand<t_real>(-plane_size, plane_size);
+		t_real y = get_rand<t_real>(10., 30.);
+		t_real z = get_rand<t_real>(-plane_size, plane_size);
+		t_real rot_x = get_rand<t_real>(-m::pi<t_real>*0.5, m::pi<t_real>*0.5);
+		t_real rot_y = get_rand<t_real>(-m::pi<t_real>*0.5, m::pi<t_real>*0.5);
+		t_real size = get_rand<t_real>(0.333, 1.5);
+		t_real mass = get_rand<t_real>(5., 10.);
+		t_real col = get_rand<t_real>(0., 1.);
+
+		PolyObject box;
+		box.CreateCubeGeometry(
+			m::hom_translation<t_mat, t_real>(x, y, z) *
+				m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), rot_x) *
+				m::rotation<t_mat, t_vec>(m::create<t_vec>({0,1,0}), rot_y),
+			size, col, 0., 0., mass);
+		renderer->AddObject(box);
+	}
+
+	// spheres
+	for(std::size_t idx=0; idx<500; ++idx)
+	{
+		t_real x = get_rand<t_real>(-plane_size, plane_size);
+		t_real y = get_rand<t_real>(30., 500.);
+		t_real z = get_rand<t_real>(-plane_size, plane_size);
+		t_real rad = get_rand<t_real>(0.333, 0.75);
+		t_real mass = get_rand<t_real>(0.1, 1.);
+		t_real col = get_rand<t_real>(0., 1.);
+
+		PolyObject sphere;
+		sphere.CreateSphereGeometry(
+			m::hom_translation<t_mat, t_real>(x, y, z),
+			rad, 0., 0., col, mass);
+		renderer->AddObject(sphere);
+	}
+
+	// cylinder
+	for(std::size_t idx=0; idx<10; ++idx)
+	{
+		t_real x = get_rand<t_real>(-plane_size, plane_size);
+		t_real y = get_rand<t_real>(5., 10.);
+		t_real z = get_rand<t_real>(-plane_size, plane_size);
+		t_real rot_x = get_rand<t_real>(-m::pi<t_real>*0.5, m::pi<t_real>*0.5);
+		t_real rot_y = get_rand<t_real>(-m::pi<t_real>*0.5, m::pi<t_real>*0.5);
+		t_real rad = get_rand<t_real>(0.333, 1.5);
+		t_real height = get_rand<t_real>(0.5, 2.);
+		t_real mass = get_rand<t_real>(1, 2.);
+		t_real col = get_rand<t_real>(0., 1.);
+
+		PolyObject cyl;
+		cyl.CreateCylinderGeometry(
+			m::hom_translation<t_mat, t_real>(x, y, z) *
+				m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), rot_x) *
+				m::rotation<t_mat, t_vec>(m::create<t_vec>({0,1,0}), rot_y),
+			rad, height, 0., col, 0., mass);
+		renderer->AddObject(cyl);
+	}
+	// ------------------------------------------------------------------------
 }
 
 
@@ -151,7 +282,8 @@ void VkWnd::keyReleaseEvent(QKeyEvent *pEvt)
 // ----------------------------------------------------------------------------
 // main window
 // ----------------------------------------------------------------------------
-Wnd::Wnd(VkWnd *vkwnd, QWidget* parent) : QMainWindow(parent), m_vkwnd{vkwnd}
+Wnd::Wnd(VkWnd *vkwnd, QWidget* parent) 
+	: QMainWindow(parent), m_vkwnd{vkwnd}
 {
 	// set the vk window as central widget
 	m_vkwidget = QWidget::createWindowContainer(m_vkwnd);
@@ -208,7 +340,7 @@ int main(int argc, char** argv)
 	// ------------------------------------------------------------------------
 	// misc initialisation
 	// ------------------------------------------------------------------------
-	QLoggingCategory::setFilterRules("*=true\n*.debug=false\n");
+	QLoggingCategory::setFilterRules("*=false\n*.debug=false\n");
 	qInstallMessageHandler([](QtMsgType ty, const QMessageLogContext& ctx, const QString& log) -> void
 	{
 		auto get_msg_type = [](const QtMsgType& _ty) -> std::string

@@ -59,14 +59,19 @@ public:
 		t_real r=0, t_real g=0, t_real b=1);
 	void CreateCubeGeometry(
 		const t_mat& mat,
-		t_real size=1., t_real r=0, t_real g=0, t_real b=1);
+		t_real size=1., 
+		t_real r=0, t_real g=0, t_real b=1, 
+		t_real m=1);
 	void CreateSphereGeometry(
 		const t_mat& mat,
-		t_real rad=1., t_real r=0, t_real g=0, t_real b=1);
+		t_real rad=1., 
+		t_real r=0, t_real g=0, t_real b=1, 
+		t_real m=1);
 	void CreateCylinderGeometry(
 		const t_mat& mat,
 		t_real rad=1., t_real height=1.,
-		t_real r=0, t_real g=0, t_real b=1);
+		t_real r=0, t_real g=0, t_real b=1,
+		t_real m=1);
 
 	std::size_t UpdateVertexBuffers(t_real* pMem, std::size_t mem_offs);
 	std::size_t GetMemOffset() const;
@@ -75,7 +80,7 @@ public:
 	const t_mat& GetMatrix() const;
 
 	void SetMatrixFromState();
-	std::shared_ptr<btRigidBody> GetRigidBody() { return m_rigid_body; }
+	std::shared_ptr<btRigidBody> GetRigidBody() const { return m_rigid_body; }
 
 	void tick(const std::chrono::milliseconds& ms);
 };

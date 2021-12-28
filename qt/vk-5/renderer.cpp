@@ -67,10 +67,7 @@ VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk,
 	std::shared_ptr<btDynamicsWorld> world, VkWnd* wnd)
 	: m_world{world}, m_vkinst{vk}, m_vkwnd{wnd}
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
-
-	// create some objects
-	CreateObjects();
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	m_cam.SetTranslation(0., 0., -3.);
 	m_cam.Update();
@@ -79,53 +76,14 @@ VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk,
 
 VkRenderer::~VkRenderer()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 
-void VkRenderer::CreateObjects()
+void VkRenderer::AddObject(const PolyObject& obj)
 {
-	// plane
-	PolyObject plane;
-	plane.CreatePlaneGeometry(
-		m::hom_translation<t_mat, t_real>(0, -2, 0),
-		m::create<t_vec3>({0, -1, 0}), 10., 0., 0., 1.);
-	m_world->addRigidBody(plane.GetRigidBody().get());
-	m_objs.emplace_back(std::move(plane));
-
-	// box 1
-	PolyObject box;
-	box.CreateCubeGeometry(
-		m::hom_translation<t_mat, t_real>(0, 10, 0) *
-			m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), m::pi<t_real>*0.25) *
-			m::rotation<t_mat, t_vec>(m::create<t_vec>({0,1,0}), m::pi<t_real>*0.25),
-		1., 1., 0., 0.);
-	m_world->addRigidBody(box.GetRigidBody().get());
-	m_objs.emplace_back(std::move(box));
-
-	// box 2
-	PolyObject box2;
-	box2.CreateCubeGeometry(
-		m::hom_translation<t_mat, t_real>(0, 15, 0.25),
-		1., 1., 0., 0.);
-	m_world->addRigidBody(box2.GetRigidBody().get());
-	m_objs.emplace_back(std::move(box2));
-
-	// sphere 1
-	PolyObject sphere1;
-	sphere1.CreateSphereGeometry(
-		m::hom_translation<t_mat, t_real>(2, 30, 0.25),
-		2., 1., 1., 0.);
-	m_world->addRigidBody(sphere1.GetRigidBody().get());
-	m_objs.emplace_back(std::move(sphere1));
-
-	// cylinder 1
-	/*PolyObject cyl1;
-	cyl1.CreateCylinderGeometry(
-		m::hom_translation<t_mat, t_real>(-5, 50, 0.25),
-		1., 2., 1., 0., 1.);
-	m_world->addRigidBody(cyl1.GetRigidBody().get());
-	m_objs.emplace_back(std::move(cyl1));*/
+	m_world->addRigidBody(obj.GetRigidBody().get());
+	m_objs.push_back(obj);
 }
 
 
@@ -195,46 +153,65 @@ void VkRenderer::UpdatePicker()
 		m_cam.GetMatrixInv(), m_matPerspective_inv,
 		m_matViewport_inv, &m_matViewport, false);
 
-	const auto& obj = m_objs[0];	// only intersect with first object
-	const auto& matObj = obj.GetMatrix();
-
-	for(std::size_t startidx=0; startidx+2<obj.GetNumVertices(); startidx+=3)
+	std::vector<std::size_t> intersecting_objects;
+	//for(std::size_t idx=0; idx<m_objs.size(); ++idx)
+	std::size_t idx = 0;
 	{
-		std::vector<t_vec3> poly
-		{{
-			hom_trafo(matObj, obj.GetVertex(startidx + 0), 1),
-			hom_trafo(matObj, obj.GetVertex(startidx + 1), 1),
-			hom_trafo(matObj, obj.GetVertex(startidx + 2), 1),
-		}};
+		const auto& obj = m_objs[idx];
+		const auto& matObj = obj.GetMatrix();
 
-		auto [vecInters, bInters, lamInters] =
-			m::intersect_line_poly<t_vec3>(
-				t_vec3(org[0], org[1], org[2]),
-				t_vec3(dir[0], dir[1], dir[2]),
-				poly);
+		// TODO: bounding box intersection check before per-polygon check
 
-		if(bInters)
+		for(std::size_t startidx=0; startidx+2<obj.GetNumVertices(); startidx+=3)
 		{
-			std::vector<t_vec3> polyuv
+			std::vector<t_vec3> poly
 			{{
-				obj.GetUV(startidx + 0),
-				obj.GetUV(startidx + 1),
-				obj.GetUV(startidx + 2)
+				hom_trafo(matObj, obj.GetVertex(startidx + 0), 1),
+				hom_trafo(matObj, obj.GetVertex(startidx + 1), 1),
+				hom_trafo(matObj, obj.GetVertex(startidx + 2), 1),
 			}};
 
-			using t_mat_tmp = m::mat<t_real>;
-			auto uv = m::poly_uv<t_mat_tmp, t_vec3>(poly[0], poly[1], poly[2],
-				polyuv[0], polyuv[1], polyuv[2], vecInters);
+			auto [vecInters, bInters, lamInters] =
+				m::intersect_line_poly<t_vec3>(
+					t_vec3(org[0], org[1], org[2]),
+					t_vec3(dir[0], dir[1], dir[2]),
+					poly);
 
-			m_veccurUV[0] = uv[0]; m_veccurUV[1] = uv[1];
+			// only calculate cursor position for first object
+			if(bInters && idx==0)
+			{
+				std::vector<t_vec3> polyuv
+				{{
+					obj.GetUV(startidx + 0),
+					obj.GetUV(startidx + 1),
+					obj.GetUV(startidx + 2)
+				}};
+
+				using t_mat_tmp = m::mat<t_real>;
+				auto uv = m::poly_uv<t_mat_tmp, t_vec3>(poly[0], poly[1], poly[2],
+					polyuv[0], polyuv[1], polyuv[2], vecInters);
+
+				m_veccurUV[0] = uv[0]; m_veccurUV[1] = uv[1];
+			}
+
+			if(bInters)
+			{
+				intersecting_objects.push_back(idx);
+				break;
+			}
 		}
 	}
+
+	/*std::cout << "intersecting objects: ";
+	for(std::size_t idx : intersecting_objects)
+		std::cout << idx << ", ";
+	std::cout << std::endl;*/
 }
 
 
 void VkRenderer::preInitResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 
@@ -462,8 +439,6 @@ void VkRenderer::CreatePipelineLayout()
 	}
 }
 
-
-
 void VkRenderer::CreatePipelineCache()
 {
 	if(!m_vkfuncs)
@@ -606,7 +581,7 @@ VkRenderer::CreatePipelineStages() const
 
 void VkRenderer::initResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	m_vkdev = m_vkwnd->device();
 	m_vkfuncs = m_vkinst->deviceFunctions(m_vkdev);
@@ -911,7 +886,7 @@ void VkRenderer::initResources()
 
 void VkRenderer::releaseResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	// handles
 	VK_DEFINE_NON_DISPATCHABLE_HANDLE(vkhandle);
@@ -1004,7 +979,7 @@ void VkRenderer::UpdatePerspective()
 
 void VkRenderer::initSwapChainResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	m_iScreenDims[0] = m_vkwnd->swapChainImageSize().width();
 	m_iScreenDims[1] = m_vkwnd->swapChainImageSize().height();
@@ -1033,19 +1008,19 @@ void VkRenderer::initSwapChainResources()
 
 void VkRenderer::releaseSwapChainResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 
 void VkRenderer::logicalDeviceLost()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 
 void VkRenderer::physicalDeviceLost()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 
