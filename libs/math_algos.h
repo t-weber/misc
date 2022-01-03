@@ -2638,7 +2638,7 @@ requires is_vec<t_vec>
 	//using T = typename t_vec::value_type;
 
 	const t_cont<t_vec>& vertices = std::get<0>(tup);
-	const t_cont<t_vec>& normals = std::get<1>(tup);
+	[[maybe_unused]] const t_cont<t_vec>& normals = std::get<1>(tup);
 	const t_cont<t_vec>& uvs = std::get<2>(tup);
 
 	t_cont<t_vec> vertices_new;

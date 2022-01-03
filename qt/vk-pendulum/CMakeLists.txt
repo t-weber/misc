@@ -13,7 +13,6 @@ find_package(Boost REQUIRED)
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Gui REQUIRED)
 find_package(Qt5Widgets REQUIRED)
-find_package(Bullet REQUIRED)
 find_package(Threads REQUIRED)
 
 set(CMAKE_AUTOUIC ON)
@@ -27,8 +26,7 @@ add_definitions(${Boost_CXX_FLAGS})
 include_directories(
 	"${PROJECT_SOURCE_DIR}"
 	"${Boost_INCLUDE_DIRS}/.."
-	"${BULLET_INCLUDE_DIRS}")
-
+)
 
 add_executable(vk
 	wnd.cpp wnd.h
@@ -39,7 +37,6 @@ add_executable(vk
 
 target_link_libraries(vk
 	"${Boost_LIBRARIES}"
-	"${BULLET_LIBRARIES}"
 	Qt5::Core Qt5::Widgets Qt5::Gui
 	Threads::Threads
 )

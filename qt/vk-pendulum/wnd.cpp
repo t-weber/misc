@@ -10,7 +10,6 @@
  *  * https://doc.qt.io/qt-5/qvulkaninstance.html
  *  * https://doc.qt.io/qt-5/qvulkanwindowrenderer.html
  *  * https://doc.qt.io/qt-5/qtgui-hellovulkanwindow-example.html
- *  * https://github.com/bulletphysics/bullet3/blob/master/examples/HelloWorld/HelloWorld.cpp
  */
 
 #include "wnd.h"
@@ -54,9 +53,8 @@ t_num get_rand(t_num min=1, t_num max=-1)
 // vk window
 // ----------------------------------------------------------------------------
 
-VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk,
-	std::shared_ptr<btDynamicsWorld> world, QWindow* parent)
-	: QVulkanWindow{parent}, m_vkinst{vk}, m_world{world}
+VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent)
+	: QVulkanWindow{parent}, m_vkinst{vk}
 {
 	setVulkanInstance(m_vkinst.get());
 
@@ -67,17 +65,33 @@ VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk,
 			if(!m_vkrenderer)
 				return;
 
-			m_world->stepSimulation(t_real(ticks.count()) / 1000.);
 			m_vkrenderer->tick(ticks);
 			m_runningtime += ticks;
 
-			t_vec pos = m_vkrenderer->GetCamera().GetPosition();
+			// pendulum mass
+			t_real t = t_real(m_runningtime.count()) / t_real(1000);
+			t_real phi = m_pendulum.GetPhi(t);
+			t_vec pos = m_pendulum.GetPos(t);
+			std::swap(pos[1], pos[2]);
+			if(PolyObject *sphere = m_vkrenderer->GetObject(m_sphere_index); sphere)
+				sphere->SetMatrix(m::hom_translation<t_mat, t_real>(pos[0], pos[1], pos[2]));
+
+			// pendulum thread
+			t_mat mat = m::unit<t_mat>(4);
+			mat *= m::hom_translation<t_mat>(0.f, m_pendulum.GetLength(), 0.f);
+			mat *= m::rotation<t_mat, t_vec>(m::create<t_vec>({0,0,1}), phi);
+			mat *= m::hom_translation<t_mat>(0.f, -m_pendulum.GetLength()*0.5f, 0.f);
+			mat *= m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), m::pi<t_real>*0.5f);
+			if(PolyObject *cyl = m_vkrenderer->GetObject(m_cyl_index); cyl)
+				cyl->SetMatrix(mat);
+
+			t_vec pos_cam = m_vkrenderer->GetCamera().GetPosition();
 
 			auto status = QString{"Running time: %1 s, camera: %2, %3, %4"}
 				.arg(m_runningtime.count()/1000, 0)
-				.arg(pos[0], 0, 'f', 1)
-				.arg(pos[1], 0, 'f', 1)
-				.arg(pos[2], 0, 'f', 1);
+				.arg(pos_cam[0], 0, 'f', 1)
+				.arg(pos_cam[1], 0, 'f', 1)
+				.arg(pos_cam[2], 0, 'f', 1);
 			emit EmitStatusMsg(status);
 		});
 
@@ -96,7 +110,7 @@ QVulkanWindowRenderer* VkWnd::createRenderer()
 	if(m_vkrenderer)
 		delete m_vkrenderer;
 
-	m_vkrenderer = new VkRenderer(m_vkinst, m_world, this);	
+	m_vkrenderer = new VkRenderer(m_vkinst, this);
 
 	CreateObjects();
 	return m_vkrenderer;
@@ -115,93 +129,33 @@ void VkWnd::CreateObjects()
 
 	PolyObject plane;
 	plane.CreatePlaneGeometry(
-		m::hom_translation<t_mat, t_real>(0, -2, 0)*
-			m::rotation<t_mat, t_vec>(m::create<t_vec>({1,1,0}), m::pi<t_real>*0.01),
-		m::create<t_vec3>({0, -1, 0}), plane_size, 0.5, 0.5, 0.5);
+		m::hom_translation<t_mat, t_real>(0, -2, 0),
+		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
 	renderer->AddObject(plane);
 
-	PolyObject plane2;
-	plane2.CreatePlaneGeometry(
-		m::hom_translation<t_mat, t_real>(-plane_size*1.5, -8, 0),
-		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
-	renderer->AddObject(plane2);
-
-	PolyObject plane3;
-	plane3.CreatePlaneGeometry(
-		m::hom_translation<t_mat, t_real>(plane_size*1.5, -8, 0),
-		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
-	renderer->AddObject(plane3);
-
-	PolyObject plane4;
-	plane4.CreatePlaneGeometry(
-		m::hom_translation<t_mat, t_real>(0., -8, -plane_size*1.5),
-		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
-	renderer->AddObject(plane4);
-
-	PolyObject plane5;
-	plane5.CreatePlaneGeometry(
-		m::hom_translation<t_mat, t_real>(0., -8, plane_size*1.5),
-		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
-	renderer->AddObject(plane5);
-
-	// cubes
-	for(std::size_t idx=0; idx<50; ++idx)
+	// sphere
 	{
-		t_real x = get_rand<t_real>(-plane_size, plane_size);
-		t_real y = get_rand<t_real>(10., 30.);
-		t_real z = get_rand<t_real>(-plane_size, plane_size);
-		t_real rot_x = get_rand<t_real>(-m::pi<t_real>*0.5, m::pi<t_real>*0.5);
-		t_real rot_y = get_rand<t_real>(-m::pi<t_real>*0.5, m::pi<t_real>*0.5);
-		t_real size = get_rand<t_real>(0.333, 1.5);
-		t_real mass = get_rand<t_real>(5., 10.);
-		t_real col = get_rand<t_real>(0., 1.);
-
-		PolyObject box;
-		box.CreateCubeGeometry(
-			m::hom_translation<t_mat, t_real>(x, y, z) *
-				m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), rot_x) *
-				m::rotation<t_mat, t_vec>(m::create<t_vec>({0,1,0}), rot_y),
-			size, col, 0., 0., mass);
-		renderer->AddObject(box);
-	}
-
-	// spheres
-	for(std::size_t idx=0; idx<500; ++idx)
-	{
-		t_real x = get_rand<t_real>(-plane_size, plane_size);
-		t_real y = get_rand<t_real>(30., 500.);
-		t_real z = get_rand<t_real>(-plane_size, plane_size);
-		t_real rad = get_rand<t_real>(0.333, 0.75);
-		t_real mass = get_rand<t_real>(0.1, 1.);
-		t_real col = get_rand<t_real>(0., 1.);
+		t_real rad = 0.5;
+		t_real col = get_rand<t_real>(0.5, 1.);
 
 		PolyObject sphere;
 		sphere.CreateSphereGeometry(
-			m::hom_translation<t_mat, t_real>(x, y, z),
-			rad, 0., 0., col, mass);
-		renderer->AddObject(sphere);
+			m::hom_translation<t_mat, t_real>(0, 0, 0),
+			rad, 0., 0., col);
+		m_sphere_index = renderer->AddObject(sphere);
 	}
 
 	// cylinder
-	for(std::size_t idx=0; idx<10; ++idx)
 	{
-		t_real x = get_rand<t_real>(-plane_size, plane_size);
-		t_real y = get_rand<t_real>(5., 10.);
-		t_real z = get_rand<t_real>(-plane_size, plane_size);
-		t_real rot_x = get_rand<t_real>(-m::pi<t_real>*0.5, m::pi<t_real>*0.5);
-		t_real rot_y = get_rand<t_real>(-m::pi<t_real>*0.5, m::pi<t_real>*0.5);
-		t_real rad = get_rand<t_real>(0.333, 1.5);
-		t_real height = get_rand<t_real>(0.5, 2.);
-		t_real mass = get_rand<t_real>(1, 2.);
-		t_real col = get_rand<t_real>(0., 1.);
+		t_real rad = 0.1;
+		t_real height = m_pendulum.GetLength();
+		t_real col = get_rand<t_real>(0.5, 1.);
 
 		PolyObject cyl;
 		cyl.CreateCylinderGeometry(
-			m::hom_translation<t_mat, t_real>(x, y, z) *
-				m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), rot_x) *
-				m::rotation<t_mat, t_vec>(m::create<t_vec>({0,1,0}), rot_y),
-			rad, height, 0., col, 0., mass);
-		renderer->AddObject(cyl);
+			m::hom_translation<t_mat, t_real>(0, 0, 0),
+			rad, height, 0., col, 0.);
+		m_cyl_index = renderer->AddObject(cyl);
 	}
 	// ------------------------------------------------------------------------
 }
@@ -381,44 +335,6 @@ int main(int argc, char** argv)
 
 
 		// ------------------------------------------------------------------------
-		// bullet
-		// ------------------------------------------------------------------------
-		auto coll = std::make_shared<btDefaultCollisionConfiguration>(btDefaultCollisionConstructionInfo{});
-		if(!coll)
-		{
-			std::cerr << "Cannot create bullet's default collision configuration." << std::endl;
-			return -1;
-		}
-		auto disp = std::make_shared<btCollisionDispatcherMt>(coll.get(), 40);
-		if(!disp)
-		{
-			std::cerr << "Cannot create bullet's default collision dispatcher." << std::endl;
-			return -1;
-		}
-		auto cache = std::make_shared<btDbvtBroadphase>();
-		if(!cache)
-		{
-			std::cerr << "Cannot create bullet's broadphase." << std::endl;
-			return -1;
-		}
-		auto solver = std::make_shared<btSequentialImpulseConstraintSolver>();
-		if(!solver)
-		{
-			std::cerr << "Cannot create bullet's solver." << std::endl;
-			return -1;
-		}
-		auto world = std::make_shared<btDiscreteDynamicsWorld>(disp.get(), cache.get(), solver.get(), coll.get());
-		if(!world)
-		{
-			std::cerr << "Cannot create bullet's dynamics world." << std::endl;
-			return -1;
-		}
-
-		world->setGravity({0, -9.81, 0});
-		// ------------------------------------------------------------------------
-
-
-		// ------------------------------------------------------------------------
 		// vk
 		// ------------------------------------------------------------------------
 		// create vk instance
@@ -470,7 +386,7 @@ int main(int argc, char** argv)
 		}
 
 		// create main and vk window
-		auto vkwnd = new VkWnd(vk, world);
+		auto vkwnd = new VkWnd(vk);
 		auto wnd = std::make_unique<Wnd>(vkwnd);
 		wnd->resize(800, 600);
 		wnd->show();

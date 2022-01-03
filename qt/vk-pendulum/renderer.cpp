@@ -1,8 +1,8 @@
 /**
- * minimal qt vk example
+ * vk renderer
  * @author Tobias Weber
  * @date Feb-2021
- * @license: see 'LICENSE.GPL' file
+ * @license see 'LICENSE.GPL' file
  *
  * References:
  *  * https://code.qt.io/cgit/qt/qtbase.git/tree/examples/vulkan/shared/trianglerenderer.cpp
@@ -13,17 +13,10 @@
  *  * https://github.com/bulletphysics/bullet3/blob/master/examples/HelloWorld/HelloWorld.cpp
  */
 
-#include "qttst.h"
+#include "renderer.h"
+#include "wnd.h"
 
-#include <QApplication>
-#include <QMainWindow>
-#include <QLoggingCategory>
-
-#include <cstddef>
-#include <cstdint>
-#include <locale>
 #include <iostream>
-#include <random>
 #include <ranges>
 #include <fstream>
 #include <filesystem>
@@ -62,232 +55,6 @@ static inline std::string get_device_type(const VkPhysicalDeviceType& ty)
 		default: return "<unknown>";
 	}
 }
-
-// ----------------------------------------------------------------------------
-
-
-
-// ----------------------------------------------------------------------------
-// 3d object
-// ----------------------------------------------------------------------------
-
-/**
- * number of floats in vertex buffer
- */
-std::size_t PolyObject::GetNumVertexBufferElements() const
-{
-	return m_vecVerts.size() + m_vecNorms.size() + m_vecCols.size() + m_vecUVs.size();
-}
-
-
-std::size_t PolyObject::GetNumVertices() const
-{
-	return m_triangles.size();
-}
-
-
-const t_vec3& PolyObject::GetVertex(std::size_t i) const
-{
-	return m_triangles[i];
-}
-
-
-const t_vec3& PolyObject::GetUV(std::size_t i) const
-{
-	return m_triangleuvs[i];
-}
-
-
-static inline btTransform to_bttrafo(const t_mat& _mat)
-{
-	btMatrix3x3 mat
-	{
-		_mat(0,0), _mat(0,1), _mat(0,2),
-		_mat(1,0), _mat(1,1), _mat(1,2),
-		_mat(2,0), _mat(2,1), _mat(2,2)
-	};
-
-	btVector3 vec{_mat(0,3), _mat(1,3), _mat(2,3)};
-
-	return btTransform{mat, vec};
-}
-
-
-void PolyObject::CreatePlaneGeometry(
-	const t_mat& mat,
-	const t_vec3& norm, t_real size,
-	t_real r, t_real g, t_real b)
-{
-	// flatten vertex array into raw float array
-	auto to_float_array = [](const std::vector<t_vec3>& verts, int iRepeat=1,
-		int iInElems=3, int iOutElems=4, t_real fillElem=1.f) -> std::vector<t_real>
-	{
-		std::vector<t_real> vecRet;
-		vecRet.reserve(iRepeat*verts.size()*iOutElems);
-
-		for(const t_vec3& vert : verts)
-		{
-			for(int i=0; i<iRepeat; ++i)
-				for(int iElem=0; iElem<iOutElems; ++iElem)
-					vecRet.push_back(iElem < iInElems ? vert[iElem] : fillElem);
-		}
-		return vecRet;
-	};
-
-	// 3d object
-	auto solid = m::create_plane<t_mat, t_vec3>(norm, size);
-	std::tie(m_triangles, m_trianglenorms, m_triangleuvs) =
-		m::subdivide_triangles<t_vec3>(m::create_triangles<t_vec3>(solid), 2);
-
-	m_vecVerts = to_float_array(m_triangles, 1, 3, 4, 1.f);
-	m_vecNorms = to_float_array(m_trianglenorms, 3, 3, 4, 0.f);
-	m_vecUVs = to_float_array(m_triangleuvs, 1, 2, 2, 0.f);
-
-	m_vecCols.reserve(4*m_triangles.size());
-	for(std::size_t iVert=0; iVert<m_triangles.size(); ++iVert)
-	{
-		m_vecCols.push_back(r); m_vecCols.push_back(g);
-		m_vecCols.push_back(b); m_vecCols.push_back(1);
-	}
-	m_mat = mat;
-
-	// rigid body
-	m_state = std::make_shared<btDefaultMotionState>(to_bttrafo(m_mat));
-	m_shape = std::make_shared<btBoxShape>(btVector3{size, 0.01, size});
-	m_rigid_body = std::make_shared<btRigidBody>(
-		btRigidBody::btRigidBodyConstructionInfo{0, m_state.get(), m_shape.get(), {0, 0, 0}});
-}
-
-
-void PolyObject::CreateCubeGeometry(
-	const t_mat& mat,
-	t_real size, t_real r, t_real g, t_real b)
-{
-	// flatten vertex array into raw float array
-	auto to_float_array = [](const std::vector<t_vec3>& verts, int iRepeat=1,
-		int iInElems=3, int iOutElems=4, t_real fillElem=1.f) -> std::vector<t_real>
-	{
-		std::vector<t_real> vecRet;
-		vecRet.reserve(iRepeat*verts.size()*iOutElems);
-
-		for(const t_vec3& vert : verts)
-		{
-			for(int i=0; i<iRepeat; ++i)
-				for(int iElem=0; iElem<iOutElems; ++iElem)
-					vecRet.push_back(iElem < iInElems ? vert[iElem] : fillElem);
-		}
-		return vecRet;
-	};
-
-	// 3d object
-	auto solid = m::create_cube<t_vec3>(size);
-	std::tie(m_triangles, m_trianglenorms, m_triangleuvs) =
-		m::subdivide_triangles<t_vec3>(m::create_triangles<t_vec3>(solid), 2);
-
-	m_vecVerts = to_float_array(m_triangles, 1, 3, 4, 1.f);
-	m_vecNorms = to_float_array(m_trianglenorms, 3, 3, 4, 0.f);
-	m_vecUVs = to_float_array(m_triangleuvs, 1, 2, 2, 0.f);
-
-	m_vecCols.reserve(4*m_triangles.size());
-	for(std::size_t iVert=0; iVert<m_triangles.size(); ++iVert)
-	{
-		m_vecCols.push_back(r); m_vecCols.push_back(g);
-		m_vecCols.push_back(b); m_vecCols.push_back(1);
-	}
-	m_mat = mat;
-
-	// rigid body
-	btScalar mass{1.f};
-	btVector3 com{0, 0, 0};
-	m_shape = std::make_shared<btBoxShape>(btVector3{size, size, size});
-	m_shape->calculateLocalInertia(mass, com);
-	m_state = std::make_shared<btDefaultMotionState>(to_bttrafo(m_mat));
-	m_rigid_body = std::make_shared<btRigidBody>(
-		btRigidBody::btRigidBodyConstructionInfo{mass, m_state.get(), m_shape.get(), com});
-
-}
-
-
-/**
- * copy vertex info to mapped memory
- */
-std::size_t PolyObject::UpdateVertexBuffers(t_real *pMemOrig, std::size_t mem_offs)
-{
-	// get offset to memory where the current vertex object is to be saved
-	t_real *pMem = pMemOrig + mem_offs;
-	m_mem_offs = mem_offs;
-
-	std::cout << "Copying " << m_vecVerts.size()/4 << " vertices." << std::endl;
-	std::size_t memidx = 0;
-	for(std::size_t vertex=0; vertex<m_vecVerts.size()/4; ++vertex)
-	{
-		// vertex
-		pMem[memidx++] = m_vecVerts[vertex*4 + 0];
-		pMem[memidx++] = m_vecVerts[vertex*4 + 1];
-		pMem[memidx++] = m_vecVerts[vertex*4 + 2];
-		pMem[memidx++] = m_vecVerts[vertex*4 + 3];
-
-		// normals
-		pMem[memidx++] = m_vecNorms[vertex*4 + 0];
-		pMem[memidx++] = m_vecNorms[vertex*4 + 1];
-		pMem[memidx++] = m_vecNorms[vertex*4 + 2];
-		pMem[memidx++] = m_vecNorms[vertex*4 + 3];
-
-		// colours
-		pMem[memidx++] = m_vecCols[vertex*4 + 0];
-		pMem[memidx++] = m_vecCols[vertex*4 + 1];
-		pMem[memidx++] = m_vecCols[vertex*4 + 2];
-		pMem[memidx++] = m_vecCols[vertex*4 + 3];
-
-		// uv coords
-		pMem[memidx++] = m_vecUVs[vertex*2 + 0];
-		pMem[memidx++] = m_vecUVs[vertex*2 + 1];
-	}
-
-	return mem_offs + memidx;
-}
-
-
-std::size_t PolyObject::GetMemOffset() const
-{
-	return m_mem_offs;
-}
-
-
-void PolyObject::SetMatrix(const t_mat& mat)
-{
-	m_mat = mat;
-}
-
-
-const t_mat& PolyObject::GetMatrix() const
-{
-	return m_mat;
-}
-
-
-void PolyObject::tick([[maybe_unused]] const std::chrono::milliseconds& ms)
-{
-	this->SetMatrixFromState();
-}
-
-
-void PolyObject::SetMatrixFromState()
-{
-	btTransform trafo{};
-	m_rigid_body->getMotionState()->getWorldTransform(trafo);
-	btMatrix3x3 mat = trafo.getBasis();
-	btVector3 pos = trafo.getOrigin();
-
-	m_mat = m::unit<t_mat>(4);
-	for(int row=0; row<3; ++row)
-	{
-		for(int col=0; col<3; ++col)
-			m_mat(row, col) = mat.getRow(row)[col];
-
-		m_mat(row, 3) = pos[row];
-	}
-}
 // ----------------------------------------------------------------------------
 
 
@@ -296,41 +63,10 @@ void PolyObject::SetMatrixFromState()
 // vk renderer
 // ----------------------------------------------------------------------------
 
-VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk,
-	std::shared_ptr<btDynamicsWorld> world, VkWnd* wnd)
-	: m_world{world}, m_vkinst{vk}, m_vkwnd{wnd}
+VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd)
+	: m_vkinst{vk}, m_vkwnd{wnd}
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
-
-	// create some objects
-	{
-		// plane
-		PolyObject plane;
-		plane.CreatePlaneGeometry(
-			m::hom_translation<t_mat, t_real>(0, -1, 0),
-			m::create<t_vec3>({0, 1, 0}), 5., 0., 0., 1.);
-		m_world->addRigidBody(plane.GetRigidBody().get());
-		m_objs.emplace_back(std::move(plane));
-
-		// box 1
-		PolyObject box;
-		box.CreateCubeGeometry(
-			m::hom_translation<t_mat, t_real>(0, 10, 0) *
-				m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), m::pi<t_real>*0.25) *
-				m::rotation<t_mat, t_vec>(m::create<t_vec>({0,1,0}), m::pi<t_real>*0.25),
-			1., 1., 0., 0.);
-		m_world->addRigidBody(box.GetRigidBody().get());
-		m_objs.emplace_back(std::move(box));
-
-		// box 2
-		PolyObject box2;
-		box2.CreateCubeGeometry(
-			m::hom_translation<t_mat, t_real>(0, 15, 0.25),
-			1., 1., 0., 0.);
-		m_world->addRigidBody(box2.GetRigidBody().get());
-		m_objs.emplace_back(std::move(box2));
-
-	}
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	m_cam.SetTranslation(0., 0., -3.);
 	m_cam.Update();
@@ -339,7 +75,17 @@ VkRenderer::VkRenderer(std::shared_ptr<QVulkanInstance>& vk,
 
 VkRenderer::~VkRenderer()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
+}
+
+
+std::size_t VkRenderer::AddObject(const PolyObject& obj)
+{
+	//m_world->addRigidBody(obj.GetRigidBody().get());
+	m_objs.push_back(obj);
+
+	// object index
+	return m_objs.size()-1;
 }
 
 
@@ -409,46 +155,65 @@ void VkRenderer::UpdatePicker()
 		m_cam.GetMatrixInv(), m_matPerspective_inv,
 		m_matViewport_inv, &m_matViewport, false);
 
-	const auto& obj = m_objs[0];	// only intersect with first object
-	const auto& matObj = obj.GetMatrix();
-
-	for(std::size_t startidx=0; startidx+2<obj.GetNumVertices(); startidx+=3)
+	std::vector<std::size_t> intersecting_objects;
+	//for(std::size_t idx=0; idx<m_objs.size(); ++idx)
+	std::size_t idx = 0;
 	{
-		std::vector<t_vec3> poly
-		{{
-			hom_trafo(matObj, obj.GetVertex(startidx + 0), 1),
-			hom_trafo(matObj, obj.GetVertex(startidx + 1), 1),
-			hom_trafo(matObj, obj.GetVertex(startidx + 2), 1),
-		}};
+		const auto& obj = m_objs[idx];
+		const auto& matObj = obj.GetMatrix();
 
-		auto [vecInters, bInters, lamInters] =
-			m::intersect_line_poly<t_vec3>(
-				t_vec3(org[0], org[1], org[2]),
-				t_vec3(dir[0], dir[1], dir[2]),
-				poly);
+		// TODO: bounding box intersection check before per-polygon check
 
-		if(bInters)
+		for(std::size_t startidx=0; startidx+2<obj.GetNumVertices(); startidx+=3)
 		{
-			std::vector<t_vec3> polyuv
+			std::vector<t_vec3> poly
 			{{
-				obj.GetUV(startidx + 0),
-				obj.GetUV(startidx + 1),
-				obj.GetUV(startidx + 2)
+				hom_trafo(matObj, obj.GetVertex(startidx + 0), 1),
+				hom_trafo(matObj, obj.GetVertex(startidx + 1), 1),
+				hom_trafo(matObj, obj.GetVertex(startidx + 2), 1),
 			}};
 
-			using t_mat_tmp = m::mat<t_real>;
-			auto uv = m::poly_uv<t_mat_tmp, t_vec3>(poly[0], poly[1], poly[2],
-				polyuv[0], polyuv[1], polyuv[2], vecInters);
+			auto [vecInters, bInters, lamInters] =
+				m::intersect_line_poly<t_vec3>(
+					t_vec3(org[0], org[1], org[2]),
+					t_vec3(dir[0], dir[1], dir[2]),
+					poly);
 
-			m_veccurUV[0] = uv[0]; m_veccurUV[1] = uv[1];
+			// only calculate cursor position for first object
+			if(bInters && idx==0)
+			{
+				std::vector<t_vec3> polyuv
+				{{
+					obj.GetUV(startidx + 0),
+					obj.GetUV(startidx + 1),
+					obj.GetUV(startidx + 2)
+				}};
+
+				using t_mat_tmp = m::mat<t_real>;
+				auto uv = m::poly_uv<t_mat_tmp, t_vec3>(poly[0], poly[1], poly[2],
+					polyuv[0], polyuv[1], polyuv[2], vecInters);
+
+				m_veccurUV[0] = uv[0]; m_veccurUV[1] = uv[1];
+			}
+
+			if(bInters)
+			{
+				intersecting_objects.push_back(idx);
+				break;
+			}
 		}
 	}
+
+	/*std::cout << "intersecting objects: ";
+	for(std::size_t idx : intersecting_objects)
+		std::cout << idx << ", ";
+	std::cout << std::endl;*/
 }
 
 
 void VkRenderer::preInitResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 
@@ -573,7 +338,7 @@ std::size_t VkRenderer::GetFullSizeVertexBuffer(bool use_granularity) const
 
 
 /**
- * size of buffer
+ * size of buffer for uniforms
  */
 std::size_t VkRenderer::GetFullSizeUniformBuffer(bool use_granularity) const
 {
@@ -676,8 +441,6 @@ void VkRenderer::CreatePipelineLayout()
 	}
 }
 
-
-
 void VkRenderer::CreatePipelineCache()
 {
 	if(!m_vkfuncs)
@@ -754,7 +517,7 @@ VkRenderer::CreatePipelineStages() const
 		.depthClampEnable = 0,
 		.rasterizerDiscardEnable = 0,
 		.polygonMode = VK_POLYGON_MODE_FILL,
-		.cullMode = /*VK_CULL_MODE_BACK_BIT*/ VK_CULL_MODE_NONE,
+		.cullMode = VK_CULL_MODE_BACK_BIT /*VK_CULL_MODE_NONE*/,
 		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
 		.depthBiasEnable = 0,
 		.depthBiasConstantFactor = 0.f,
@@ -820,7 +583,7 @@ VkRenderer::CreatePipelineStages() const
 
 void VkRenderer::initResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	m_vkdev = m_vkwnd->device();
 	m_vkfuncs = m_vkinst->deviceFunctions(m_vkdev);
@@ -1125,7 +888,7 @@ void VkRenderer::initResources()
 
 void VkRenderer::releaseResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	// handles
 	VK_DEFINE_NON_DISPATCHABLE_HANDLE(vkhandle);
@@ -1218,7 +981,7 @@ void VkRenderer::UpdatePerspective()
 
 void VkRenderer::initSwapChainResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
 	m_iScreenDims[0] = m_vkwnd->swapChainImageSize().width();
 	m_iScreenDims[1] = m_vkwnd->swapChainImageSize().height();
@@ -1247,19 +1010,19 @@ void VkRenderer::initSwapChainResources()
 
 void VkRenderer::releaseSwapChainResources()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 
 void VkRenderer::logicalDeviceLost()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 
 void VkRenderer::physicalDeviceLost()
 {
-	std::cout << __PRETTY_FUNCTION__ << std::endl;
+	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 }
 
 
@@ -1426,304 +1189,5 @@ void VkRenderer::startNextFrame()
 
 		m_vkfuncs->vkCmdDraw(m_vkwnd->currentCommandBuffer(), numVertices, 1, startVertex, 0);
 	}
-}
-// ----------------------------------------------------------------------------
-
-
-
-// ----------------------------------------------------------------------------
-// vk window
-// ----------------------------------------------------------------------------
-
-VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk,
-	std::shared_ptr<btDynamicsWorld> world, QWindow* parent)
-	: QVulkanWindow{parent}, m_vkinst{vk}, m_world{world}
-{
-	setVulkanInstance(m_vkinst.get());
-
-	std::chrono::milliseconds ticks{1000 / 60};
-	connect(&m_timer, &QTimer::timeout,
-		[this, ticks]() -> void
-		{
-			if(!m_vkrenderer)
-				return;
-
-			m_world->stepSimulation(t_real(ticks.count()) / 1000.);
-			m_vkrenderer->tick(ticks);
-			m_runningtime += ticks;
-
-			t_vec pos = m_vkrenderer->GetCamera().GetPosition();
-
-			auto status = QString{"Running time: %1 s, camera: %2, %3, %4"}
-				.arg(m_runningtime.count()/1000, 0)
-				.arg(pos[0], 0, 'f', 1)
-				.arg(pos[1], 0, 'f', 1)
-				.arg(pos[2], 0, 'f', 1);
-			emit EmitStatusMsg(status);
-		});
-
-	m_timer.start(ticks);
-}
-
-
-VkWnd::~VkWnd()
-{
-	m_timer.stop();
-}
-
-
-QVulkanWindowRenderer* VkWnd::createRenderer()
-{
-	if(m_vkrenderer)
-		delete m_vkrenderer;
-
-	return m_vkrenderer = new VkRenderer(m_vkinst, m_world, this);
-}
-
-
-void VkWnd::mouseMoveEvent(QMouseEvent *pEvt)
-{
-	if(m_vkrenderer)
-		m_vkrenderer->SetMousePos(pEvt->localPos());
-
-	QVulkanWindow::mouseMoveEvent(pEvt);
-}
-
-
-void VkWnd::keyPressEvent(QKeyEvent *pEvt)
-{
-	if(!m_vkrenderer)
-		return;
-
-	if(pEvt->key() == Qt::Key_Space)
-		m_vkrenderer->TogglePerspective();
-
-	if(pEvt->key() == Qt::Key_A)
-		m_vkrenderer->SetMoving(0, 1.);
-	if(pEvt->key() == Qt::Key_D)
-		m_vkrenderer->SetMoving(0, -1.);
-	if(pEvt->key() == Qt::Key_W)
-		m_vkrenderer->SetMoving(2, 1.);
-	if(pEvt->key() == Qt::Key_S)
-		m_vkrenderer->SetMoving(2, -1.);
-	if(pEvt->key() == Qt::Key_E)
-		m_vkrenderer->SetMoving(1, 1.);
-	if(pEvt->key() == Qt::Key_Q)
-		m_vkrenderer->SetMoving(1, -1.);
-
-	if(pEvt->key() == Qt::Key_Up /*|| pEvt->key() == Qt::Key_I*/)
-		m_vkrenderer->SetRotating(0, 1.);
-	if(pEvt->key() == Qt::Key_Down /*|| pEvt->key() == Qt::Key_K*/)
-		m_vkrenderer->SetRotating(0, -1.);
-	if(pEvt->key() == Qt::Key_Left /*|| pEvt->key() == Qt::Key_J*/)
-		m_vkrenderer->SetRotating(1, -1.);
-	if(pEvt->key() == Qt::Key_Right /*|| pEvt->key() == Qt::Key_L*/)
-		m_vkrenderer->SetRotating(1, 1.);
-	if(pEvt->key() == Qt::Key_Y)
-		m_vkrenderer->SetRotating(2, -1.);
-	if(pEvt->key() == Qt::Key_C)
-		m_vkrenderer->SetRotating(2, 1.);
-
-	QVulkanWindow::keyPressEvent(pEvt);
-}
-
-
-void VkWnd::keyReleaseEvent(QKeyEvent *pEvt)
-{
-	if(!m_vkrenderer)
-		return;
-
-	if(pEvt->key() == Qt::Key_A || pEvt->key() == Qt::Key_D)
-		m_vkrenderer->SetMoving(0, 0.);
-	if(pEvt->key() == Qt::Key_W || pEvt->key() == Qt::Key_S)
-		m_vkrenderer->SetMoving(2, 0.);
-	if(pEvt->key() == Qt::Key_E || pEvt->key() == Qt::Key_Q)
-		m_vkrenderer->SetMoving(1, 0.);
-
-	if(pEvt->key() == Qt::Key_Up || pEvt->key() == Qt::Key_Down)
-		m_vkrenderer->SetRotating(0, 0.);
-	if(pEvt->key() == Qt::Key_Left || pEvt->key() == Qt::Key_Right)
-		m_vkrenderer->SetRotating(1, 0.);
-	if(pEvt->key() == Qt::Key_Y || pEvt->key() == Qt::Key_C)
-		m_vkrenderer->SetRotating(2, 0.);
-
-	QVulkanWindow::keyReleaseEvent(pEvt);
-}
-// ----------------------------------------------------------------------------
-
-
-
-// ----------------------------------------------------------------------------
-// main window
-// ----------------------------------------------------------------------------
-Wnd::Wnd(VkWnd *vkwnd, QWidget* parent) : QMainWindow(parent), m_vkwnd{vkwnd}
-{
-	// set the vk window as central widget
-	m_vkwidget = QWidget::createWindowContainer(m_vkwnd);
-	m_vkwidget->setFocusPolicy(Qt::StrongFocus);
-	//setFocusProxy(m_vkwidget);
-	setCentralWidget(m_vkwidget);
-
-	m_statusbar = new QStatusBar(this);
-	m_statuslabel = new QLabel(m_statusbar);
-	m_statusbar->addPermanentWidget(m_statuslabel, 0);
-	setStatusBar(m_statusbar);
-
-	connect(m_vkwnd, &VkWnd::EmitStatusMsg,
-		[this](const QString& str)->void
-		{
-			if(!m_statuslabel)
-				return;
-
-			m_statuslabel->setText(str);
-		});
-}
-
-
-Wnd::~Wnd()
-{
-}
-
-
-void Wnd::resizeEvent(QResizeEvent *evt)
-{
-	QMainWindow::resizeEvent(evt);
-	//m_vkwidget->setFocus();
-}
-// ----------------------------------------------------------------------------
-
-
-
-// ----------------------------------------------------------------------------
-// init
-// ----------------------------------------------------------------------------
-
-static inline void set_locales()
-{
-	std::ios_base::sync_with_stdio(false);
-
-	::setlocale(LC_ALL, "C");
-	std::locale::global(std::locale("C"));
-	QLocale::setDefault(QLocale::C);
-}
-
-
-int main(int argc, char** argv)
-{
-	// ------------------------------------------------------------------------
-	// misc initialisation
-	// ------------------------------------------------------------------------
-	QLoggingCategory::setFilterRules("*=true\n*.debug=false\n");
-	qInstallMessageHandler([](QtMsgType ty, const QMessageLogContext& ctx, const QString& log) -> void
-	{
-		auto get_msg_type = [](const QtMsgType& _ty) -> std::string
-		{
-			switch(_ty)
-			{
-				case QtDebugMsg: return "debug";
-				case QtWarningMsg: return "warning";
-				case QtCriticalMsg: return "critical";
-				case QtFatalMsg: return "fatal";
-				case QtInfoMsg: return "info";
-				default: return "<unknown>";
-			}
-		};
-
-		auto get_str = [](const char* pc) -> std::string
-		{
-			if(!pc) return "<unknown>";
-			return std::string{"\""} + std::string{pc} + std::string{"\""};
-		};
-
-		std::cerr << "qt " << get_msg_type(ty);
-		if(ctx.function)
-		{
-			std::cerr << " in "
-				<< "file " << get_str(ctx.file) << ", "
-				<< "function " << get_str(ctx.function) << ", "
-				<< "line " << ctx.line;
-		}
-		std::cerr << ": " << log.toStdString() << std::endl;
-	});
-
-	auto app = std::make_unique<QApplication>(argc, argv);
-	set_locales();
-	// ------------------------------------------------------------------------
-
-
-	// ------------------------------------------------------------------------
-	// bullet
-	// ------------------------------------------------------------------------
-	auto coll = std::make_shared<btDefaultCollisionConfiguration>(btDefaultCollisionConstructionInfo{});
-	auto disp = std::make_shared<btCollisionDispatcher/*Mt*/>(coll.get());
-	auto cache = std::make_shared<btDbvtBroadphase>();
-	auto solver = std::make_shared<btSequentialImpulseConstraintSolver>();
-	auto world = std::make_shared<btDiscreteDynamicsWorld>(disp.get(), cache.get(), solver.get(), coll.get());
-
-	world->setGravity({0, -9.81, 0});
-	// ------------------------------------------------------------------------
-
-
-	// ------------------------------------------------------------------------
-	// vk
-	// ------------------------------------------------------------------------
-	// create vk instance
-	auto vk = std::make_shared<QVulkanInstance>();
-
-	QByteArrayList layers{{
-		"VK_LAYER_KHRONOS_validation",
-		"VK_EXT_debug_report",
-		"VK_EXT_debug_utils",
-	}};
-	vk->setLayers(layers);
-	vk->setFlags(vk->flags() & ~QVulkanInstance::NoDebugOutputRedirect);
-
-	if(!vk->create() || !vk->isValid())
-	{
-		std::cerr << "Cannot create a valid Vk instance." << std::endl;
-		return -1;
-	}
-
-	BOOST_SCOPE_EXIT(&vk)
-	{
-		vk->destroy();
-	}
-	BOOST_SCOPE_EXIT_END
-
-
-	// get version infos
-	std::string vkver = vk->apiVersion().toString().toStdString();
-	if(vkver != "")
-		std::cout << "Vk API version: " << vkver << "." << std::endl;
-
-	// get layer infos
-	QVulkanInfoVector<QVulkanLayer> vklayers = vk->supportedLayers();
-	for(const auto& vklayer : vklayers)
-	{
-		std::cout << "Vk layer: " << vklayer.name.toStdString()
-			<< ", description: " << vklayer.description.toStdString()
-			<< ", layer version: " << vklayer.version
-			<< ", Vk version: " << vklayer.specVersion.toString().toStdString()
-			<< "." << std::endl;
-	}
-
-	// get extension infos
-	QVulkanInfoVector<QVulkanExtension> vkexts = vk->supportedExtensions();
-	for(const auto& vkext : vkexts)
-	{
-		std::cout << "Vk extension: " << vkext.name.toStdString()
-			<< ", version " << vkext.version << "." << std::endl;
-	}
-
-	// create main and vk window
-	auto vkwnd = new VkWnd(vk, world);
-	auto wnd = std::make_unique<Wnd>(vkwnd);
-	wnd->resize(800, 600);
-	wnd->show();
-	// ------------------------------------------------------------------------
-
-
-	// run application
-	return app->exec();
 }
 // ----------------------------------------------------------------------------
