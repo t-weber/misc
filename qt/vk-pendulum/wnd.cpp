@@ -68,22 +68,45 @@ VkWnd::VkWnd(std::shared_ptr<QVulkanInstance>& vk, QWindow* parent)
 			m_vkrenderer->tick(ticks);
 			m_runningtime += ticks;
 
-			// pendulum mass
-			t_real t = t_real(m_runningtime.count()) / t_real(1000);
-			t_real phi = m_pendulum.GetPhi(t);
-			t_vec pos = m_pendulum.GetPos(t);
-			std::swap(pos[1], pos[2]);
-			if(PolyObject *sphere = m_vkrenderer->GetObject(m_sphere_index); sphere)
-				sphere->SetMatrix(m::hom_translation<t_mat, t_real>(pos[0], pos[1], pos[2]));
+			// pendulum 1 using closed-form solution
+			{
+				// pendulum mass
+				t_real t = t_real(m_runningtime.count()) / t_real(1000);
+				t_real phi = m_pendulum.GetPhiAbs(t);
+				t_vec pos = m_pendulum.GetPos(phi);
+				std::swap(pos[1], pos[2]);
+				if(PolyObject *sphere = m_vkrenderer->GetObject(m_sphere_indices[0]); sphere)
+					sphere->SetMatrix(m::hom_translation<t_mat, t_real>(pos[0], pos[1], pos[2]));
 
-			// pendulum thread
-			t_mat mat = m::unit<t_mat>(4);
-			mat *= m::hom_translation<t_mat>(0.f, m_pendulum.GetLength(), 0.f);
-			mat *= m::rotation<t_mat, t_vec>(m::create<t_vec>({0,0,1}), phi);
-			mat *= m::hom_translation<t_mat>(0.f, -m_pendulum.GetLength()*0.5f, 0.f);
-			mat *= m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), m::pi<t_real>*0.5f);
-			if(PolyObject *cyl = m_vkrenderer->GetObject(m_cyl_index); cyl)
-				cyl->SetMatrix(mat);
+				// pendulum thread
+				t_mat mat = m::unit<t_mat>(4);
+				mat *= m::hom_translation<t_mat>(0.f, m_pendulum.GetLength(), 0.f);
+				mat *= m::rotation<t_mat, t_vec>(m::create<t_vec>({0,0,1}), phi);
+				mat *= m::hom_translation<t_mat>(0.f, -m_pendulum.GetLength()*0.5f, 0.f);
+				mat *= m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), m::pi<t_real>*0.5f);
+				if(PolyObject *cyl = m_vkrenderer->GetObject(m_cyl_indices[0]); cyl)
+					cyl->SetMatrix(mat);
+			}
+
+			// pendulum 2 using numerical solution of differential equation
+			{
+				// pendulum mass
+				t_real dt = t_real(ticks.count()) / t_real(1000);
+				t_real phi = m_pendulum.StepPhiEuler(dt);
+				t_vec pos = m_pendulum.GetPos(phi);
+				std::swap(pos[1], pos[2]);
+				if(PolyObject *sphere = m_vkrenderer->GetObject(m_sphere_indices[1]); sphere)
+					sphere->SetMatrix(m::hom_translation<t_mat, t_real>(pos[0], pos[1], pos[2]+2.f));
+
+				// pendulum thread
+				t_mat mat = m::unit<t_mat>(4);
+				mat *= m::hom_translation<t_mat>(0.f, m_pendulum.GetLength(), 2.f);
+				mat *= m::rotation<t_mat, t_vec>(m::create<t_vec>({0,0,1}), phi);
+				mat *= m::hom_translation<t_mat>(0.f, -m_pendulum.GetLength()*0.5f, 0.f);
+				mat *= m::rotation<t_mat, t_vec>(m::create<t_vec>({1,0,0}), m::pi<t_real>*0.5f);
+				if(PolyObject *cyl = m_vkrenderer->GetObject(m_cyl_indices[1]); cyl)
+					cyl->SetMatrix(mat);
+			}
 
 			t_vec pos_cam = m_vkrenderer->GetCamera().GetPosition();
 
@@ -133,7 +156,7 @@ void VkWnd::CreateObjects()
 		m::create<t_vec3>({0, -1, 0}), plane_size, 0.75, 0.75, 0.75);
 	renderer->AddObject(plane);
 
-	// sphere
+	// sphere for pendulum 1
 	{
 		t_real rad = 0.5;
 		t_real col = get_rand<t_real>(0.5, 1.);
@@ -142,10 +165,10 @@ void VkWnd::CreateObjects()
 		sphere.CreateSphereGeometry(
 			m::hom_translation<t_mat, t_real>(0, 0, 0),
 			rad, 0., 0., col);
-		m_sphere_index = renderer->AddObject(sphere);
+		m_sphere_indices[0] = renderer->AddObject(sphere);
 	}
 
-	// cylinder
+	// cylinder for pendulum 1
 	{
 		t_real rad = 0.1;
 		t_real height = m_pendulum.GetLength();
@@ -155,7 +178,32 @@ void VkWnd::CreateObjects()
 		cyl.CreateCylinderGeometry(
 			m::hom_translation<t_mat, t_real>(0, 0, 0),
 			rad, height, 0., col, 0.);
-		m_cyl_index = renderer->AddObject(cyl);
+		m_cyl_indices[0] = renderer->AddObject(cyl);
+	}
+
+	// sphere for pendulum 2
+	{
+		t_real rad = 0.5;
+		t_real col = get_rand<t_real>(0.5, 1.);
+
+		PolyObject sphere;
+		sphere.CreateSphereGeometry(
+			m::hom_translation<t_mat, t_real>(0, 0, 0),
+			rad, 0., 0., col);
+		m_sphere_indices[1] = renderer->AddObject(sphere);
+	}
+
+	// cylinder for pendulum 2
+	{
+		t_real rad = 0.1;
+		t_real height = m_pendulum.GetLength();
+		t_real col = get_rand<t_real>(0.5, 1.);
+
+		PolyObject cyl;
+		cyl.CreateCylinderGeometry(
+			m::hom_translation<t_mat, t_real>(0, 0, 0),
+			rad, height, 0., col, 0.);
+		m_cyl_indices[1] = renderer->AddObject(cyl);
 	}
 	// ------------------------------------------------------------------------
 }

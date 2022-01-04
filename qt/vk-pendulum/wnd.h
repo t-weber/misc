@@ -36,8 +36,9 @@ protected:
 	QTimer m_timer;
 	std::chrono::milliseconds m_runningtime{0};
 
-	std::size_t m_sphere_index{};
-	std::size_t m_cyl_index{};
+	std::size_t m_sphere_indices[2]{0, 0};
+	std::size_t m_cyl_indices[2]{0, 0};
+
 	Pendulum<t_vec, t_real> m_pendulum{5.5};
 
 public:
