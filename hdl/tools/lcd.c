@@ -7,32 +7,7 @@
  * @see https://www.arduino.cc/documents/datasheets/LCDscreen.PDF
  */
 
-#include <stdint.h>
-#include <stdbool.h>
-
-
-typedef struct _LCDInfo
-{
-	/* enable and register select pins */
-	int pin_en;
-	int pin_rs;
-
-	/* data pins for 4-bit mode */
-	int pin_d4;
-	int pin_d5;
-	int pin_d6;
-	int pin_d7;
-
-	/* (microcontroller's) delay function */
-	void (*delay)(uint32_t millisecs);
-
-	/* (microcontroller's) outout function */
-	void (*set_pin)(uint8_t pin, uint8_t state);
-
-	/* constants for set or unset pins */
-	int pin_set;
-	int pin_unset;
-} LCDInfo;
+#include "lcd.h"
 
 
 /**
@@ -91,9 +66,14 @@ void lcd_clear(const LCDInfo* lcd)
 /**
  * set the direction of the caret
  */
-void lcd_set_caret_direction(const LCDInfo* lcd)
+void lcd_set_caret_direction(const LCDInfo* lcd, bool inc, bool shift)
 {
-	lcd_send_byte(lcd, 0, 0b00000110);
+	uint8_t byte = 0b00000100;
+	if(inc)
+		byte |= 1<<1;
+	if(shift)
+		byte |= 1;
+	lcd_send_byte(lcd, 0, byte);
 }
 
 
@@ -124,12 +104,12 @@ void lcd_shift(const LCDInfo* lcd, bool all, bool right)
 /**
  * set display functions
  */
-void lcd_set_function(const LCDInfo* lcd, bool displ, bool lines, bool font)
+void lcd_set_function(const LCDInfo* lcd, bool bits_8, bool two_lines, bool font)
 {
 	uint8_t byte = 0b00100000;
-	if(displ)
+	if(bits_8)
 		byte |= 1<<4;
-	if(lines)
+	if(two_lines)
 		byte |= 1<<3;
 	if(font)
 		byte |= 1<<2;
@@ -156,9 +136,9 @@ void lcd_set_display(const LCDInfo* lcd, bool on, bool caret_line, bool caret_bo
 /**
  * write a string to the display
  */
-void lcd_puts(const LCDInfo* lcd, const char* str)
+void lcd_puts(const LCDInfo* lcd, const int8_t* str)
 {
-	const char* iter = str;
+	const int8_t* iter = str;
 	while(*iter)
 	{
 		lcd_send_byte(lcd, 1, *iter);
