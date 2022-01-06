@@ -134,6 +134,37 @@ void lcd_set_display(const LCDInfo* lcd, bool on, bool caret_line, bool caret_bo
 
 
 /**
+ * set address of display or character ram
+ */
+void lcd_set_address(const LCDInfo* lcd, bool disp, uint8_t addr)
+{
+	uint8_t byte = 0;
+
+	if(disp)
+	{
+		byte = 0b10000000;
+		byte |= addr & 0b01111111;
+	}
+	else
+	{
+		byte = 0b01000000;
+		byte |= addr & 0b00111111;
+	}
+
+	lcd_send_byte(lcd, 0, byte);
+}
+
+
+/**
+ * set data of display or character ram
+ */
+void lcd_set_data(const LCDInfo* lcd, uint8_t data)
+{
+	lcd_send_byte(lcd, 1, data);
+}
+
+
+/**
  * write a string to the display
  */
 void lcd_puts(const LCDInfo* lcd, const int8_t* str)

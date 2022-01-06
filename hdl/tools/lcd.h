@@ -94,9 +94,21 @@ extern void lcd_set_display(const LCDInfo* lcd, bool on, bool caret_line, bool c
 
 
 /**
+ * set address of display or character ram
+ */
+extern void lcd_set_address(const LCDInfo* lcd, bool disp, uint8_t addr);
+
+
+/**
+ * set data of display or character ram
+ */
+extern void lcd_set_data(const LCDInfo* lcd, uint8_t data);
+
+
+/**
  * write a string to the display
  */
 extern void lcd_puts(const LCDInfo* lcd, const int8_t* str);
 
-#endif
 
+#endif
