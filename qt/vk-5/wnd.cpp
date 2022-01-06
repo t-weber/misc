@@ -96,7 +96,7 @@ QVulkanWindowRenderer* VkWnd::createRenderer()
 	if(m_vkrenderer)
 		delete m_vkrenderer;
 
-	m_vkrenderer = new VkRenderer(m_vkinst, m_world, this);	
+	m_vkrenderer = new VkRenderer(m_vkinst, m_world, this);
 
 	CreateObjects();
 	return m_vkrenderer;
@@ -390,6 +390,7 @@ int main(int argc, char** argv)
 			return -1;
 		}
 		auto disp = std::make_shared<btCollisionDispatcherMt>(coll.get(), 40);
+		//auto disp = std::make_shared<btCollisionDispatcher>(coll.get());
 		if(!disp)
 		{
 			std::cerr << "Cannot create bullet's default collision dispatcher." << std::endl;

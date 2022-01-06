@@ -89,24 +89,6 @@ std::size_t VkRenderer::AddObject(const PolyObject& obj)
 }
 
 
-QPointF VkRenderer::VkToScreenCoords(const t_vec& vec4, bool *pVisible)
-{
-	auto [ vecPersp, vec ] =
-		m::hom_to_screen_coords<t_mat, t_vec>(vec4,
-			m_cam.GetMatrix(), m_matPerspective, m_matViewport, true);
-
-	// position not visible -> return a point outside the viewport
-	if(vecPersp[2] > 1.)
-	{
-		if(pVisible) *pVisible = false;
-		return QPointF(-1*m_iScreenDims[0], -1*m_iScreenDims[1]);
-	}
-
-	if(pVisible) *pVisible = true;
-	return QPointF(vec[0], vec[1]);
-}
-
-
 void VkRenderer::tick(const std::chrono::milliseconds& ms)
 {
 	const t_real moveDelta = 0.015 * ms.count();
@@ -152,8 +134,8 @@ void VkRenderer::UpdatePicker()
 {
 	auto [org, dir] = m::hom_line_from_screen_coords<t_mat, t_vec>(
 		m_posMouse.x(), m_posMouse.y(), 0., 1.,
-		m_cam.GetMatrixInv(), m_matPerspective_inv,
-		m_matViewport_inv, &m_matViewport, false);
+		m_cam.GetMatrixInv(), m_cam.GetPerspectiveMatrixInv(),
+		m_viewport.GetMatrixInv(), &m_viewport.GetMatrix(), false);
 
 	std::vector<std::size_t> intersecting_objects;
 	//for(std::size_t idx=0; idx<m_objs.size(); ++idx)
@@ -308,8 +290,9 @@ std::size_t VkRenderer::GetNumShaderInputElements() const
 std::size_t VkRenderer::GetUniformBufferSize(bool use_granularity) const
 {
 	const auto& matCam = m_cam.GetMatrix();
+	const auto& matPersp = m_cam.GetPerspectiveMatrix();
 
-	std::size_t size = (m_matPerspective.size1() * m_matPerspective.size2()) * sizeof(t_real);
+	std::size_t size = (matPersp.size1() * matPersp.size2()) * sizeof(t_real);
 	size += (matCam.size1() * matCam.size2()) * sizeof(t_real);
 	size += (4*4) * sizeof(t_real);	// object matrix
 	size += (m_veccurUV.size()) * sizeof(t_real);
@@ -949,33 +932,10 @@ void VkRenderer::releaseResources()
 
 void VkRenderer::TogglePerspective()
 {
-	m_use_prespective_proj = !m_use_prespective_proj;
-	UpdatePerspective();
-}
-
-
-void VkRenderer::UpdatePerspective()
-{
-	using namespace m_ops;
-
-	// perspective projection
-	if(m_use_prespective_proj)
-	{
-		m_matPerspective = m::hom_perspective<t_mat>(
-			0.01, 100., m::pi<t_real>*0.5,
-			t_real(m_iScreenDims[1])/t_real(m_iScreenDims[0]), false, true, true);
-	}
-
-	// orthogonal projection
-	else
-	{
-		m_matPerspective = m::hom_parallel_sym<t_mat>(
-			0.01, 100., 8., 8., false, true, true);
-	}
-
-	std::tie(m_matPerspective_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matPerspective);
-	std::cout << "projection matrix: " << m_matPerspective << "." << std::endl;
-	std::cout << "inverted projection matrix: " << m_matPerspective_inv << "." << std::endl;
+	m_cam.SetUsePerspectiveProj(!m_cam.GetUsePerspectiveProj());
+	m_cam.UpdatePerspective(
+		t_real(m_viewport.GetScreenHeight()) /
+		t_real(m_viewport.GetScreenWidth()));
 }
 
 
@@ -983,28 +943,28 @@ void VkRenderer::initSwapChainResources()
 {
 	//std::cout << __PRETTY_FUNCTION__ << std::endl;
 
-	m_iScreenDims[0] = m_vkwnd->swapChainImageSize().width();
-	m_iScreenDims[1] = m_vkwnd->swapChainImageSize().height();
-	std::cout << "window size: " << m_iScreenDims[0] << " x " << m_iScreenDims[1] << "." << std::endl;
+	std::uint32_t w = m_vkwnd->swapChainImageSize().width();
+	std::uint32_t h = m_vkwnd->swapChainImageSize().height();
+	std::cout << "screen size: " << w << " x " << h << "." << std::endl;
 
 	// viewport
-	m_matViewport = m::hom_viewport<t_mat>(m_iScreenDims[0], m_iScreenDims[1], 0., 1.);
-	std::tie(m_matViewport_inv, std::ignore) = m::inv<t_mat, t_vec>(m_matViewport);
+	m_viewport.SetScreenSize(w, h);
+	m_viewport.Update();
 
 	m_viewports[0] = VkViewport
 	{
 		.x = 0, .y = 0,
-		.width = (t_real)m_iScreenDims[0], .height = (t_real)m_iScreenDims[1],
+		.width = (t_real)w, .height = (t_real)h,
 		.minDepth = 0, .maxDepth = 1,
 	};
 
 	m_viewrects[0] = VkRect2D
 	{
 		.offset = VkOffset2D { .x = 0, .y = 0 },
-		.extent = VkExtent2D { .width = m_iScreenDims[0], .height = m_iScreenDims[1] },
+		.extent = VkExtent2D { .width = w, .height = h },
 	};
 
-	UpdatePerspective();
+	m_cam.UpdatePerspective(t_real(h)/t_real(w));
 }
 
 
@@ -1081,6 +1041,7 @@ void VkRenderer::UpdateUniforms()
 	}
 
 	const auto& matCam = m_cam.GetMatrix();
+	const auto& matPersp = m_cam.GetPerspectiveMatrix();
 
 	// create a copy of the uniforms for each object
 	for(std::size_t objidx=0; objidx<m_objs.size(); ++objidx)
@@ -1103,7 +1064,7 @@ void VkRenderer::UpdateUniforms()
 			for(std::size_t j=0; j<4; ++j)
 			{
 				// perspective matrix
-				pCurMem[persp_start_idx + j*4 + i] = m_matPerspective(i,j);
+				pCurMem[persp_start_idx + j*4 + i] = matPersp(i,j);
 
 				// camera matrix
 				pCurMem[cam_start_idx + j*4 + i] = matCam(i,j);
@@ -1143,7 +1104,11 @@ void VkRenderer::startNextFrame()
 		.renderArea = VkRect2D
 		{
 			.offset = VkOffset2D { .x = 0, .y = 0 },
-			.extent = VkExtent2D { .width = m_iScreenDims[0], .height = m_iScreenDims[1] },
+			.extent = VkExtent2D
+			{
+				.width = m_viewport.GetScreenWidth(),
+				.height = m_viewport.GetScreenHeight()
+			},
 		},
 		.clearValueCount = sizeof(clr) / sizeof(clr[0]),
 		.pClearValues = clr,

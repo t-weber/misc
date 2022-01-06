@@ -284,7 +284,7 @@ void VkWnd::keyReleaseEvent(QKeyEvent *pEvt)
 // ----------------------------------------------------------------------------
 // main window
 // ----------------------------------------------------------------------------
-Wnd::Wnd(VkWnd *vkwnd, QWidget* parent) 
+Wnd::Wnd(VkWnd *vkwnd, QWidget* parent)
 	: QMainWindow(parent), m_vkwnd{vkwnd}
 {
 	// set the vk window as central widget

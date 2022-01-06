@@ -219,7 +219,7 @@ void PolyObject::CreateCylinderGeometry(
 	btScalar mass = btScalar(m);
 	btVector3 com{0, 0, 0};
 	// TODO: get correct axis
-	m_shape = std::make_shared<btCylinderShapeZ>(btVector3{rad, 0, height*0.5});
+	m_shape = std::make_shared<btCylinderShapeZ>(btVector3{rad, 0, btScalar(height*0.5)});
 	m_shape->calculateLocalInertia(mass, com);
 	m_state = std::make_shared<btDefaultMotionState>(to_bttrafo(m_mat));
 	m_rigid_body = std::make_shared<btRigidBody>(

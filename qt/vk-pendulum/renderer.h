@@ -16,6 +16,7 @@
 #include "../../libs/math_algos.h"
 #include "../../libs/math_conts.h"
 #include "cam.h"
+#include "viewport.h"
 #include "obj.h"
 
 
@@ -49,21 +50,17 @@ protected:
 	std::shared_ptr<VkDescriptorSet[]> m_descrset;
 	std::shared_ptr<VkDescriptorBufferInfo[]> m_descrbufferinfo;
 
-	t_mat m_matPerspective{m::unit<t_mat>(4)}, m_matPerspective_inv{m::unit<t_mat>(4)};
-	t_mat m_matViewport{m::unit<t_mat>(4)}, m_matViewport_inv{m::unit<t_mat>(4)};
 	t_vec2 m_veccurUV = m::create<t_vec2>({ 0.f, 0.f });
 	Camera<t_mat, t_vec, t_real> m_cam;
+	Viewport<t_mat, t_vec, t_real> m_viewport;
+
 	t_real m_moving[3] = {0., 0., 0.};
 	t_real m_rotating[3] = {0., 0., 0.};
 
 	VkViewport m_viewports[1];
 	VkRect2D m_viewrects[1];
-	std::uint32_t m_iScreenDims[2] = { 800, 600 };
-	bool m_use_prespective_proj = true;
 
 protected:
-	QPointF VkToScreenCoords(const t_vec& vec, bool *pVisible=nullptr);
-
 	void UpdatePicker();
 	void UpdateVertexBuffers();
 	void UpdateUniforms();
@@ -81,8 +78,6 @@ protected:
 		VkPipelineViewportStateCreateInfo, VkPipelineRasterizationStateCreateInfo,
 		VkPipelineMultisampleStateCreateInfo, VkPipelineDepthStencilStateCreateInfo>
 	CreatePipelineStages() const;
-
-	void UpdatePerspective();
 
 public:
 	VkRenderer(std::shared_ptr<QVulkanInstance>& vk, VkWnd* wnd);
