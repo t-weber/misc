@@ -105,6 +105,22 @@ void pr_tup(const auto& tup, std::index_sequence<seq...>)
 
 
 
+struct Tst
+{
+	Tst(int val) : val{val}
+	{
+		std::cout << __func__ << std::endl;
+	}
+
+	~Tst()
+	{
+		std::cout << __func__ << std::endl;
+	}
+
+	int val{0};
+};
+
+
 int main()
 {
 	// --------------------------------------------------------------------
@@ -343,6 +359,24 @@ int main()
 	{
 		std::cout << "gcd(10, 5) = " << std::gcd(10, 5) << std::endl;
 		std::cout << "lcm(7, 5) = " << std::lcm(7, 5) << std::endl;
+	}
+	// --------------------------------------------------------------------
+
+
+
+	std::cout << std::endl;
+
+
+	// --------------------------------------------------------------------
+	// placement new
+	// see: https://en.cppreference.com/w/cpp/language/new
+	{
+		char stack_mem[sizeof(Tst)];
+		Tst *tst = new(stack_mem) Tst(123);
+		std::cout << tst->val << std::endl;
+		std::cout << std::hex << tst << " " << static_cast<void*>(stack_mem) << std::endl;
+		tst->~Tst();
+		//delete tst;
 	}
 	// --------------------------------------------------------------------
 

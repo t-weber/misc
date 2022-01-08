@@ -133,9 +133,10 @@ QVulkanWindowRenderer* VkWnd::createRenderer()
 	if(m_vkrenderer)
 		delete m_vkrenderer;
 
-	m_vkrenderer = new VkRenderer(m_vkinst, this);
+	m_vkrenderer = new(std::nothrow) VkRenderer(m_vkinst, this);
+	if(m_vkrenderer)
+		CreateObjects();
 
-	CreateObjects();
 	return m_vkrenderer;
 }
 
