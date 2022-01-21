@@ -49,25 +49,54 @@ void draw_line(t_view& view, t_x x_start, t_y y_start, t_x x_end, t_y y_end, t_c
 	}
 
 
-	// general case: sloped line
-	const t_x mult = 2;
-	t_y y = y_start;
-	t_x err = x_range * mult/2;
-
-	for(t_x x=x_start; x!=x_end; x+=x_inc)
+	// general case: sloped line with x range larger than y range
+	if(x_range >= y_range)
 	{
-		view(x, y) = col;
-		err -= mult*y_range;
+		const t_x mult = 2;
+		t_y y = y_start;
+		t_x err = x_range * mult/2;
 
-		if(err < 0)
+		for(t_x x=x_start; x!=x_end; x+=x_inc)
 		{
-			++y;
-			err += mult*x_range;
+			view(x, y) = col;
+			err -= mult*y_range;
+
+			if(err < 0)
+			{
+				++y;
+				err += mult*x_range;
+			}
+			else if(err > 0)
+			{
+				--y;
+				err -= mult*x_range;
+			}
 		}
-		else if(err > 0)
+	}
+
+
+	// general case: sloped line with y range larger than x range
+	else
+	{
+		const t_y mult = 2;
+		t_x x = x_start;
+		t_y err = y_range * mult/2;
+
+		for(t_y y=y_start; y!=y_end; y+=y_inc)
 		{
-			--y;
+			view(x, y) = col;
 			err -= mult*x_range;
+
+			if(err < 0)
+			{
+				++x;
+				err += mult*y_range;
+			}
+			else if(err > 0)
+			{
+				--x;
+				err -= mult*y_range;
+			}
 		}
 	}
 }
