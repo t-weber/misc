@@ -204,7 +204,6 @@ void PolyObject::CreateCubeGeometry(
 	m_state = std::make_shared<btDefaultMotionState>(to_bttrafo(m_mat));
 	m_rigid_body = std::make_shared<btRigidBody>(
 		btRigidBody::btRigidBodyConstructionInfo{mass, m_state.get(), m_shape.get(), com});
-
 }
 
 
