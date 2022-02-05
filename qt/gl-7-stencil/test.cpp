@@ -5,6 +5,7 @@
  * @license see 'LICENSE.GPL' file
  */
 #include "glplot.h"
+#include "../../libs/math_conts.h"
 
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QGridLayout>
@@ -43,15 +44,31 @@ public:
 	// add test object for plot
 	void AfterGLInitialisation()
 	{
+		t_vec_gl plane_norm = m::create<t_vec_gl>({0., 0., 1.});
+		t_vec_gl plane_pos = m::create<t_vec_gl>({0, 0., -2.});
+
 		std::size_t plane_idx = 
-			m_plots[0]->AddPlane(2.5, 0.,0.,-4., 0.,0.,1., 0.,0.,0.,1.);
+			m_plots[0]->AddPlane(
+				2.5,
+				plane_pos[0], plane_pos[1], plane_pos[2],
+				plane_norm[0], plane_norm[1], plane_norm[2],
+				0., 0., 0., 1.);
 		m_plots[0]->AddSphere(0.2, 0.,0.,2., 0.,0.,1.,1.);
 		m_plots[0]->AddCone(1., 1., 0.,0.,0.,  0.,0.5,0.,1.);
 
-		// enlarging mirror
 		m_plots[0]->SetObjectPortal(plane_idx, true);
-		m_plots[0]->SetObjectPortalMatrix(plane_idx,
-			m::hom_scaling<t_mat_gl>(1.5f, 1.5f, -1.5f));
+
+
+		// enlarging mirror without translation
+		//t_mat_gl plane_mat = m::hom_scaling<t_mat_gl>(1.5f, 1.5f, -1.5f);
+
+		// mirror
+		t_mat_gl plane_mat = m::hom_mirror<t_mat_gl, t_vec_gl>(plane_norm, plane_pos, true);
+
+		//using namespace m_ops;
+		//std::cout << plane_mat << std::endl;
+
+		m_plots[0]->SetObjectPortalMatrix(plane_idx, plane_mat);
 	}
 };
 // ----------------------------------------------------------------------------

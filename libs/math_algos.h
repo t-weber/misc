@@ -3523,6 +3523,41 @@ requires is_vec<t_vec> && is_mat<t_mat>
 
 
 /**
+ * mirror matrix in homogeneous coordinates
+ */
+template<class t_mat, class t_vec>
+t_mat hom_mirror(const t_vec& axis, bool is_normalised=1)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	t_mat mat = ortho_mirror_op<t_mat, t_vec>(axis, is_normalised);
+
+	t_mat mat_hom = unit<t_mat>(4,4);
+	m::convert<t_mat, t_mat>(mat_hom, mat);
+
+	// in case the matrix is statically sized and was already larger than 4x4
+	mat_hom(3, 3) = 1.;
+	return mat_hom;
+}
+
+
+/**
+ * mirror matrix in homogeneous coordinates with translation
+ */
+template<class t_mat, class t_vec>
+t_mat hom_mirror(const t_vec& axis, const t_vec& pos, bool is_normalised=1)
+requires is_vec<t_vec> && is_mat<t_mat>
+{
+	t_mat mirr = hom_mirror<t_mat, t_vec>(axis, is_normalised);
+
+	t_mat offs = hom_translation<t_mat, t_vec>(pos);
+	t_mat offs_inv = hom_translation<t_mat, t_vec>(-pos);
+	//t_mat offs_t = trans<t_mat>(offs);
+
+	return offs * mirr * offs_inv;
+}
+
+
+/**
  * "look at" matrix in homogeneous coordinates
  * @see (Sellers 2014), pp. 78-79
  * @see https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/xhtml/gluLookAt.xml
