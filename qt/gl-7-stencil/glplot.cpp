@@ -647,7 +647,7 @@ void GlPlot::paintGL()
 			// draw normal scene without portals
 			else if(pass == 2)
 			{
-					pGl->glDisable(GL_STENCIL_TEST);
+				pGl->glDisable(GL_STENCIL_TEST);
 			}
 
 			// bind shaders
