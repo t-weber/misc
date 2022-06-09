@@ -6,7 +6,7 @@
  * @license see 'LICENSE.GPL' file
  *
  * only need to create the viable prefix transition graph:
- *   bison -g tst2.y && dot -Tpdf tst2.dot > tst2.pdf
+ *   bison --report=all -g left_recursion.y && dot -Tpdf left_recursion.dot > left_recursion.pdf
  */
 
 %{
@@ -21,12 +21,12 @@ S
 ;
 
 As
-	: A As
-	| /*eps*/
+	: As A
+	| %empty
 ;
 
 A
-	: 'a'
+	: 'a' 'b'
 ;
 
 %%
