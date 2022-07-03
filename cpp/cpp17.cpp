@@ -347,6 +347,17 @@ int main()
                 {
 			print(args...);
                 }, var, var2);
+
+
+		using t_var3 = std::variant<
+			std::monostate /*dummy first type to default-construct*/,
+				int, int>;
+		t_var3 var3;
+		std::cout << var3.index() << std::endl;
+		var3 = t_var3{std::in_place_index<1>, 123};
+		std::cout << var3.index() << std::endl;
+		var3 = t_var3{std::in_place_index<2>, 123};
+		std::cout << var3.index() << std::endl;
 	}
 	// --------------------------------------------------------------------
 
