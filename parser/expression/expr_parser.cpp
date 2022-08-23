@@ -1,5 +1,5 @@
 /**
- * test simple LL(1) expression parser
+ * simple LL(1) expression parser via recursive descent
  *
  * @author Tobias Weber
  * @date 14-mar-20

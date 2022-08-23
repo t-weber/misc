@@ -40,7 +40,7 @@ std::vector<std::pair<int, t_real>> get_matching_tokens(const std::string& str)
 		{
 			t_real val{};
 			std::istringstream{str} >> val;
-			matches.push_back(std::make_pair((int)Token::TOK_REAL, val));
+			matches.emplace_back(std::make_pair((int)Token::TOK_REAL, val));
 		}
 	}
 
@@ -48,18 +48,18 @@ std::vector<std::pair<int, t_real>> get_matching_tokens(const std::string& str)
 		std::regex regex{"[A-Za-z]+[A-Za-z0-9]*"};
 		std::smatch smatch;
 		if(std::regex_match(str, smatch, regex))
-			matches.push_back(std::make_pair((int)Token::TOK_IDENT, 0.));
+			matches.emplace_back(std::make_pair((int)Token::TOK_IDENT, 0.));
 	}
 
 	{	// tokens represented by themselves
 		if(str == "+" || str == "-" || str == "*" || str == "/" ||
 			str == "%" || str == "^" || str == "(" || str == ")" || str == ",")
-			matches.push_back(std::make_pair((int)str[0], 0.));
+			matches.emplace_back(std::make_pair((int)str[0], 0.));
 	}
 
 	/*{	// new line
 		if(str == "\n")
-			matches.push_back(std::make_pair((int)Token::TOK_END, 0.));
+			matches.emplace_back(std::make_pair((int)Token::TOK_END, 0.));
 	}*/
 
 	//std::cerr << "Input \"" << str << "\" has " << matches.size() << " matches." << std::endl;

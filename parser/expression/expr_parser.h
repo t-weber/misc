@@ -1,5 +1,5 @@
 /**
- * simple LL(1) expression parser
+ * simple LL(1) expression parser via recursive descent
  *
  * @author Tobias Weber
  * @date 14-mar-20
@@ -71,7 +71,7 @@ protected:
 			{
 				t_real val{};
 				std::istringstream{str} >> val;
-				matches.push_back(std::make_pair((int)Token::TOK_REAL, val));
+				matches.emplace_back(std::make_pair((int)Token::TOK_REAL, val));
 			}
 		}
 		else if constexpr(std::is_integral_v<t_real>)
@@ -82,7 +82,7 @@ protected:
 			{
 				t_real val{};
 				std::istringstream{str} >> val;
-				matches.push_back(std::make_pair((int)Token::TOK_REAL, val));
+				matches.emplace_back(std::make_pair((int)Token::TOK_REAL, val));
 			}
 		}
 		else
@@ -94,13 +94,13 @@ protected:
 			std::regex regex{"[A-Za-z]+[A-Za-z0-9]*"};
 			std::smatch smatch;
 			if(std::regex_match(str, smatch, regex))
-				matches.push_back(std::make_pair((int)Token::TOK_IDENT, 0.));
+				matches.emplace_back(std::make_pair((int)Token::TOK_IDENT, 0.));
 		}
 
 		{	// tokens represented by themselves
 			if(str == "+" || str == "-" || str == "*" || str == "/" || str == "%" ||
 				str == "^" || str == "(" || str == ")" || str == "," || str == "=")
-				matches.push_back(std::make_pair((int)str[0], 0.));
+				matches.emplace_back(std::make_pair((int)str[0], 0.));
 		}
 
 		return matches;
