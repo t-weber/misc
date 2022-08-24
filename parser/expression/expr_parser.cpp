@@ -15,7 +15,32 @@
 
 int main()
 {
-	ExprParser<double> parser;
+	using t_val = double;
+	std::cout.precision(std::numeric_limits<t_val>::digits10);
+
+	try
+	{
+		ExprParser<t_val> parser;
+		while(true)
+		{
+			std::string expr;
+			std::cout << "> ";
+
+			std::getline(std::cin, expr);
+			if(expr == "")
+				continue;
+
+			std::cout << parser.parse(expr) << std::endl;
+		}
+	}
+	catch(const std::exception& ex)
+	{
+		std::cerr << ex.what() << std::endl;
+		return -1;
+	}
+
+
+	/*ExprParser<double> parser;
 	std::cout << parser.parse("a = 2 + 3*4") << std::endl;
 	std::cout << parser.parse("(2 + (b=3))*4 + b*2") << std::endl;
 	std::cout << parser.parse("pow((2 + 3)*4, 2)") << std::endl;
@@ -31,7 +56,7 @@ int main()
 	std::cout << parser2.parse("2 + 3*4") << std::endl;
 	std::cout << parser2.parse("(2 + 3)*4") << std::endl;
 	std::cout << parser2.parse("pow((2 + 3)*4, 2)") << std::endl;
-	std::cout << parser2.parse("sqrt(400)") << std::endl;
+	std::cout << parser2.parse("sqrt(400)") << std::endl;*/
 
 	return 0;
 }

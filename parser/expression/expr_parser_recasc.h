@@ -18,43 +18,36 @@
 #include <memory>
 #include <variant>
 #include <unordered_map>
-#include <cmath>
-
-
-using t_val = double;
-
-
-struct Symbol
-{
-	bool is_expr{false};
-	std::variant<t_val, std::string> val{};
-};
-
-
-struct Token
-{
-	enum : int
-	{
-		REAL    = 1000,
-		IDENT   = 1001,
-		END     = 1002,
-
-		INVALID = 10000,
-	};
-
-	int id{INVALID};
-	t_val val{};
-	std::string strval{};
-};
 
 
 class ExprParser
 {
 public:
-	ExprParser() = default;
-	~ExprParser() = default;
-	ExprParser(const ExprParser&) = delete;
-	ExprParser& operator=(const ExprParser&) = delete;
+	using t_val = double;
+	using t_sym = std::variant<t_val, std::string>;
+
+	struct Token
+	{
+		enum : int
+		{
+			REAL    = 1000,
+			IDENT   = 1001,
+			END     = 1002,
+
+			INVALID = 10000,
+		};
+
+		int id{INVALID};
+		t_val val{};
+		std::string strval{};
+	};
+
+
+public:
+	ExprParser();
+	~ExprParser();
+	ExprParser(const ExprParser&);
+	ExprParser& operator=(const ExprParser&);
 
 	t_val Parse(const std::string& expr);
 
@@ -73,11 +66,11 @@ protected:
 	// --------------------------------------------------------------------
 
 	// --------------------------------------------------------------------
-	t_val GetValue(const Symbol& sym) const;
+	t_val GetValue(const t_sym& sym) const;
 	t_val GetIdentValue(const std::string& ident) const;
-	Symbol CallFunc(const std::string& ident) const;
-	Symbol CallFunc(const std::string& ident, const Symbol& arg) const;
-	Symbol CallFunc(const std::string& ident, const Symbol& arg1, const Symbol& arg2) const;
+	t_sym CallFunc(const std::string& ident) const;
+	t_sym CallFunc(const std::string& ident, const t_sym& arg) const;
+	t_sym CallFunc(const std::string& ident, const t_sym& arg1, const t_sym& arg2) const;
 	// --------------------------------------------------------------------
 
 	// --------------------------------------------------------------------
@@ -133,7 +126,7 @@ private:
 	std::shared_ptr<std::istream> m_istr{};
 
 	Token m_lookahead{};
-	std::stack<Symbol> m_symbols{};
+	std::stack<t_sym> m_symbols{};
 	bool m_accepted{false};
 
 	std::size_t m_dist_to_jump{0};
@@ -142,31 +135,16 @@ private:
 	// Tables
 	// --------------------------------------------------------------------
 	// symbol table
-	std::unordered_map<std::string, t_val> m_mapSymbols =
-	{
-		{ "pi", t_val(M_PI) },
-	};
+	std::unordered_map<std::string, t_val> m_mapSymbols{};
 
 	// zero-args function table
-	std::unordered_map<std::string, t_val(*)()> m_mapFuncs0 =
-	{ };
+	std::unordered_map<std::string, t_val(*)()> m_mapFuncs0{};
 
 	// one-arg function table
-	std::unordered_map<std::string, t_val(*)(t_val)> m_mapFuncs1 =
-	{
-		{ "sin", [](t_val x) -> t_val { return (t_val)std::sin(x); } },
-		{ "cos", [](t_val x) -> t_val { return (t_val)std::cos(x); } },
-		{ "tan", [](t_val x) -> t_val { return (t_val)std::tan(x); } },
-
-		{ "sqrt", [](t_val x) -> t_val { return (t_val)std::sqrt(x); } },
-		{ "exp", [](t_val x) -> t_val { return (t_val)std::exp(x); } },
-	};
+	std::unordered_map<std::string, t_val(*)(t_val)> m_mapFuncs1{};
 
 	// two-args function table
-	std::unordered_map<std::string, t_val(*)(t_val, t_val)> m_mapFuncs2 =
-	{
-		{ "pow", [](t_val x, t_val y) -> t_val { return (t_val)std::pow(x, y); } },
-	};
+	std::unordered_map<std::string, t_val(*)(t_val, t_val)> m_mapFuncs2{};
 	// ----------------------------------------------------------------------------
 };
 

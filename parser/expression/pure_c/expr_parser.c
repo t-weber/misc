@@ -1,5 +1,5 @@
 /**
- * simple LL(1) expression parser -- C version
+ * simple LL(1) recursive descent expression parser -- C version
  *
  * @author Tobias Weber
  * @date 14-mar-2020, 8-may-2021
@@ -781,7 +781,20 @@ int main()
 {
 	init_symbols();
 
-	t_value val1 = parse("x = cos(pi)");
+	while(1)
+	{
+		char expr[256];
+		fputs("> ", stdout);
+		fgets(expr, sizeof(expr), stdin);
+		t_value val = parse(expr);
+#ifdef USE_INTEGER
+		printf("%d\n", val);
+#else
+		printf("%g\n", val);
+#endif
+	}
+
+	/*t_value val1 = parse("x = cos(pi)");
 	t_value val2 = parse("c = (2 + (b=3))*4 + b*2");
 
 #ifdef USE_INTEGER
@@ -789,7 +802,7 @@ int main()
 #else
 	printf("%g\n%g\n\n", val1, val2);
 #endif
-	print_symbols();
+	print_symbols();*/
 
 	deinit_symbols();
 	return 0;

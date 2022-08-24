@@ -15,13 +15,98 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <random>
 #include <regex>
+#include <cmath>
+
+
+static std::mt19937 g_rng{std::random_device{}()};
+
+
+ExprParser::ExprParser() :
+	m_mapSymbols  // symbol table
+	{
+		{ "pi", t_val(M_PI) },
+	},
+
+	m_mapFuncs0   // zero-args function table
+	{
+		{ "rand", []() -> t_val
+			{
+				return std::uniform_real_distribution<t_val>(
+					t_val(0), t_val(1))(g_rng);
+			} },
+	},
+
+	m_mapFuncs1   // one-arg function table
+	{
+		{ "sin", [](t_val x) -> t_val { return (t_val)std::sin(x); } },
+		{ "cos", [](t_val x) -> t_val { return (t_val)std::cos(x); } },
+		{ "tan", [](t_val x) -> t_val { return (t_val)std::tan(x); } },
+		{ "asin", [](t_val x) -> t_val { return (t_val)std::asin(x); } },
+		{ "acos", [](t_val x) -> t_val { return (t_val)std::acos(x); } },
+		{ "atan", [](t_val x) -> t_val { return (t_val)std::atan(x); } },
+
+		{ "sqrt", [](t_val x) -> t_val { return (t_val)std::sqrt(x); } },
+		{ "exp", [](t_val x) -> t_val { return (t_val)std::exp(x); } },
+
+		{ "round", [](t_val x) -> t_val { return (t_val)std::round(x); } },
+		{ "ceil", [](t_val x) -> t_val { return (t_val)std::ceil(x); } },
+		{ "floor", [](t_val x) -> t_val { return (t_val)std::floor(x); } },
+	},
+
+	m_mapFuncs2   // two-args function table
+	{
+		{ "pow", [](t_val x, t_val y) -> t_val { return (t_val)std::pow(x, y); } },
+		{ "atan2", [](t_val y, t_val x) -> t_val { return (t_val)std::atan2(y, x); } },
+
+		{ "rand", [](t_val min, t_val max) -> t_val
+			{
+				if constexpr(std::is_floating_point_v<t_val>)
+					return std::uniform_real_distribution<t_val>(
+						min, max)(g_rng);
+				else if constexpr(std::is_integral_v<t_val>)
+					return std::uniform_int_distribution<t_val>(
+						min, max)(g_rng);
+				return t_val{};
+			} },
+	}
+{ }
+
+
+ExprParser::~ExprParser()
+{ }
+
+
+ExprParser::ExprParser(const ExprParser& parser)
+{
+	this->operator=(parser);
+}
+
+
+ExprParser& ExprParser::operator=(const ExprParser& parser)
+{
+	this->m_istr = parser.m_istr;
+
+	this->m_lookahead = parser.m_lookahead;
+	this->m_symbols = parser.m_symbols;
+	this->m_accepted = parser.m_accepted;
+	this->m_dist_to_jump = parser.m_dist_to_jump;
+
+	this->m_mapSymbols = parser.m_mapSymbols;
+	this->m_mapFuncs0 = parser.m_mapFuncs0;
+	this->m_mapFuncs1 = parser.m_mapFuncs1;
+	this->m_mapFuncs2 = parser.m_mapFuncs2;
+
+	return *this;
+}
 
 
 /**
  * find all matching tokens for input string
  */
-std::vector<Token> ExprParser::get_matching_tokens(const std::string& str)
+std::vector<ExprParser::Token>
+ExprParser::get_matching_tokens(const std::string& str)
 {
 	std::vector<Token> matches;
 
@@ -33,9 +118,7 @@ std::vector<Token> ExprParser::get_matching_tokens(const std::string& str)
 		{
 			Token tok{};
 			tok.id = Token::REAL;
-			t_val val{};
-			std::istringstream{str} >> val;
-			tok.val = val;
+			std::istringstream{str} >> tok.val;
 			matches.emplace_back(std::move(tok));
 		}
 	}
@@ -47,9 +130,7 @@ std::vector<Token> ExprParser::get_matching_tokens(const std::string& str)
 		{
 			Token tok{};
 			tok.id = Token::REAL;
-			t_val val{};
-			std::istringstream{str} >> val;
-			tok.val = val;
+			std::istringstream{str} >> tok.val;
 			matches.emplace_back(std::move(tok));
 		}
 	}
@@ -87,7 +168,7 @@ std::vector<Token> ExprParser::get_matching_tokens(const std::string& str)
 /**
  * @return [token, yylval, yytext]
  */
-Token ExprParser::lex(std::istream* istr)
+ExprParser::Token ExprParser::lex(std::istream* istr)
 {
 	std::string input, longest_input;
 	std::vector<Token> longest_matching;
@@ -182,24 +263,24 @@ void ExprParser::GetNextLookahead()
 /**
  * get the value of a symbol
  */
-t_val ExprParser::GetValue(const Symbol& sym) const
+ExprParser::t_val ExprParser::GetValue(const ExprParser::t_sym& sym) const
 {
 	// t_val constant
-	if(std::holds_alternative<t_val>(sym.val))
-		return std::get<t_val>(sym.val);
+	if(std::holds_alternative<t_val>(sym))
+		return std::get<t_val>(sym);
 
 	// string naming a variable
-	else if(std::holds_alternative<std::string>(sym.val))
-		return GetIdentValue(std::get<std::string>(sym.val));
+	else if(std::holds_alternative<std::string>(sym))
+		return GetIdentValue(std::get<std::string>(sym));
 
-	return 0.;
+	return t_val(0);
 }
 
 
 /**
  * get the value of a variable with given id
  */
-t_val ExprParser::GetIdentValue(const std::string& id) const
+ExprParser::t_val ExprParser::GetIdentValue(const std::string& id) const
 {
 	if(auto iter = m_mapSymbols.find(id); iter != m_mapSymbols.end())
 		return iter->second;
@@ -230,13 +311,10 @@ void ExprParser::TransitionError(const char* func, int token)
 /**
  * call a function with 0 arguments
  */
-Symbol ExprParser::CallFunc(const std::string& id) const
+ExprParser::t_sym ExprParser::CallFunc(const std::string& id) const
 {
 	if(auto iter = m_mapFuncs0.find(id); iter != m_mapFuncs0.end())
-	{
-		t_val retval = (*iter->second)();
-		return Symbol{.is_expr=true, .val=retval};
-	}
+		return (*iter->second)();
 
 	throw std::runtime_error("Unknown function \"" + id + "\".");
 }
@@ -245,14 +323,11 @@ Symbol ExprParser::CallFunc(const std::string& id) const
 /**
  * call a function with 1 argument
  */
-Symbol ExprParser::CallFunc(const std::string& id,
-	const Symbol& arg) const
+ExprParser::t_sym ExprParser::CallFunc(const std::string& id,
+	const ExprParser::t_sym& arg) const
 {
 	if(auto iter = m_mapFuncs1.find(id); iter != m_mapFuncs1.end())
-	{
-		t_val retval = (*iter->second)(GetValue(arg));
-		return Symbol{.is_expr=true, .val=retval};
-	}
+		return (*iter->second)(GetValue(arg));
 
 	throw std::runtime_error("Unknown function \"" + id + "\".");
 }
@@ -261,20 +336,20 @@ Symbol ExprParser::CallFunc(const std::string& id,
 /**
  * call a function with 2 arguments
  */
-Symbol ExprParser::CallFunc(const std::string& id,
-	const Symbol& arg1, const Symbol& arg2) const
+ExprParser::t_sym ExprParser::CallFunc(const std::string& id,
+	const ExprParser::t_sym& arg1, const ExprParser::t_sym& arg2) const
 {
 	if(auto iter = m_mapFuncs2.find(id); iter != m_mapFuncs2.end())
 	{
 		t_val retval = (*iter->second)(GetValue(arg1), GetValue(arg2));
-		return Symbol{.is_expr=true, .val=retval};
+		return t_sym{retval};
 	}
 
 	throw std::runtime_error("Unknown function \"" + id + "\".");
 }
 
 
-t_val ExprParser::Parse(const std::string& expr)
+ExprParser::t_val ExprParser::Parse(const std::string& expr)
 {
 	m_istr = std::make_shared<std::istringstream>(expr);
 	m_lookahead = Token{};
@@ -290,7 +365,7 @@ t_val ExprParser::Parse(const std::string& expr)
 		return GetValue(m_symbols.top());
 
 	// error
-	return 0.;
+	return t_val(0);
 }
 
 
@@ -321,14 +396,14 @@ void ExprParser::start()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -341,11 +416,7 @@ void ExprParser::start()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			after_expr();
-	}
+		after_expr();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -439,14 +510,14 @@ void ExprParser::add_after_op()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -459,11 +530,7 @@ void ExprParser::add_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			after_add();
-	}
+		after_add();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -505,14 +572,13 @@ void ExprParser::after_add()
 		case '+': case '-': case ')': case ',': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			Symbol arg1 = std::move(m_symbols.top());
+			t_sym arg1 = std::move(m_symbols.top());
 			m_symbols.pop();
-			Symbol arg0 = std::move(m_symbols.top());
+			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> expr + expr.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = GetValue(arg0) + GetValue(arg1)});
+			m_symbols.emplace(GetValue(arg0) + GetValue(arg1));
 			break;
 		}
 		default:
@@ -554,14 +620,14 @@ void ExprParser::sub_after_op()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -574,11 +640,7 @@ void ExprParser::sub_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			after_sub();
-	}
+		after_sub();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -620,14 +682,13 @@ void ExprParser::after_sub()
 		case '+': case '-': case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			Symbol arg1 = std::move(m_symbols.top());
+			t_sym arg1 = std::move(m_symbols.top());
 			m_symbols.pop();
-			Symbol arg0 = std::move(m_symbols.top());
+			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> expr - expr.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = GetValue(arg0) - GetValue(arg1)});
+			m_symbols.emplace(GetValue(arg0) - GetValue(arg1));
 			break;
 		}
 		default:
@@ -669,14 +730,14 @@ void ExprParser::mul_after_op()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -689,11 +750,7 @@ void ExprParser::mul_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			after_mul();
-	}
+		after_mul();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -718,14 +775,13 @@ void ExprParser::after_mul()
 		case '%': case ')': case ',': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			Symbol arg1 = std::move(m_symbols.top());
+			t_sym arg1 = std::move(m_symbols.top());
 			m_symbols.pop();
-			Symbol arg0 = std::move(m_symbols.top());
+			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> expr * expr.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = GetValue(arg0) * GetValue(arg1)});
+			m_symbols.emplace(GetValue(arg0) * GetValue(arg1));
 			break;
 		}
 		default:
@@ -767,14 +823,14 @@ void ExprParser::div_after_op()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -787,11 +843,7 @@ void ExprParser::div_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			after_div();
-	}
+		after_div();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -816,14 +868,13 @@ void ExprParser::after_div()
 		case '%': case ')': case ',': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			Symbol arg1 = std::move(m_symbols.top());
+			t_sym arg1 = std::move(m_symbols.top());
 			m_symbols.pop();
-			Symbol arg0 = std::move(m_symbols.top());
+			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> expr / expr.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = GetValue(arg0) / GetValue(arg1)});
+			m_symbols.emplace(GetValue(arg0) / GetValue(arg1));
 			break;
 		}
 		default:
@@ -865,14 +916,14 @@ void ExprParser::mod_after_op()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT: 
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -885,11 +936,7 @@ void ExprParser::mod_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			after_mod();
-	}
+		after_mod();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -914,14 +961,13 @@ void ExprParser::after_mod()
 		case '%': case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			Symbol arg1 = std::move(m_symbols.top());
+			t_sym arg1 = std::move(m_symbols.top());
 			m_symbols.pop();
-			Symbol arg0 = std::move(m_symbols.top());
+			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> expr % expr.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = std::fmod(GetValue(arg0), GetValue(arg1))});
+			m_symbols.emplace(std::fmod(GetValue(arg0), GetValue(arg1)));
 			break;
 		}
 		default:
@@ -963,14 +1009,14 @@ void ExprParser::pow_after_op()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -983,11 +1029,7 @@ void ExprParser::pow_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			after_pow();
-	}
+		after_pow();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -1012,14 +1054,13 @@ void ExprParser::after_pow()
 		case '%': case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			Symbol arg1 = std::move(m_symbols.top());
+			t_sym arg1 = std::move(m_symbols.top());
 			m_symbols.pop();
-			Symbol arg0 = std::move(m_symbols.top());
+			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> expr ^ expr.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = std::pow(GetValue(arg0), GetValue(arg1))});
+			m_symbols.emplace(std::pow(GetValue(arg0), GetValue(arg1)));
 			break;
 		}
 		default:
@@ -1061,14 +1102,14 @@ void ExprParser::after_bracket()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -1081,11 +1122,7 @@ void ExprParser::after_bracket()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			bracket_after_expr();
-	}
+		bracket_after_expr();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -1172,12 +1209,11 @@ void ExprParser::after_ident()
 		case Token::END:
 		{
 			m_dist_to_jump = 1;
-			Symbol arg = std::move(m_symbols.top());
+			t_sym arg = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> ident.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = GetValue(arg)});
+			m_symbols.emplace(GetValue(arg));
 			break;
 		}
 		default:
@@ -1204,12 +1240,11 @@ void ExprParser::after_bracket_expr()
 		case Token::END:
 		{
 			m_dist_to_jump = 3;
-			Symbol arg = std::move(m_symbols.top());
+			t_sym arg = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> ( expr ).
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = GetValue(arg)});
+			m_symbols.emplace(GetValue(arg));
 			break;
 		}
 		default:
@@ -1257,14 +1292,14 @@ void ExprParser::funccall_after_ident()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -1277,11 +1312,7 @@ void ExprParser::funccall_after_ident()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			funccall_after_arg();
-	}
+		funccall_after_arg();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -1300,12 +1331,12 @@ void ExprParser::after_funccall_0args()
 		case Token::END:
 		{
 			m_dist_to_jump = 3;
-			Symbol arg = std::move(m_symbols.top());
+			t_sym arg = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> ident ( ).
-			if(std::holds_alternative<std::string>(arg.val))
-				m_symbols.emplace(CallFunc(std::get<std::string>(arg.val)));
+			if(std::holds_alternative<std::string>(arg))
+				m_symbols.emplace(CallFunc(std::get<std::string>(arg)));
 			else
 				throw std::runtime_error("Function call needs an identifier.");
 			break;
@@ -1401,14 +1432,14 @@ void ExprParser::after_funccall_1arg()
 		case Token::END:
 		{
 			m_dist_to_jump = 4;
-			Symbol arg1 = std::move(m_symbols.top());
+			t_sym arg1 = std::move(m_symbols.top());
 			m_symbols.pop();
-			Symbol arg0 = std::move(m_symbols.top());
+			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> ident ( expr ).
-			if(std::holds_alternative<std::string>(arg0.val))
-				m_symbols.emplace(CallFunc(std::get<std::string>(arg0.val), arg1));
+			if(std::holds_alternative<std::string>(arg0))
+				m_symbols.emplace(CallFunc(std::get<std::string>(arg0), arg1));
 			else
 				throw std::runtime_error("Function call needs an identifier.");
 			break;
@@ -1452,14 +1483,14 @@ void ExprParser::funccall_after_comma()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -1472,11 +1503,7 @@ void ExprParser::funccall_after_comma()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			funccall_after_arg2();
-	}
+		funccall_after_arg2();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -1556,12 +1583,11 @@ void ExprParser::after_real()
 		case Token::END:
 		{
 			m_dist_to_jump = 1;
-			Symbol arg = std::move(m_symbols.top());
+			t_sym arg = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> real.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = GetValue(arg)});
+			m_symbols.emplace(GetValue(arg));
 			break;
 		}
 		default:
@@ -1603,14 +1629,14 @@ void ExprParser::usub_after_op()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -1623,11 +1649,7 @@ void ExprParser::usub_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			after_usub();
-	}
+		after_usub();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -1646,16 +1668,16 @@ void ExprParser::after_funccall_2args()
 		case Token::END:
 		{
 			m_dist_to_jump = 6;
-			Symbol arg2 = std::move(m_symbols.top());
+			t_sym arg2 = std::move(m_symbols.top());
 			m_symbols.pop();
-			Symbol arg1 = std::move(m_symbols.top());
+			t_sym arg1 = std::move(m_symbols.top());
 			m_symbols.pop();
-			Symbol arg0 = std::move(m_symbols.top());
+			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> ident ( expr , expr ).
-			if(std::holds_alternative<std::string>(arg0.val))
-				m_symbols.emplace(CallFunc(std::get<std::string>(arg0.val), arg1, arg2));
+			if(std::holds_alternative<std::string>(arg0))
+				m_symbols.emplace(CallFunc(std::get<std::string>(arg0), arg1, arg2));
 			else
 				throw std::runtime_error("Function call needs an identifier.");
 			break;
@@ -1707,12 +1729,11 @@ void ExprParser::after_usub()
 		case '+': case '-': case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 2;
-			Symbol arg = std::move(m_symbols.top());
+			t_sym arg = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> - expr.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = -GetValue(arg)});
+			m_symbols.emplace(-GetValue(arg));
 			break;
 		}
 		default:
@@ -1754,14 +1775,14 @@ void ExprParser::uadd_after_op()
 		}
 		case Token::REAL:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.val});
+			m_symbols.emplace(m_lookahead.val);
 			GetNextLookahead();
 			after_real();
 			break;
 		}
 		case Token::IDENT:
 		{
-			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
+			m_symbols.emplace(m_lookahead.strval);
 			GetNextLookahead();
 			after_ident();
 			break;
@@ -1774,11 +1795,7 @@ void ExprParser::uadd_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-	{
-		const Symbol& topsym = m_symbols.top();
-		if(topsym.is_expr)
-			after_uadd();
-	}
+		after_uadd();
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -1820,12 +1837,11 @@ void ExprParser::after_uadd()
 		case '+': case '-': case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 2;
-			Symbol arg = std::move(m_symbols.top());
+			t_sym arg = std::move(m_symbols.top());
 			m_symbols.pop();
 
 			// semantic rule: expr -> + expr.
-			m_symbols.emplace(Symbol{.is_expr = true,
-				.val = GetValue(arg)});
+			m_symbols.emplace(GetValue(arg));
 			break;
 		}
 		default:
@@ -1842,7 +1858,7 @@ void ExprParser::after_uadd()
 
 int main()
 {
-	std::cout.precision(std::numeric_limits<t_val>::digits10);
+	std::cout.precision(std::numeric_limits<ExprParser::t_val>::digits10);
 
 	try
 	{
