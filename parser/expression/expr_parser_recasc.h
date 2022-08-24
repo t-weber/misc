@@ -16,6 +16,7 @@
 #include <vector>
 #include <stack>
 #include <memory>
+#include <variant>
 #include <unordered_map>
 #include <cmath>
 
@@ -26,13 +27,13 @@ using t_val = double;
 struct Symbol
 {
 	bool is_expr{false};
-	t_val val{};
+	std::variant<t_val, std::string> val{};
 };
 
 
 struct Token
 {
-	enum : std::size_t
+	enum : int
 	{
 		REAL    = 1000,
 		IDENT   = 1001,
@@ -41,9 +42,9 @@ struct Token
 		INVALID = 10000,
 	};
 
-	std::size_t id{INVALID};
+	int id{INVALID};
 	t_val val{};
-	std::string ident{};
+	std::string strval{};
 };
 
 
@@ -55,7 +56,7 @@ public:
 	ExprParser(const ExprParser&) = delete;
 	ExprParser& operator=(const ExprParser&) = delete;
 
-	Symbol Parse(const std::string& expr);
+	t_val Parse(const std::string& expr);
 
 
 protected:
@@ -69,12 +70,14 @@ protected:
 	static Token lex(std::istream* /*= &std::cin*/);
 
 	void GetNextLookahead();
+	// --------------------------------------------------------------------
 
-	Symbol GetIdentValue(const std::string& ident) const;
+	// --------------------------------------------------------------------
+	t_val GetValue(const Symbol& sym) const;
+	t_val GetIdentValue(const std::string& ident) const;
 	Symbol CallFunc(const std::string& ident) const;
 	Symbol CallFunc(const std::string& ident, const Symbol& arg) const;
 	Symbol CallFunc(const std::string& ident, const Symbol& arg1, const Symbol& arg2) const;
-
 	// --------------------------------------------------------------------
 
 	// --------------------------------------------------------------------
@@ -122,6 +125,8 @@ protected:
 	void uadd_after_op();
 	void after_uadd();
 	// --------------------------------------------------------------------
+
+	static void TransitionError(const char* func, int token);
 
 
 private:

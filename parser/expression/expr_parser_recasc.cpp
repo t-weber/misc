@@ -33,7 +33,9 @@ std::vector<Token> ExprParser::get_matching_tokens(const std::string& str)
 		{
 			Token tok{};
 			tok.id = Token::REAL;
-			std::istringstream{str} >> tok.val;
+			t_val val{};
+			std::istringstream{str} >> val;
+			tok.val = val;
 			matches.emplace_back(std::move(tok));
 		}
 	}
@@ -45,7 +47,9 @@ std::vector<Token> ExprParser::get_matching_tokens(const std::string& str)
 		{
 			Token tok{};
 			tok.id = Token::REAL;
-			std::istringstream{str} >> tok.val;
+			t_val val{};
+			std::istringstream{str} >> val;
+			tok.val = val;
 			matches.emplace_back(std::move(tok));
 		}
 	}
@@ -61,7 +65,7 @@ std::vector<Token> ExprParser::get_matching_tokens(const std::string& str)
 		{
 			Token tok{};
 			tok.id = Token::IDENT;
-			tok.ident = str;
+			tok.strval = str;
 			matches.emplace_back(std::move(tok));
 		}
 	}
@@ -71,7 +75,7 @@ std::vector<Token> ExprParser::get_matching_tokens(const std::string& str)
 			str == "^" || str == "(" || str == ")" || str == ",")
 		{
 			Token tok{};
-			tok.id = (std::size_t)str[0];
+			tok.id = (int)str[0];
 			matches.emplace_back(std::move(tok));
 		}
 	}
@@ -106,7 +110,7 @@ Token ExprParser::lex(std::istream* istr)
 			{
 				Token tok{};
 				tok.id = Token::END;
-				tok.ident = longest_input;
+				tok.strval = longest_input;
 				return tok;
 			}
 		}
@@ -134,7 +138,7 @@ Token ExprParser::lex(std::istream* istr)
 	{
 		Token tok{};
 		tok.id = Token::END;
-		tok.ident = longest_input;
+		tok.strval = longest_input;
 		return tok;
 	}
 
@@ -145,7 +149,7 @@ Token ExprParser::lex(std::istream* istr)
 
 		Token tok{};
 		tok.id = Token::INVALID;
-		tok.ident = longest_input;
+		tok.strval = longest_input;
 		return tok;
 	}
 
@@ -164,7 +168,7 @@ Token ExprParser::lex(std::istream* istr)
 	// should not get here
 	Token tok{};
 	tok.id = Token::INVALID;
-	tok.ident = longest_input;
+	tok.strval = longest_input;
 	return tok;
 }
 
@@ -176,26 +180,62 @@ void ExprParser::GetNextLookahead()
 
 
 /**
+ * get the value of a symbol
+ */
+t_val ExprParser::GetValue(const Symbol& sym) const
+{
+	// t_val constant
+	if(std::holds_alternative<t_val>(sym.val))
+		return std::get<t_val>(sym.val);
+
+	// string naming a variable
+	else if(std::holds_alternative<std::string>(sym.val))
+		return GetIdentValue(std::get<std::string>(sym.val));
+
+	return 0.;
+}
+
+
+/**
  * get the value of a variable with given id
  */
-Symbol ExprParser::GetIdentValue(const std::string& id) const
+t_val ExprParser::GetIdentValue(const std::string& id) const
 {
 	if(auto iter = m_mapSymbols.find(id); iter != m_mapSymbols.end())
-		return Symbol{.is_expr=false, .val=iter->second};
+		return iter->second;
 
 	throw std::runtime_error("Unknown variable \"" + id + "\".");
 }
 
 
+void ExprParser::TransitionError(const char* func, int token)
+{
+	std::ostringstream ostr;
+	ostr << "No transition from " << func
+		<< " and look-ahead terminal " << token;
+	if(token == Token::REAL)
+		ostr << " (real)";
+	else if(token == Token::IDENT)
+		ostr << " (ident)";
+	else if(token == Token::END)
+		ostr << " (end)";
+	else if(std::isprint(token))
+		ostr << " ('" << char(token) << "')";
+	ostr << ".";
+
+	throw std::runtime_error(ostr.str());
+}
+
+
 /**
- * call a function with 0 args
+ * call a function with 0 arguments
  */
 Symbol ExprParser::CallFunc(const std::string& id) const
 {
 	if(auto iter = m_mapFuncs0.find(id); iter != m_mapFuncs0.end())
 	{
 		t_val retval = (*iter->second)();
-		return Symbol{.is_expr=false, .val=retval};
+		return Symbol{.is_expr=true, .val=retval};
 	}
 
 	throw std::runtime_error("Unknown function \"" + id + "\".");
@@ -203,15 +243,15 @@ Symbol ExprParser::CallFunc(const std::string& id) const
 
 
 /**
- * call a function with 1 arg
+ * call a function with 1 argument
  */
 Symbol ExprParser::CallFunc(const std::string& id,
 	const Symbol& arg) const
 {
 	if(auto iter = m_mapFuncs1.find(id); iter != m_mapFuncs1.end())
 	{
-		t_val retval = (*iter->second)(arg.val);
-		return Symbol{.is_expr=false, .val=retval};
+		t_val retval = (*iter->second)(GetValue(arg));
+		return Symbol{.is_expr=true, .val=retval};
 	}
 
 	throw std::runtime_error("Unknown function \"" + id + "\".");
@@ -219,22 +259,22 @@ Symbol ExprParser::CallFunc(const std::string& id,
 
 
 /**
- * call a function with 2 args
+ * call a function with 2 arguments
  */
 Symbol ExprParser::CallFunc(const std::string& id,
 	const Symbol& arg1, const Symbol& arg2) const
 {
 	if(auto iter = m_mapFuncs2.find(id); iter != m_mapFuncs2.end())
 	{
-		t_val retval = (*iter->second)(arg1.val, arg2.val);
-		return Symbol{.is_expr=false, .val=retval};
+		t_val retval = (*iter->second)(GetValue(arg1), GetValue(arg2));
+		return Symbol{.is_expr=true, .val=retval};
 	}
 
 	throw std::runtime_error("Unknown function \"" + id + "\".");
 }
 
 
-Symbol ExprParser::Parse(const std::string& expr)
+t_val ExprParser::Parse(const std::string& expr)
 {
 	m_istr = std::make_shared<std::istringstream>(expr);
 	m_lookahead = Token{};
@@ -247,10 +287,10 @@ Symbol ExprParser::Parse(const std::string& expr)
 	start();
 
 	if(m_symbols.size() && m_accepted)
-		return m_symbols.top();
+		return GetValue(m_symbols.top());
 
 	// error
-	return Symbol{};
+	return 0.;
 }
 
 
@@ -288,15 +328,14 @@ void ExprParser::start()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -363,8 +402,7 @@ void ExprParser::after_expr()
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -408,15 +446,14 @@ void ExprParser::add_after_op()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -468,21 +505,19 @@ void ExprParser::after_add()
 		case '+': case '-': case ')': case ',': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			std::vector<Symbol> args(2);
-			for(std::size_t arg=0; arg<2; ++arg)
-			{
-				args[1-arg] = std::move(m_symbols.top());
-				m_symbols.pop();
-			}
+			Symbol arg1 = std::move(m_symbols.top());
+			m_symbols.pop();
+			Symbol arg0 = std::move(m_symbols.top());
+			m_symbols.pop();
 
 			// semantic rule: expr -> expr + expr.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = args[0].val + args[1].val});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = GetValue(arg0) + GetValue(arg1)});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -526,15 +561,14 @@ void ExprParser::sub_after_op()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -586,21 +620,19 @@ void ExprParser::after_sub()
 		case '+': case '-': case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			std::vector<Symbol> args(2);
-			for(std::size_t arg=0; arg<2; ++arg)
-			{
-				args[1-arg] = std::move(m_symbols.top());
-				m_symbols.pop();
-			}
+			Symbol arg1 = std::move(m_symbols.top());
+			m_symbols.pop();
+			Symbol arg0 = std::move(m_symbols.top());
+			m_symbols.pop();
 
 			// semantic rule: expr -> expr - expr.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = args[0].val - args[1].val});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = GetValue(arg0) - GetValue(arg1)});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -644,15 +676,14 @@ void ExprParser::mul_after_op()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -687,21 +718,19 @@ void ExprParser::after_mul()
 		case '%': case ')': case ',': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			std::vector<Symbol> args(2);
-			for(std::size_t arg=0; arg<2; ++arg)
-			{
-				args[1-arg] = std::move(m_symbols.top());
-				m_symbols.pop();
-			}
+			Symbol arg1 = std::move(m_symbols.top());
+			m_symbols.pop();
+			Symbol arg0 = std::move(m_symbols.top());
+			m_symbols.pop();
 
 			// semantic rule: expr -> expr * expr.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = args[0].val * args[1].val});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = GetValue(arg0) * GetValue(arg1)});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -745,15 +774,14 @@ void ExprParser::div_after_op()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -788,21 +816,19 @@ void ExprParser::after_div()
 		case '%': case ')': case ',': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			std::vector<Symbol> args(2);
-			for(std::size_t arg=0; arg<2; ++arg)
-			{
-				args[1-arg] = std::move(m_symbols.top());
-				m_symbols.pop();
-			}
+			Symbol arg1 = std::move(m_symbols.top());
+			m_symbols.pop();
+			Symbol arg0 = std::move(m_symbols.top());
+			m_symbols.pop();
 
 			// semantic rule: expr -> expr / expr.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = args[0].val / args[1].val});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = GetValue(arg0) / GetValue(arg1)});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -846,15 +872,14 @@ void ExprParser::mod_after_op()
 		}
 		case Token::IDENT: 
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -889,21 +914,19 @@ void ExprParser::after_mod()
 		case '%': case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			std::vector<Symbol> args(2);
-			for(std::size_t arg=0; arg<2; ++arg)
-			{
-				args[1-arg] = std::move(m_symbols.top());
-				m_symbols.pop();
-			}
+			Symbol arg1 = std::move(m_symbols.top());
+			m_symbols.pop();
+			Symbol arg0 = std::move(m_symbols.top());
+			m_symbols.pop();
 
 			// semantic rule: expr -> expr % expr.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = std::fmod(args[0].val, args[1].val)});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = std::fmod(GetValue(arg0), GetValue(arg1))});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -947,15 +970,14 @@ void ExprParser::pow_after_op()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -990,21 +1012,19 @@ void ExprParser::after_pow()
 		case '%': case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 3;
-			std::vector<Symbol> args(2);
-			for(std::size_t arg=0; arg<2; ++arg)
-			{
-				args[1-arg] = std::move(m_symbols.top());
-				m_symbols.pop();
-			}
+			Symbol arg1 = std::move(m_symbols.top());
+			m_symbols.pop();
+			Symbol arg0 = std::move(m_symbols.top());
+			m_symbols.pop();
 
 			// semantic rule: expr -> expr ^ expr.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = std::pow(args[0].val, args[1].val)});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = std::pow(GetValue(arg0), GetValue(arg1))});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1048,15 +1068,14 @@ void ExprParser::after_bracket()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1124,8 +1143,7 @@ void ExprParser::bracket_after_expr()
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1158,13 +1176,13 @@ void ExprParser::after_ident()
 			m_symbols.pop();
 
 			// semantic rule: expr -> ident.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = arg.val});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = GetValue(arg)});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1190,13 +1208,13 @@ void ExprParser::after_bracket_expr()
 			m_symbols.pop();
 
 			// semantic rule: expr -> ( expr ).
-			m_symbols.emplace(Symbol{.is_expr = true, .val = arg.val});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = GetValue(arg)});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1246,15 +1264,14 @@ void ExprParser::funccall_after_ident()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1286,14 +1303,16 @@ void ExprParser::after_funccall_0args()
 			Symbol arg = std::move(m_symbols.top());
 			m_symbols.pop();
 
-			// TODO: semantic rule: expr -> ident ( ).
-			//m_symbols.emplace(CallFunc(arg));
+			// semantic rule: expr -> ident ( ).
+			if(std::holds_alternative<std::string>(arg.val))
+				m_symbols.emplace(CallFunc(std::get<std::string>(arg.val)));
+			else
+				throw std::runtime_error("Function call needs an identifier.");
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1360,8 +1379,7 @@ void ExprParser::funccall_after_arg()
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1383,21 +1401,21 @@ void ExprParser::after_funccall_1arg()
 		case Token::END:
 		{
 			m_dist_to_jump = 4;
-			std::vector<Symbol> args(2);
-			for(std::size_t arg=0; arg<2; ++arg)
-			{
-				args[1-arg] = std::move(m_symbols.top());
-				m_symbols.pop();
-			}
+			Symbol arg1 = std::move(m_symbols.top());
+			m_symbols.pop();
+			Symbol arg0 = std::move(m_symbols.top());
+			m_symbols.pop();
 
-			// TODO: semantic rule: expr -> ident ( expr ).
-			// m_symbols.emplace(CallFunc(args[0], args[1]));
+			// semantic rule: expr -> ident ( expr ).
+			if(std::holds_alternative<std::string>(arg0.val))
+				m_symbols.emplace(CallFunc(std::get<std::string>(arg0.val), arg1));
+			else
+				throw std::runtime_error("Function call needs an identifier.");
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1441,15 +1459,14 @@ void ExprParser::funccall_after_comma()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1517,8 +1534,7 @@ void ExprParser::funccall_after_arg2()
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1544,13 +1560,13 @@ void ExprParser::after_real()
 			m_symbols.pop();
 
 			// semantic rule: expr -> real.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = arg.val});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = GetValue(arg)});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1594,15 +1610,14 @@ void ExprParser::usub_after_op()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1631,21 +1646,23 @@ void ExprParser::after_funccall_2args()
 		case Token::END:
 		{
 			m_dist_to_jump = 6;
-			std::vector<Symbol> args(3);
-			for(std::size_t arg=0; arg<3; ++arg)
-			{
-				args[2-arg] = std::move(m_symbols.top());
-				m_symbols.pop();
-			}
+			Symbol arg2 = std::move(m_symbols.top());
+			m_symbols.pop();
+			Symbol arg1 = std::move(m_symbols.top());
+			m_symbols.pop();
+			Symbol arg0 = std::move(m_symbols.top());
+			m_symbols.pop();
 
-			// TODO: semantic rule: expr -> ident ( expr , expr ).
-			// m_symbols.emplace(CallFunc(args[0], args[1], args[2]));
+			// semantic rule: expr -> ident ( expr , expr ).
+			if(std::holds_alternative<std::string>(arg0.val))
+				m_symbols.emplace(CallFunc(std::get<std::string>(arg0.val), arg1, arg2));
+			else
+				throw std::runtime_error("Function call needs an identifier.");
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1694,13 +1711,13 @@ void ExprParser::after_usub()
 			m_symbols.pop();
 
 			// semantic rule: expr -> - expr.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = -arg.val});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = -GetValue(arg)});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1744,15 +1761,14 @@ void ExprParser::uadd_after_op()
 		}
 		case Token::IDENT:
 		{
-			m_symbols.push(GetIdentValue(m_lookahead.ident));
+			m_symbols.emplace(Symbol{.is_expr=false, .val=m_lookahead.strval});
 			GetNextLookahead();
 			after_ident();
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1808,13 +1824,13 @@ void ExprParser::after_uadd()
 			m_symbols.pop();
 
 			// semantic rule: expr -> + expr.
-			m_symbols.emplace(Symbol{.is_expr = true, .val = arg.val});
+			m_symbols.emplace(Symbol{.is_expr = true,
+				.val = GetValue(arg)});
 			break;
 		}
 		default:
 		{
-			throw std::runtime_error("No transition from " + std::string(__FUNCTION__)
-				+ " and look-ahead terminal " + std::to_string(m_lookahead.id) + ".");
+			TransitionError(__FUNCTION__, m_lookahead.id);
 			break;
 		}
 	}
@@ -1826,6 +1842,8 @@ void ExprParser::after_uadd()
 
 int main()
 {
+	std::cout.precision(std::numeric_limits<t_val>::digits10);
+
 	try
 	{
 		ExprParser parser;
@@ -1838,7 +1856,7 @@ int main()
 			if(expr == "")
 				continue;
 
-			std::cout << parser.Parse(expr).val << std::endl;
+			std::cout << parser.Parse(expr) << std::endl;
 		}
 	}
 	catch(const std::exception& ex)
