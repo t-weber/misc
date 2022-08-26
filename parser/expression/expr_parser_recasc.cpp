@@ -994,11 +994,28 @@ void ExprParser::assign_after_ident()
  */
 void ExprParser::after_assign()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+': case '-': case '*': case '/':
-		case '%': case '^': case ',': case ')':
-		case Token::END:
+		case '+': case '-':
+		{
+			GetNextLookahead();
+			add_after_op(lookahead);
+			break;
+		}
+		case '*': case '/': case '%':
+		{
+			GetNextLookahead();
+			mul_after_op(lookahead);
+			break;
+		}
+		case '^':
+		{
+			GetNextLookahead();
+			pow_after_op();
+			break;
+		}
+		case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 3;
 			t_sym rhs = std::move(m_symbols.top());
