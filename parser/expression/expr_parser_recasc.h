@@ -79,20 +79,14 @@ protected:
 	void start();
 	void after_expr();
 
-	void add_after_op();
-	void after_add();
+	void uadd_after_op(int op='+');
+	void after_uadd(int op='+');
 
-	void sub_after_op();
-	void after_sub();
+	void add_after_op(int op='+');
+	void after_add(int op='+');
 
-	void mul_after_op();
-	void after_mul();
-
-	void div_after_op();
-	void after_div();
-
-	void mod_after_op();
-	void after_mod();
+	void mul_after_op(int op='*');
+	void after_mul(int op='*');
 
 	void pow_after_op();
 	void after_pow();
@@ -111,12 +105,6 @@ protected:
 	void after_funccall_0args();
 	void after_funccall_1arg();
 	void after_funccall_2args();
-
-	void usub_after_op();
-	void after_usub();
-
-	void uadd_after_op();
-	void after_uadd();
 	// --------------------------------------------------------------------
 
 	static void TransitionError(const char* func, int token);

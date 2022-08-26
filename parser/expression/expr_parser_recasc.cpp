@@ -374,18 +374,13 @@ ExprParser::t_val ExprParser::Parse(const std::string& expr)
  */
 void ExprParser::start()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
+			uadd_after_op(lookahead);
 			break;
 		}
 		case '(':
@@ -424,40 +419,23 @@ void ExprParser::start()
 
 
 /**
- * start -> expr• ｜ end
+ * start -> expr•
  */
 void ExprParser::after_expr()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			add_after_op();
+			add_after_op(lookahead);
 			break;
 		}
-		case '-':
+		case '*': case '/': case '%':
 		{
 			GetNextLookahead();
-			sub_after_op();
-			break;
-		}
-		case '*':
-		{
-			GetNextLookahead();
-			mul_after_op();
-			break;
-		}
-		case '/':
-		{
-			GetNextLookahead();
-			div_after_op();
-			break;
-		}
-		case '%':
-		{
-			GetNextLookahead();
-			mod_after_op();
+			mul_after_op(lookahead);
 			break;
 		}
 		case '^':
@@ -484,22 +462,17 @@ void ExprParser::after_expr()
 
 
 /**
- * expr -> expr + •expr ｜ ) , end + - * / % ^
+ * expr -> expr + •expr
  */
-void ExprParser::add_after_op()
+void ExprParser::add_after_op(int op)
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
+			uadd_after_op(lookahead);
 			break;
 		}
 		case '(':
@@ -530,7 +503,7 @@ void ExprParser::add_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-		after_add();
+		after_add(op);
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -538,28 +511,17 @@ void ExprParser::add_after_op()
 
 
 /**
- * expr -> expr + expr• ｜ ) , end + - * / % ^
+ * expr -> expr + expr•
  */
-void ExprParser::after_add()
+void ExprParser::after_add(int op)
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '*':
+		case '*': case '/': case '%':
 		{
 			GetNextLookahead();
-			mul_after_op();
-			break;
-		}
-		case '/':
-		{
-			GetNextLookahead();
-			div_after_op();
-			break;
-		}
-		case '%':
-		{
-			GetNextLookahead();
-			mod_after_op();
+			mul_after_op(lookahead);
 			break;
 		}
 		case '^':
@@ -568,7 +530,6 @@ void ExprParser::after_add()
 			pow_after_op();
 			break;
 		}
-
 		case '+': case '-': case ')': case ',': case Token::END:
 		{
 			m_dist_to_jump = 3;
@@ -577,8 +538,17 @@ void ExprParser::after_add()
 			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
-			// semantic rule: expr -> expr + expr.
-			m_symbols.emplace(GetValue(arg0) + GetValue(arg1));
+			switch(op)
+			{
+				case '+':
+					// semantic rule: expr -> expr + expr.
+					m_symbols.emplace(GetValue(arg0) + GetValue(arg1));
+					break;
+				case '-':
+					// semantic rule: expr -> expr - expr.
+					m_symbols.emplace(GetValue(arg0) - GetValue(arg1));
+					break;
+			}
 			break;
 		}
 		default:
@@ -594,22 +564,17 @@ void ExprParser::after_add()
 
 
 /**
- * expr -> expr - •expr ｜ ) * / % ^ , end + -
+ * expr -> expr * •expr
  */
-void ExprParser::sub_after_op()
+void ExprParser::mul_after_op(int op)
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
+			uadd_after_op(lookahead);
 			break;
 		}
 		case '(':
@@ -640,7 +605,7 @@ void ExprParser::sub_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-		after_sub();
+		after_mul(op);
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -648,119 +613,9 @@ void ExprParser::sub_after_op()
 
 
 /**
- * expr -> expr - expr• ｜ + end , - * / % ^ )
+ * expr -> expr * expr•
  */
-void ExprParser::after_sub()
-{
-	switch(m_lookahead.id)
-	{
-		case '*':
-		{
-			GetNextLookahead();
-			mul_after_op();
-			break;
-		}
-		case '/':
-		{
-			GetNextLookahead();
-			div_after_op();
-			break;
-		}
-		case '%':
-		{
-			GetNextLookahead();
-			mod_after_op();
-			break;
-		}
-		case '^':
-		{
-			GetNextLookahead();
-			pow_after_op();
-			break;
-		}
-
-		case '+': case '-': case ',': case ')': case Token::END:
-		{
-			m_dist_to_jump = 3;
-			t_sym arg1 = std::move(m_symbols.top());
-			m_symbols.pop();
-			t_sym arg0 = std::move(m_symbols.top());
-			m_symbols.pop();
-
-			// semantic rule: expr -> expr - expr.
-			m_symbols.emplace(GetValue(arg0) - GetValue(arg1));
-			break;
-		}
-		default:
-		{
-			TransitionError(__FUNCTION__, m_lookahead.id);
-			break;
-		}
-	}
-
-	if(m_dist_to_jump > 0)
-		--m_dist_to_jump;
-}
-
-
-/**
- * expr -> expr * •expr ｜ ) / % ^ , + end - *
- */
-void ExprParser::mul_after_op()
-{
-	switch(m_lookahead.id)
-	{
-		case '+':
-		{
-			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
-			break;
-		}
-		case '(':
-		{
-			GetNextLookahead();
-			after_bracket();
-			break;
-		}
-		case Token::REAL:
-		{
-			m_symbols.emplace(m_lookahead.val);
-			GetNextLookahead();
-			after_real();
-			break;
-		}
-		case Token::IDENT:
-		{
-			m_symbols.emplace(m_lookahead.strval);
-			GetNextLookahead();
-			after_ident();
-			break;
-		}
-		default:
-		{
-			TransitionError(__FUNCTION__, m_lookahead.id);
-			break;
-		}
-	}
-
-	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-		after_mul();
-
-	if(m_dist_to_jump > 0)
-		--m_dist_to_jump;
-}
-
-
-/**
- * expr -> expr * expr• ｜ - * / % , + end ^ )
- */
-void ExprParser::after_mul()
+void ExprParser::after_mul(int op)
 {
 	switch(m_lookahead.id)
 	{
@@ -770,7 +625,6 @@ void ExprParser::after_mul()
 			pow_after_op();
 			break;
 		}
-
 		case '+': case '-': case '*': case '/':
 		case '%': case ')': case ',': case Token::END:
 		{
@@ -780,8 +634,21 @@ void ExprParser::after_mul()
 			t_sym arg0 = std::move(m_symbols.top());
 			m_symbols.pop();
 
-			// semantic rule: expr -> expr * expr.
-			m_symbols.emplace(GetValue(arg0) * GetValue(arg1));
+			switch(op)
+			{
+				case '*':
+					// semantic rule: expr -> expr * expr.
+					m_symbols.emplace(GetValue(arg0) * GetValue(arg1));
+					break;
+				case '/':
+					// semantic rule: expr -> expr / expr.
+					m_symbols.emplace(GetValue(arg0) / GetValue(arg1));
+					break;
+				case '%':
+					// semantic rule: expr -> expr % expr.
+					m_symbols.emplace(std::fmod(GetValue(arg0), GetValue(arg1)));
+					break;
+			}
 			break;
 		}
 		default:
@@ -797,208 +664,17 @@ void ExprParser::after_mul()
 
 
 /**
- * expr -> expr / •expr ｜ ) - % ^ , + end * /
- */
-void ExprParser::div_after_op()
-{
-	switch(m_lookahead.id)
-	{
-		case '+':
-		{
-			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
-			break;
-		}
-		case '(':
-		{
-			GetNextLookahead();
-			after_bracket();
-			break;
-		}
-		case Token::REAL:
-		{
-			m_symbols.emplace(m_lookahead.val);
-			GetNextLookahead();
-			after_real();
-			break;
-		}
-		case Token::IDENT:
-		{
-			m_symbols.emplace(m_lookahead.strval);
-			GetNextLookahead();
-			after_ident();
-			break;
-		}
-		default:
-		{
-			TransitionError(__FUNCTION__, m_lookahead.id);
-			break;
-		}
-	}
-
-	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-		after_div();
-
-	if(m_dist_to_jump > 0)
-		--m_dist_to_jump;
-}
-
-
-/**
- * expr -> expr / expr• ｜ * - / % , + end ^ )
- */
-void ExprParser::after_div()
-{
-	switch(m_lookahead.id)
-	{
-		case '^':
-		{
-			GetNextLookahead();
-			pow_after_op();
-			break;
-		}
-
-		case '+': case '-': case '*': case '/':
-		case '%': case ')': case ',': case Token::END:
-		{
-			m_dist_to_jump = 3;
-			t_sym arg1 = std::move(m_symbols.top());
-			m_symbols.pop();
-			t_sym arg0 = std::move(m_symbols.top());
-			m_symbols.pop();
-
-			// semantic rule: expr -> expr / expr.
-			m_symbols.emplace(GetValue(arg0) / GetValue(arg1));
-			break;
-		}
-		default:
-		{
-			TransitionError(__FUNCTION__, m_lookahead.id);
-			break;
-		}
-	}
-
-	if(m_dist_to_jump > 0)
-		--m_dist_to_jump;
-}
-
-
-/**
- * expr -> expr % •expr ｜ ) ^ * - , end + / %
- */
-void ExprParser::mod_after_op()
-{
-	switch(m_lookahead.id)
-	{
-		case '+':
-		{
-			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
-			break;
-		}
-		case '(':
-		{
-			GetNextLookahead();
-			after_bracket();
-			break;
-		}
-		case Token::REAL:
-		{
-			m_symbols.emplace(m_lookahead.val);
-			GetNextLookahead();
-			after_real();
-			break;
-		}
-		case Token::IDENT: 
-		{
-			m_symbols.emplace(m_lookahead.strval);
-			GetNextLookahead();
-			after_ident();
-			break;
-		}
-		default:
-		{
-			TransitionError(__FUNCTION__, m_lookahead.id);
-			break;
-		}
-	}
-
-	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-		after_mod();
-
-	if(m_dist_to_jump > 0)
-		--m_dist_to_jump;
-}
-
-
-/**
- * expr -> expr % expr• ｜ / % ^ * - + end , )
- */
-void ExprParser::after_mod()
-{
-	switch(m_lookahead.id)
-	{
-		case '^':
-		{
-			GetNextLookahead();
-			pow_after_op();
-			break;
-		}
-
-		case '+': case '-': case '*': case '/':
-		case '%': case ',': case ')': case Token::END:
-		{
-			m_dist_to_jump = 3;
-			t_sym arg1 = std::move(m_symbols.top());
-			m_symbols.pop();
-			t_sym arg0 = std::move(m_symbols.top());
-			m_symbols.pop();
-
-			// semantic rule: expr -> expr % expr.
-			m_symbols.emplace(std::fmod(GetValue(arg0), GetValue(arg1)));
-			break;
-		}
-		default:
-		{
-			TransitionError(__FUNCTION__, m_lookahead.id);
-			break;
-		}
-	}
-
-	if(m_dist_to_jump > 0)
-		--m_dist_to_jump;
-}
-
-
-/**
- * expr -> expr ^ •expr ｜ ) % ^ / * - , + end
+ * expr -> expr ^ •expr
  */
 void ExprParser::pow_after_op()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
+			uadd_after_op(lookahead);
 			break;
 		}
 		case '(':
@@ -1037,7 +713,7 @@ void ExprParser::pow_after_op()
 
 
 /**
- * expr -> expr ^ expr• ｜ % ^ / * - + end , )
+ * expr -> expr ^ expr•
  */
 void ExprParser::after_pow()
 {
@@ -1076,22 +752,17 @@ void ExprParser::after_pow()
 
 
 /**
- * expr -> ( •expr ) ｜ ) ^ % / * - , + end
+ * expr -> ( •expr )
  */
 void ExprParser::after_bracket()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
+			uadd_after_op(lookahead);
 			break;
 		}
 		case '(':
@@ -1130,40 +801,23 @@ void ExprParser::after_bracket()
 
 
 /**
- * expr -> ( expr •) ｜ ^ % / * - + end , )
+ * expr -> ( expr •)
  */
 void ExprParser::bracket_after_expr()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			add_after_op();
+			add_after_op(lookahead);
 			break;
 		}
-		case '-':
+		case '*': case '/': case '%':
 		{
 			GetNextLookahead();
-			sub_after_op();
-			break;
-		}
-		case '*':
-		{
-			GetNextLookahead();
-			mul_after_op();
-			break;
-		}
-		case '/':
-		{
-			GetNextLookahead();
-			div_after_op();
-			break;
-		}
-		case '%':
-		{
-			GetNextLookahead();
-			mod_after_op();
+			mul_after_op(lookahead);
 			break;
 		}
 		case '^':
@@ -1191,7 +845,7 @@ void ExprParser::bracket_after_expr()
 
 
 /**
- * expr -> ident •( ) ｜ ^ % / * - , end + )
+ * expr -> ident •( )
  */
 void ExprParser::after_ident()
 {
@@ -1229,7 +883,7 @@ void ExprParser::after_ident()
 
 
 /**
- * expr -> ( expr )• ｜ ^ % / * - + end , )
+ * expr -> ( expr )•
  */
 void ExprParser::after_bracket_expr()
 {
@@ -1260,22 +914,17 @@ void ExprParser::after_bracket_expr()
 
 
 /**
- * expr -> ident ( •) ｜ ^ % / * - end , + )
+ * expr -> ident ( •)
  */
 void ExprParser::funccall_after_ident()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
+			uadd_after_op(lookahead);
 			break;
 		}
 		case '(':
@@ -1320,7 +969,7 @@ void ExprParser::funccall_after_ident()
 
 
 /**
- * expr -> ident ( )• ｜ ^ % / * - end , + )
+ * expr -> ident ( )•
  */
 void ExprParser::after_funccall_0args()
 {
@@ -1354,40 +1003,23 @@ void ExprParser::after_funccall_0args()
 
 
 /**
- * expr -> ident ( expr •) ｜ ^ % / * - end , + )
+ * expr -> ident ( expr •)
  */
 void ExprParser::funccall_after_arg()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			add_after_op();
+			add_after_op(lookahead);
 			break;
 		}
-		case '-':
+		case '*': case '/': case '%':
 		{
 			GetNextLookahead();
-			sub_after_op();
-			break;
-		}
-		case '*':
-		{
-			GetNextLookahead();
-			mul_after_op();
-			break;
-		}
-		case '/':
-		{
-			GetNextLookahead();
-			div_after_op();
-			break;
-		}
-		case '%':
-		{
-			GetNextLookahead();
-			mod_after_op();
+			mul_after_op(lookahead);
 			break;
 		}
 		case '^':
@@ -1421,7 +1053,7 @@ void ExprParser::funccall_after_arg()
 
 
 /**
- * expr -> ident ( expr )• ｜ ^ % / * - end , + )
+ * expr -> ident ( expr )•
  */
 void ExprParser::after_funccall_1arg()
 {
@@ -1457,22 +1089,17 @@ void ExprParser::after_funccall_1arg()
 
 
 /**
- * expr -> ident ( expr , •expr ) ｜ ^ % / * - end , + )
+ * expr -> ident ( expr , •expr )
  */
 void ExprParser::funccall_after_comma()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
+			uadd_after_op(lookahead);
 			break;
 		}
 		case '(':
@@ -1511,40 +1138,23 @@ void ExprParser::funccall_after_comma()
 
 
 /**
- * expr -> ident ( expr , expr •) ｜ ^ % / * - end , + )
+ * expr -> ident ( expr , expr •)
  */
 void ExprParser::funccall_after_arg2()
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '+':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			add_after_op();
+			add_after_op(lookahead);
 			break;
 		}
-		case '-':
+		case '*': case '/': case '%':
 		{
 			GetNextLookahead();
-			sub_after_op();
-			break;
-		}
-		case '*':
-		{
-			GetNextLookahead();
-			mul_after_op();
-			break;
-		}
-		case '/':
-		{
-			GetNextLookahead();
-			div_after_op();
-			break;
-		}
-		case '%':
-		{
-			GetNextLookahead();
-			mod_after_op();
+			mul_after_op(lookahead);
 			break;
 		}
 		case '^':
@@ -1572,7 +1182,7 @@ void ExprParser::funccall_after_arg2()
 
 
 /**
- * expr -> real• ｜ ^ % / * - , end + )
+ * expr -> real•
  */
 void ExprParser::after_real()
 {
@@ -1603,61 +1213,7 @@ void ExprParser::after_real()
 
 
 /**
- * expr -> - •expr ｜ ^ % / * - , end + )
- */
-void ExprParser::usub_after_op()
-{
-	switch(m_lookahead.id)
-	{
-		case '+':
-		{
-			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
-			break;
-		}
-		case '(':
-		{
-			GetNextLookahead();
-			after_bracket();
-			break;
-		}
-		case Token::REAL:
-		{
-			m_symbols.emplace(m_lookahead.val);
-			GetNextLookahead();
-			after_real();
-			break;
-		}
-		case Token::IDENT:
-		{
-			m_symbols.emplace(m_lookahead.strval);
-			GetNextLookahead();
-			after_ident();
-			break;
-		}
-		default:
-		{
-			TransitionError(__FUNCTION__, m_lookahead.id);
-			break;
-		}
-	}
-
-	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-		after_usub();
-
-	if(m_dist_to_jump > 0)
-		--m_dist_to_jump;
-}
-
-
-/**
- * expr -> ident ( expr , expr )• ｜ ^ % / * - end , + )
+ * expr -> ident ( expr , expr )•
  */
 void ExprParser::after_funccall_2args()
 {
@@ -1695,76 +1251,17 @@ void ExprParser::after_funccall_2args()
 
 
 /**
- * expr -> - expr• ｜ ^ % / * - end , + )
+ * expr -> + •expr
  */
-void ExprParser::after_usub()
+void ExprParser::uadd_after_op(int op)
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '*':
+		case '+': case '-':
 		{
 			GetNextLookahead();
-			mul_after_op();
-			break;
-		}
-		case '/':
-		{
-			GetNextLookahead();
-			div_after_op();
-			break;
-		}
-		case '%':
-		{
-			GetNextLookahead();
-			mod_after_op();
-			break;
-		}
-		case '^':
-		{
-			GetNextLookahead();
-			pow_after_op();
-			break;
-		}
-
-		case '+': case '-': case ',': case ')': case Token::END:
-		{
-			m_dist_to_jump = 2;
-			t_sym arg = std::move(m_symbols.top());
-			m_symbols.pop();
-
-			// semantic rule: expr -> - expr.
-			m_symbols.emplace(-GetValue(arg));
-			break;
-		}
-		default:
-		{
-			TransitionError(__FUNCTION__, m_lookahead.id);
-			break;
-		}
-	}
-
-	if(m_dist_to_jump > 0)
-		--m_dist_to_jump;
-}
-
-
-/**
- * expr -> + •expr ｜ ^ % / * - , end + )
- */
-void ExprParser::uadd_after_op()
-{
-	switch(m_lookahead.id)
-	{
-		case '+':
-		{
-			GetNextLookahead();
-			uadd_after_op();
-			break;
-		}
-		case '-':
-		{
-			GetNextLookahead();
-			usub_after_op();
+			uadd_after_op(lookahead);
 			break;
 		}
 		case '(':
@@ -1795,7 +1292,7 @@ void ExprParser::uadd_after_op()
 	}
 
 	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
-		after_uadd();
+		after_uadd(op);
 
 	if(m_dist_to_jump > 0)
 		--m_dist_to_jump;
@@ -1803,28 +1300,17 @@ void ExprParser::uadd_after_op()
 
 
 /**
- * expr -> + expr• ｜ ^ % / * - + end , )
+ * expr -> + expr•
  */
-void ExprParser::after_uadd()
+void ExprParser::after_uadd(int op)
 {
-	switch(m_lookahead.id)
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
 	{
-		case '%':
+		case '*': case '/': case '%':
 		{
 			GetNextLookahead();
-			mod_after_op();
-			break;
-		}
-		case '*':
-		{
-			GetNextLookahead();
-			mul_after_op();
-			break;
-		}
-		case '/':
-		{
-			GetNextLookahead();
-			div_after_op();
+			mul_after_op(lookahead);
 			break;
 		}
 		case '^':
@@ -1833,15 +1319,23 @@ void ExprParser::after_uadd()
 			pow_after_op();
 			break;
 		}
-
 		case '+': case '-': case ',': case ')': case Token::END:
 		{
 			m_dist_to_jump = 2;
 			t_sym arg = std::move(m_symbols.top());
 			m_symbols.pop();
 
-			// semantic rule: expr -> + expr.
-			m_symbols.emplace(GetValue(arg));
+			switch(op)
+			{
+				case '+':
+					// semantic rule: expr -> + expr.
+					m_symbols.emplace(GetValue(arg));
+					break;
+				case '-':
+					// semantic rule: expr -> - expr.
+					m_symbols.emplace(-GetValue(arg));
+					break;
+			}
 			break;
 		}
 		default:

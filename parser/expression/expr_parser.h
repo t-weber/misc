@@ -21,6 +21,7 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
+#include <random>
 #include <cmath>
 
 
@@ -543,6 +544,12 @@ private:
 	// zero-args function table
 	std::unordered_map<std::string, t_real(*)()> m_mapFuncs0 =
 	{
+		{ "rand", []() -> t_real
+			{
+				static std::mt19937 s_rng{std::random_device{}()};
+				return std::uniform_real_distribution<t_real>(
+					t_real(0), t_real(1))(s_rng);
+			} },
 	};
 
 
@@ -552,9 +559,16 @@ private:
 		{ "sin", [](t_real x) -> t_real { return (t_real)std::sin(x); } },
 		{ "cos", [](t_real x) -> t_real { return (t_real)std::cos(x); } },
 		{ "tan", [](t_real x) -> t_real { return (t_real)std::tan(x); } },
+		{ "asin", [](t_real x) -> t_real { return (t_real)std::asin(x); } },
+		{ "acos", [](t_real x) -> t_real { return (t_real)std::acos(x); } },
+		{ "atan", [](t_real x) -> t_real { return (t_real)std::atan(x); } },
 
 		{ "sqrt", [](t_real x) -> t_real { return (t_real)std::sqrt(x); } },
 		{ "exp", [](t_real x) -> t_real { return (t_real)std::exp(x); } },
+
+		{ "round", [](t_real x) -> t_real { return (t_real)std::round(x); } },
+		{ "ceil", [](t_real x) -> t_real { return (t_real)std::ceil(x); } },
+		{ "floor", [](t_real x) -> t_real { return (t_real)std::floor(x); } },
 	};
 
 
@@ -562,6 +576,19 @@ private:
 	std::unordered_map<std::string, t_real(*)(t_real, t_real)> m_mapFuncs2 =
 	{
 		{ "pow", [](t_real x, t_real y) -> t_real { return (t_real)std::pow(x, y); } },
+		{ "atan2", [](t_real y, t_real x) -> t_real { return (t_real)std::atan2(y, x); } },
+
+		{ "rand", [](t_real min, t_real max) -> t_real
+			{
+				static std::mt19937 s_rng{std::random_device{}()};
+				if constexpr(std::is_floating_point_v<t_real>)
+					return std::uniform_real_distribution<t_real>(
+						min, max)(s_rng);
+				else if constexpr(std::is_integral_v<t_real>)
+					return std::uniform_int_distribution<t_real>(
+						min, max)(s_rng);
+				return t_real{};
+			} },
 	};
 	// ----------------------------------------------------------------------------
 };
