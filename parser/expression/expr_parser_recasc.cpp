@@ -153,7 +153,7 @@ ExprParser::get_matching_tokens(const std::string& str)
 
 	{       // tokens represented by themselves
 		if(str == "+" || str == "-" || str == "*" || str == "/" || str == "%" ||
-			str == "^" || str == "(" || str == ")" || str == ",")
+			str == "^" || str == "(" || str == ")" || str == "," || str == "=")
 		{
 			Token tok{};
 			tok.id = (int)str[0];
@@ -305,6 +305,28 @@ void ExprParser::TransitionError(const char* func, int token)
 	ostr << ".";
 
 	throw std::runtime_error(ostr.str());
+}
+
+
+/**
+ * assign a variable
+ */
+ExprParser::t_sym ExprParser::AssignVar(const std::string& id,
+	const ExprParser::t_sym& arg)
+{
+	// does the variable already exist?
+	if(auto iter = m_mapSymbols.find(id); iter != m_mapSymbols.end())
+	{
+		iter->second = GetValue(arg);
+		return iter->second;
+	}
+
+	// otherwise insert variable
+	else
+	{
+		iter = m_mapSymbols.insert(std::make_pair(id, GetValue(arg))).first;
+		return iter->second;
+	}
 }
 
 
@@ -851,13 +873,18 @@ void ExprParser::after_ident()
 {
 	switch(m_lookahead.id)
 	{
+		case '=':
+		{
+			GetNextLookahead();
+			assign_after_ident();
+			break;
+		}
 		case '(':
 		{
 			GetNextLookahead();
 			funccall_after_ident();
 			break;
 		}
-
 		case '+': case '-': case '*': case '/':
 		case '%': case '^': case ',': case ')':
 		case Token::END:
@@ -899,6 +926,91 @@ void ExprParser::after_bracket_expr()
 
 			// semantic rule: expr -> ( expr ).
 			m_symbols.emplace(GetValue(arg));
+			break;
+		}
+		default:
+		{
+			TransitionError(__FUNCTION__, m_lookahead.id);
+			break;
+		}
+	}
+
+	if(m_dist_to_jump > 0)
+		--m_dist_to_jump;
+}
+
+
+/**
+ * expr -> ident = •expr
+ */
+void ExprParser::assign_after_ident()
+{
+	int lookahead = m_lookahead.id;
+	switch(lookahead)
+	{
+		case '+': case '-':
+		{
+			GetNextLookahead();
+			uadd_after_op(lookahead);
+			break;
+		}
+		case '(':
+		{
+			GetNextLookahead();
+			after_bracket();
+			break;
+		}
+		case Token::REAL:
+		{
+			m_symbols.emplace(m_lookahead.val);
+			GetNextLookahead();
+			after_real();
+			break;
+		}
+		case Token::IDENT:
+		{
+			m_symbols.emplace(m_lookahead.strval);
+			GetNextLookahead();
+			after_ident();
+			break;
+		}
+		default:
+		{
+			TransitionError(__FUNCTION__, m_lookahead.id);
+			break;
+		}
+	}
+
+	while(!m_dist_to_jump && m_symbols.size() && !m_accepted)
+		after_assign();
+
+	if(m_dist_to_jump > 0)
+		--m_dist_to_jump;
+}
+
+
+/**
+ * expr -> ident = expr•
+ */
+void ExprParser::after_assign()
+{
+	switch(m_lookahead.id)
+	{
+		case '+': case '-': case '*': case '/':
+		case '%': case '^': case ',': case ')':
+		case Token::END:
+		{
+			m_dist_to_jump = 3;
+			t_sym rhs = std::move(m_symbols.top());
+			m_symbols.pop();
+			t_sym lhs = std::move(m_symbols.top());
+			m_symbols.pop();
+
+			// semantic rule: expr -> ident = expr.
+			if(std::holds_alternative<std::string>(lhs))
+				m_symbols.emplace(AssignVar(std::get<std::string>(lhs), rhs));
+			else
+				throw std::runtime_error("Assignment needs a variable identifier.");
 			break;
 		}
 		default:

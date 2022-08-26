@@ -68,6 +68,7 @@ protected:
 	// --------------------------------------------------------------------
 	t_val GetValue(const t_sym& sym) const;
 	t_val GetIdentValue(const std::string& ident) const;
+	t_sym AssignVar(const std::string& ident, const t_sym& arg);
 	t_sym CallFunc(const std::string& ident) const;
 	t_sym CallFunc(const std::string& ident, const t_sym& arg) const;
 	t_sym CallFunc(const std::string& ident, const t_sym& arg1, const t_sym& arg2) const;
@@ -97,6 +98,9 @@ protected:
 
 	void after_ident();
 	void after_real();
+
+	void assign_after_ident();
+	void after_assign();
 
 	void funccall_after_ident();
 	void funccall_after_arg();
