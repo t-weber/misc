@@ -13,6 +13,7 @@
 
 #include <SDL2/SDL.h>
 
+#include <cmath>
 #include <numbers>
 #include <vector>
 #include <algorithm>
@@ -31,33 +32,72 @@ using t_audio = float;
 template<class t_real = double>
 std::vector<t_real> get_pythagorean_tuning(t_real base_freq)
 {
+	// octave
+	const t_real order2_freq = t_real(2) * base_freq;
+
 	std::vector<t_real> tuning;
+	tuning.push_back(base_freq);
 
+	// up from base frequency
 	t_real freq = base_freq;
-	tuning.push_back(freq);
-
-	for(int i=0; i<6; ++i)
+	for(int i=0; i<5; ++i)
 	{
 		freq *= t_real(3)/t_real(2);
-		if(freq > t_real(2)*base_freq)
-			freq *= 0.5;
+		if(freq > order2_freq)
+			freq *= t_real(0.5);
 
 		tuning.push_back(freq);
 	}
 
-	freq = base_freq;
-	for(int i=0; i<5; ++i)
+	// down from second order
+	freq = order2_freq;
+	for(int i=0; i<1; ++i)
 	{
 		freq *= t_real(2)/t_real(3);
 		if(freq < base_freq)
-			freq *= 2;
+			freq *= t_real(2);
 
 		tuning.push_back(freq);
 	}
+
+	tuning.push_back(order2_freq);
 
 	std::sort(tuning.begin(), tuning.end());
 	return tuning;
 }
+
+
+/**
+ * equal tuning
+ * @see https://en.wikipedia.org/wiki/Equal_temperament
+ */
+template<class t_real = double>
+std::vector<t_real> get_equal_tuning(t_real base_freq, bool all_keys = false)
+{
+	// halftone step
+	const t_real step = std::pow(t_real(2), 1./12.);
+	// octave
+	const t_real order2_freq = t_real(2) * base_freq;
+
+	std::vector<t_real> tuning;
+	tuning.push_back(base_freq);
+
+	t_real freq = base_freq;
+	for(int i=0; i<11; ++i)
+	{
+		freq *= step;
+
+		// skip black piano keys?
+		if(!all_keys && (i==0 || i==2 || i==5 || i==7 || i==9))
+			continue;
+
+		tuning.push_back(freq);
+	}
+
+	tuning.push_back(order2_freq);
+	return tuning;
+}
+
 
 
 /**
@@ -175,7 +215,9 @@ int main()
 		<< std::endl;
 
 	// play tuning tones
-	std::vector<t_audio> tuning = get_pythagorean_tuning<t_audio>(330);
+	//std::vector<t_audio> tuning = get_pythagorean_tuning<t_audio>(330);
+	std::vector<t_audio> tuning = get_equal_tuning<t_audio>(330);
+
 	t_audio last_phase = 0;
 	t_audio seconds = 0.5;
 	for(t_audio freq : tuning)
@@ -191,7 +233,12 @@ int main()
 	for(std::size_t idx=0; idx<tuning.size(); ++idx)
 	{
 		t_audio freq = tuning[idx];
-		std::cout << idx << ": " << freq << " Hz" << std::endl;
+		std::cout << idx << ": " << freq << " Hz";
+		if(idx > 0)
+			std::cout << " = freq[" << idx-1 << "] * " << freq / tuning[idx-1];
+		if(idx > 1)
+			std::cout << " = freq[0] * " << freq / tuning[0];
+		std::cout << std::endl;
 		SDL_Delay(seconds * 1000);
 	}
 
