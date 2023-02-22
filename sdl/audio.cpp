@@ -15,7 +15,9 @@
 
 #include <cmath>
 #include <numbers>
+#include <numeric>
 #include <vector>
+#include <unordered_map>
 #include <algorithm>
 #include <string>
 #include <iostream>
@@ -27,10 +29,11 @@ using t_audio = float;
 
 /**
  * pythagorean tuning
+ * generates the sequence C-[C#]-D-[D#]-E-F-[F#]-G-[G#]-A-[A#]-B-C
  * @see https://en.wikipedia.org/wiki/Pythagorean_tuning
  */
 template<class t_real = double>
-std::vector<t_real> get_pythagorean_tuning(t_real base_freq)
+std::vector<t_real> get_pythagorean_tuning(t_real base_freq, bool all_keys = false)
 {
 	// octave
 	const t_real order2_freq = t_real(2) * base_freq;
@@ -51,7 +54,7 @@ std::vector<t_real> get_pythagorean_tuning(t_real base_freq)
 
 	// down from second order
 	freq = order2_freq;
-	for(int i=0; i<1; ++i)
+	for(int i=0; i<(all_keys ? 6 : 1); ++i)
 	{
 		freq *= t_real(2)/t_real(3);
 		if(freq < base_freq)
@@ -69,7 +72,9 @@ std::vector<t_real> get_pythagorean_tuning(t_real base_freq)
 
 /**
  * equal tuning
+ * generates the sequence C-[C#]-D-[D#]-E-F-[F#]-G-[G#]-A-[A#]-B-C
  * @see https://en.wikipedia.org/wiki/Equal_temperament
+ * @see https://en.wikipedia.org/wiki/Piano_key_frequencies
  */
 template<class t_real = double>
 std::vector<t_real> get_equal_tuning(t_real base_freq, bool all_keys = false)
@@ -98,6 +103,32 @@ std::vector<t_real> get_equal_tuning(t_real base_freq, bool all_keys = false)
 	return tuning;
 }
 
+
+std::vector<std::string> get_tuning_names(bool all_keys = false)
+{
+	std::vector<std::string> tuning;
+
+	tuning.push_back("C");
+	if(all_keys)
+		tuning.push_back("C#");
+	tuning.push_back("D");
+	if(all_keys)
+		tuning.push_back("D#");
+	tuning.push_back("E");
+	tuning.push_back("F");
+	if(all_keys)
+		tuning.push_back("F#");
+	tuning.push_back("G");
+	if(all_keys)
+		tuning.push_back("G#");
+	tuning.push_back("A");
+	if(all_keys)
+		tuning.push_back("A#");
+	tuning.push_back("B");
+	tuning.push_back("C");
+
+	return tuning;
+}
 
 
 /**
@@ -192,6 +223,10 @@ std::pair<SDL_AudioDeviceID, SDL_AudioSpec> create_audio_dev(int freq, int chann
 
 int main()
 {
+	bool all_keys = true;
+	bool play_tuning = true;
+	bool equal_tuning = true;
+
 	if(SDL_Init(SDL_INIT_AUDIO) < 0)
 	{
 		std::cerr << SDL_GetError() << std::endl;
@@ -214,15 +249,34 @@ int main()
 		<< "format: " << print_audioformat(audiospec.format)
 		<< std::endl;
 
-	// play tuning tones
-	//std::vector<t_audio> tuning = get_pythagorean_tuning<t_audio>(330);
-	std::vector<t_audio> tuning = get_equal_tuning<t_audio>(330);
+	// tuning tones
+	std::vector<t_audio> tuning;
+	if(equal_tuning)
+		tuning = get_equal_tuning<t_audio>(261, all_keys);
+	else
+		tuning = get_pythagorean_tuning<t_audio>(261, all_keys);
+	std::vector<std::string> tuning_names = get_tuning_names(all_keys);
+
+	std::vector<std::size_t> sequence;  // sequence to play
+	std::vector<t_audio> seconds;       // lengths of notes
+
+	if(play_tuning)
+	{
+		sequence.resize(tuning.size());
+		std::iota(sequence.begin(), sequence.end(), 0);
+
+		seconds.resize(tuning.size());
+		std::fill(seconds.begin(), seconds.end(), 0.5);
+	}
 
 	t_audio last_phase = 0;
-	t_audio seconds = 0.5;
-	for(t_audio freq : tuning)
+	for(std::size_t idx_seq=0; idx_seq<sequence.size(); ++idx_seq)
 	{
-		if(!queue_sine_samples(audiodev, &audiospec, audiospec.freq*seconds*audiospec.channels, freq, &last_phase))
+		std::size_t idx = sequence[idx_seq];
+		t_audio len = seconds[idx_seq];
+		t_audio freq = tuning[idx];
+
+		if(!queue_sine_samples(audiodev, &audiospec, audiospec.freq*len*audiospec.channels, freq, &last_phase))
 		{
 			std::cerr << SDL_GetError() << std::endl;
 			return -1;
@@ -230,16 +284,20 @@ int main()
 	}
 
 	SDL_PauseAudioDevice(audiodev, SDL_FALSE);
-	for(std::size_t idx=0; idx<tuning.size(); ++idx)
+	for(std::size_t idx_seq=0; idx_seq<sequence.size(); ++idx_seq)
 	{
+		std::size_t idx = sequence[idx_seq];
+		t_audio len = seconds[idx_seq];
 		t_audio freq = tuning[idx];
-		std::cout << idx << ": " << freq << " Hz";
+		const std::string& name = tuning_names[idx];
+
+		std::cout << idx << ": " << name << " = " << freq << " Hz";
 		if(idx > 0)
 			std::cout << " = freq[" << idx-1 << "] * " << freq / tuning[idx-1];
 		if(idx > 1)
 			std::cout << " = freq[0] * " << freq / tuning[0];
 		std::cout << std::endl;
-		SDL_Delay(seconds * 1000);
+		SDL_Delay(len * 1000);
 	}
 
 	// clean up
