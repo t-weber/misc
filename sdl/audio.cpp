@@ -33,7 +33,7 @@ using t_audio = float;
  * @see https://en.wikipedia.org/wiki/Pythagorean_tuning
  */
 template<class t_real = double>
-std::vector<t_real> get_pythagorean_tuning(t_real base_freq, bool all_keys = false)
+std::vector<t_real> get_pythagorean_tuning(t_real base_freq, bool all_keys = false, std::size_t octaves = 1)
 {
 	// octave
 	const t_real order2_freq = t_real(2) * base_freq;
@@ -63,7 +63,16 @@ std::vector<t_real> get_pythagorean_tuning(t_real base_freq, bool all_keys = fal
 		tuning.push_back(freq);
 	}
 
-	tuning.push_back(order2_freq);
+	// higher octaves
+	std::size_t first_octave_end = tuning.size();
+	for(std::size_t i=1; i<octaves; ++i)
+	{
+		for(std::size_t j=0; j<first_octave_end; ++j)
+			tuning.push_back(tuning[j] * t_real(i+1));
+	}
+
+	// last note from next octave
+	tuning.push_back(base_freq * std::pow(t_real(2), t_real(octaves)));
 
 	std::sort(tuning.begin(), tuning.end());
 	return tuning;
@@ -77,12 +86,10 @@ std::vector<t_real> get_pythagorean_tuning(t_real base_freq, bool all_keys = fal
  * @see https://en.wikipedia.org/wiki/Piano_key_frequencies
  */
 template<class t_real = double>
-std::vector<t_real> get_equal_tuning(t_real base_freq, bool all_keys = false)
+std::vector<t_real> get_equal_tuning(t_real base_freq, bool all_keys = false, std::size_t octaves = 1)
 {
 	// halftone step
 	const t_real step = std::pow(t_real(2), 1./12.);
-	// octave
-	const t_real order2_freq = t_real(2) * base_freq;
 
 	std::vector<t_real> tuning;
 	tuning.push_back(base_freq);
@@ -99,12 +106,22 @@ std::vector<t_real> get_equal_tuning(t_real base_freq, bool all_keys = false)
 		tuning.push_back(freq);
 	}
 
-	tuning.push_back(order2_freq);
+	// higher octaves
+	std::size_t first_octave_end = tuning.size();
+	for(std::size_t i=1; i<octaves; ++i)
+	{
+		for(std::size_t j=0; j<first_octave_end; ++j)
+			tuning.push_back(tuning[j] * t_real(i+1));
+	}
+
+	// last note from next octave
+	tuning.push_back(base_freq * std::pow(t_real(2), t_real(octaves)));
+
 	return tuning;
 }
 
 
-std::vector<std::string> get_tuning_names(bool all_keys = false)
+std::vector<std::string> get_tuning_names(bool all_keys = false, std::size_t octaves = 1)
 {
 	std::vector<std::string> tuning;
 
@@ -125,7 +142,17 @@ std::vector<std::string> get_tuning_names(bool all_keys = false)
 	if(all_keys)
 		tuning.push_back("A#");
 	tuning.push_back("B");
-	tuning.push_back("C");
+
+	// higher octaves
+	std::size_t first_octave_end = tuning.size();
+	for(std::size_t i=1; i<octaves; ++i)
+	{
+		for(std::size_t j=0; j<first_octave_end; ++j)
+			tuning.push_back(tuning[j] + std::to_string(i+1));
+	}
+
+	// last note from next octave
+	tuning.push_back("C" + std::to_string(octaves+1));
 
 	return tuning;
 }
@@ -182,7 +209,7 @@ bool queue_sine_samples(SDL_AudioDeviceID audio_dev, const SDL_AudioSpec* audio_
 			samples[idx + chan] = amp * std::sin(phase);
 
 		// save last phase to avoid phase jumps for multiple queued sine waves
-		if(_last_phase && idx == num_samples-num_channels)
+		if(_last_phase && idx >= num_samples-num_channels)
 			*_last_phase = phase;
 	}
 
@@ -226,6 +253,8 @@ int main()
 	bool all_keys = true;
 	bool play_tuning = true;
 	bool equal_tuning = true;
+	std::size_t num_octaves = 2;
+	t_audio base_freq = 261.;
 
 	if(SDL_Init(SDL_INIT_AUDIO) < 0)
 	{
@@ -252,10 +281,15 @@ int main()
 	// tuning tones
 	std::vector<t_audio> tuning;
 	if(equal_tuning)
-		tuning = get_equal_tuning<t_audio>(261, all_keys);
+		tuning = get_equal_tuning<t_audio>(base_freq, all_keys, num_octaves);
 	else
-		tuning = get_pythagorean_tuning<t_audio>(261, all_keys);
-	std::vector<std::string> tuning_names = get_tuning_names(all_keys);
+		tuning = get_pythagorean_tuning<t_audio>(base_freq, all_keys, num_octaves);
+	std::vector<std::string> tuning_names = get_tuning_names(all_keys, num_octaves);
+
+	// map note names to frequency indices
+	std::unordered_map<std::string, std::size_t> tuning_keys;
+	for(std::size_t i=0; i<tuning.size(); ++i)
+		tuning_keys.insert(std::make_pair(tuning_names[i], i));
 
 	std::vector<std::size_t> sequence;  // sequence to play
 	std::vector<t_audio> seconds;       // lengths of notes
@@ -267,6 +301,10 @@ int main()
 
 		seconds.resize(tuning.size());
 		std::fill(seconds.begin(), seconds.end(), 0.5);
+	}
+	else
+	{
+		// TODO
 	}
 
 	t_audio last_phase = 0;
@@ -291,11 +329,13 @@ int main()
 		t_audio freq = tuning[idx];
 		const std::string& name = tuning_names[idx];
 
-		std::cout << idx << ": " << name << " = " << freq << " Hz";
+		std::cout << "tone " << idx_seq << ": ";
+		std::cout << "#" << idx << " = " << name << " = " << freq << " Hz";
 		if(idx > 0)
 			std::cout << " = freq[" << idx-1 << "] * " << freq / tuning[idx-1];
 		if(idx > 1)
 			std::cout << " = freq[0] * " << freq / tuning[0];
+		std::cout << "; length: " << len << " s";
 		std::cout << std::endl;
 		SDL_Delay(len * 1000);
 	}
