@@ -251,10 +251,14 @@ std::pair<SDL_AudioDeviceID, SDL_AudioSpec> create_audio_dev(int freq, int chann
 int main()
 {
 	bool all_keys = true;
-	bool play_tuning = true;
+	bool play_tuning = false;
 	bool equal_tuning = true;
 	std::size_t num_octaves = 2;
+	std::size_t shift_half_tones = -2 * 2;
 	t_audio base_freq = 261.;
+	t_audio base_length = 1.33;
+	t_audio time_sig = base_length;  // 4/4
+
 
 	if(SDL_Init(SDL_INIT_AUDIO) < 0)
 	{
@@ -300,18 +304,79 @@ int main()
 		std::iota(sequence.begin(), sequence.end(), 0);
 
 		seconds.resize(tuning.size());
-		std::fill(seconds.begin(), seconds.end(), 0.5);
+		std::fill(seconds.begin(), seconds.end(), 0.5 / base_length);
 	}
 	else
 	{
-		// TODO
+		// https://en.wikipedia.org/wiki/Symphony_No._9_(Beethoven)#IV._Finale
+		auto seq1 = [&sequence, &seconds, &tuning_keys](int var = 0)
+		{
+			if(var == 0)
+				sequence.insert(sequence.end(), { tuning_keys["E2"], tuning_keys["F2"], tuning_keys["G2"] });
+			else if(var == 1)
+				sequence.insert(sequence.end(), { tuning_keys["C2"], tuning_keys["D2"], tuning_keys["E2"] });
+			seconds.insert(seconds.end(), { t_audio(0.5), t_audio(0.25), t_audio(0.25) });
+		};
+
+		auto seq2 = [&sequence, &seconds, &tuning_keys]()
+		{
+			sequence.insert(sequence.end(), { tuning_keys["G2"], tuning_keys["F2"], tuning_keys["E2"], tuning_keys["D2"] });
+			seconds.insert(seconds.end(), { t_audio(0.25), t_audio(0.25), t_audio(0.25), t_audio(0.25) });
+		};
+
+		auto seq3 = [&sequence, &seconds, &tuning_keys](int var = 0)
+		{
+			if(var == 0)
+				sequence.insert(sequence.end(), { tuning_keys["E2"], tuning_keys["D2"], tuning_keys["D2"] });
+			else if(var == 1)
+				sequence.insert(sequence.end(), { tuning_keys["D2"], tuning_keys["C2"], tuning_keys["C2"] });
+			seconds.insert(seconds.end(), { t_audio(0.25 + 0.25/2.), t_audio(0.25/2.), t_audio(0.5) });
+		};
+
+		auto seq4 = [&sequence, &seconds, &tuning_keys]()
+		{
+			sequence.insert(sequence.end(), { tuning_keys["D2"], tuning_keys["E2"], tuning_keys["C2"] });
+			seconds.insert(seconds.end(), { t_audio(0.5), t_audio(0.25), t_audio(0.25) });
+		};
+
+		auto seq5 = [&sequence, &seconds, &tuning_keys](int var = 0)
+		{
+			sequence.insert(sequence.end(), { tuning_keys["D2"], tuning_keys["E2"], tuning_keys["F2"], tuning_keys["E2"] });
+			seconds.insert(seconds.end(), { t_audio(0.25), t_audio(0.25/2), t_audio(0.25/2), t_audio(0.25) });
+
+			if(var == 0)
+				sequence.push_back(tuning_keys["C2"]);
+			else if(var == 1)
+				sequence.push_back(tuning_keys["D2"]);
+			seconds.push_back(0.25);
+		};
+
+		auto seq6 = [&sequence, &seconds, &tuning_keys]()
+		{
+			sequence.insert(sequence.end(), { tuning_keys["C2"], tuning_keys["D2"], tuning_keys["G"], tuning_keys["E2"] });
+			seconds.insert(seconds.end(), { t_audio(0.25), t_audio(0.25), t_audio(0.25), t_audio(0.25) });
+		};
+
+		auto seq7 = [&sequence, &seconds, &tuning_keys]()
+		{
+			sequence.insert(sequence.end(), { tuning_keys["E2"], tuning_keys["E2"], tuning_keys["F2"], tuning_keys["G2"] });
+			seconds.insert(seconds.end(), { t_audio(0.25), t_audio(0.25), t_audio(0.25), t_audio(0.25) });
+		};
+
+		for(int i=0; i<2; ++i)
+		{
+			seq1(0); seq2(); seq1(1); seq3(i);
+		}
+
+		seq4(); seq5(0); seq5(1); seq6();
+		seq7(); seq2(); seq1(1); seq3(1);
 	}
 
 	t_audio last_phase = 0;
 	for(std::size_t idx_seq=0; idx_seq<sequence.size(); ++idx_seq)
 	{
-		std::size_t idx = sequence[idx_seq];
-		t_audio len = seconds[idx_seq];
+		std::size_t idx = sequence[idx_seq] + shift_half_tones;
+		t_audio len = seconds[idx_seq] * base_length;
 		t_audio freq = tuning[idx];
 
 		if(!queue_sine_samples(audiodev, &audiospec, audiospec.freq*len*audiospec.channels, freq, &last_phase))
@@ -322,10 +387,20 @@ int main()
 	}
 
 	SDL_PauseAudioDevice(audiodev, SDL_FALSE);
+	t_audio cur_time_sig = 0.;
+	std::size_t cur_seq = 1;
+	std::cout << "\nsequence " << cur_seq << std::endl;
 	for(std::size_t idx_seq=0; idx_seq<sequence.size(); ++idx_seq)
 	{
-		std::size_t idx = sequence[idx_seq];
-		t_audio len = seconds[idx_seq];
+		if(cur_time_sig >= time_sig)
+		{
+			++cur_seq;
+			cur_time_sig = 0.;
+			std::cout << "\nsequence " << cur_seq << std::endl;
+		}
+
+		std::size_t idx = sequence[idx_seq] + shift_half_tones;
+		t_audio len = seconds[idx_seq] * base_length;
 		t_audio freq = tuning[idx];
 		const std::string& name = tuning_names[idx];
 
@@ -337,6 +412,8 @@ int main()
 			std::cout << " = freq[0] * " << freq / tuning[0];
 		std::cout << "; length: " << len << " s";
 		std::cout << std::endl;
+
+		cur_time_sig += len;
 		SDL_Delay(len * 1000);
 	}
 
