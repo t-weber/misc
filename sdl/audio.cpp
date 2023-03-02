@@ -188,7 +188,7 @@ std::string print_audioformat(SDL_AudioFormat fmt)
 
 
 /**
- * adds a sine sample
+ * adds a sine-wave sample
  */
 bool queue_sine_samples(SDL_AudioDeviceID audio_dev, const SDL_AudioSpec* audio_spec, std::size_t num_samples,
 	t_audio freq, t_audio* _last_phase = nullptr)
@@ -207,6 +207,106 @@ bool queue_sine_samples(SDL_AudioDeviceID audio_dev, const SDL_AudioSpec* audio_
 
 		for(int chan=0; chan<num_channels; ++chan)
 			samples[idx + chan] = amp * std::sin(phase);
+
+		// save last phase to avoid phase jumps for multiple queued sine waves
+		if(_last_phase && idx >= num_samples-num_channels)
+			*_last_phase = phase;
+	}
+
+	int ret = SDL_QueueAudio(audio_dev, samples, sizeof(t_audio)*num_samples);
+	delete[] samples;
+
+	return ret >= 0;
+}
+
+
+/**
+ * adds a square-wave sample
+ * @see https://en.wikipedia.org/wiki/Square_wave
+ */
+#define SQUARE_ANALYTICAL 1
+bool queue_square_samples(SDL_AudioDeviceID audio_dev, const SDL_AudioSpec* audio_spec, std::size_t num_samples,
+	t_audio freq, t_audio* _last_phase = nullptr)
+{
+	t_audio *samples = new t_audio[num_samples];
+	//memset(samples, 0, num_samples*sizeof(t_audio));
+
+	t_audio last_phase = _last_phase ? *_last_phase : 0;
+	int num_channels = audio_spec->channels;
+
+	for(std::size_t idx=0; idx<num_samples; idx+=num_channels)
+	{
+		t_audio amp = 0.75;
+		t_audio phi = t_audio(2) * std::numbers::pi_v<t_audio> * t_audio(idx) / t_audio(num_channels);
+		t_audio phase = phi * freq / t_audio(audio_spec->freq) + last_phase;
+
+		for(int chan=0; chan<num_channels; ++chan)
+		{
+#if SQUARE_ANALYTICAL == 1
+			samples[idx + chan] = amp * (std::sin(phase) >= 0. ? 1. : -1.);
+#else
+			const t_audio max_n = 100.;
+			samples[idx + chan] = t_audio(0);
+
+			for(t_audio n=1.; n<max_n; n += 2.)
+			{
+				samples[idx + chan] += amp/n * t_audio(4)/std::numbers::pi_v<t_audio> *
+					std::sin(n*phase);
+			}
+#endif
+		}
+
+		// save last phase to avoid phase jumps for multiple queued sine waves
+		if(_last_phase && idx >= num_samples-num_channels)
+			*_last_phase = phase;
+	}
+
+	int ret = SDL_QueueAudio(audio_dev, samples, sizeof(t_audio)*num_samples);
+	delete[] samples;
+
+	return ret >= 0;
+}
+
+
+/**
+ * adds a triangle-wave sample
+ * @see https://en.wikipedia.org/wiki/Triangle_wave
+ */
+#define TRIANGLE_ANALYTICAL 1
+bool queue_triangle_samples(SDL_AudioDeviceID audio_dev, const SDL_AudioSpec* audio_spec, std::size_t num_samples,
+	t_audio freq, t_audio* _last_phase = nullptr)
+{
+	t_audio *samples = new t_audio[num_samples];
+	//memset(samples, 0, num_samples*sizeof(t_audio));
+
+	t_audio last_phase = _last_phase ? *_last_phase : 0;
+	int num_channels = audio_spec->channels;
+
+	for(std::size_t idx=0; idx<num_samples; idx+=num_channels)
+	{
+		t_audio amp = 0.75;
+		t_audio phi = t_audio(2) * std::numbers::pi_v<t_audio> * t_audio(idx) / t_audio(num_channels);
+		t_audio phase = phi * freq / t_audio(audio_spec->freq) + last_phase;
+
+		for(int chan=0; chan<num_channels; ++chan)
+		{
+#if TRIANGLE_ANALYTICAL == 1
+			samples[idx + chan] = amp * t_audio(2)/std::numbers::pi_v<t_audio> *
+				std::asin(std::sin(phase));
+#else
+			const t_audio max_n = 100.;
+			t_audio sign = 1.;
+			samples[idx + chan] = t_audio(0);
+
+			for(t_audio n=1.; n<max_n; n += 2.)
+			{
+				samples[idx + chan] += sign * amp/(n*n) *
+					t_audio(8)/(std::numbers::pi_v<t_audio>*std::numbers::pi_v<t_audio>) *
+					std::sin(n*phase);
+				sign *= -1.;
+			}
+#endif
+		}
 
 		// save last phase to avoid phase jumps for multiple queued sine waves
 		if(_last_phase && idx >= num_samples-num_channels)
@@ -258,6 +358,7 @@ int main()
 	t_audio base_freq = 261.;
 	t_audio base_length = 1.33;
 	t_audio time_sig = base_length;  // 4/4
+	int which_waveform = 2;
 
 
 	if(SDL_Init(SDL_INIT_AUDIO) < 0)
@@ -378,8 +479,22 @@ int main()
 		std::size_t idx = sequence[idx_seq] + shift_half_tones;
 		t_audio len = seconds[idx_seq] * base_length;
 		t_audio freq = tuning[idx];
+		bool ok = false;
 
-		if(!queue_sine_samples(audiodev, &audiospec, audiospec.freq*len*audiospec.channels, freq, &last_phase))
+		switch(which_waveform)
+		{
+			case 0:
+				ok = queue_sine_samples(audiodev, &audiospec, audiospec.freq*len*audiospec.channels, freq, &last_phase);
+				break;
+			case 1:
+				ok = queue_square_samples(audiodev, &audiospec, audiospec.freq*len*audiospec.channels, freq, &last_phase);
+				break;
+			case 2:
+				ok = queue_triangle_samples(audiodev, &audiospec, audiospec.freq*len*audiospec.channels, freq, &last_phase);
+				break;
+		}
+
+		if(!ok)
 		{
 			std::cerr << SDL_GetError() << std::endl;
 			return -1;
