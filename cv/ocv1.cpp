@@ -71,11 +71,11 @@ int main(int argc, char** argv)
 		std::cout << "\tTotal elements: " << mat.total() << std::endl;
 		std::cout << "\tChannels: " << mat.channels() << std::endl;
 		std::cout << "\tDimensions: " << mat.dims << std::endl;
-		std::cout << "\tSizes: " << mat.rows << " x " << mat.cols << std::endl;
-		/*std::cout << "\tSizes: ";
+		std::cout << "\tSizes: " << mat.cols << " x " << mat.rows << std::endl;
+		std::cout << "\tSizes: ";
 		for(int dim=0; dim<mat.size.dims(); ++dim)
-			std::cout << mat.size[dim] << " ";
-		std::cout << std::endl;*/
+			std::cout << mat.size[dim] << " ";  // in inverse order
+		std::cout << std::endl;
 
 		// some test operations on the image
 		cv::Mat blurred = blur(mat, 5);

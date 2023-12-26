@@ -87,7 +87,7 @@ int main(int argc, char** argv)
 		std::cout << "\tTotal elements: " << mat.total() << std::endl;
 		std::cout << "\tChannels: " << mat.channels() << std::endl;
 		std::cout << "\tDimensions: " << mat.dims << std::endl;
-		std::cout << "\tSizes: " << mat.rows << " x " << mat.cols << std::endl;
+		std::cout << "\tSizes: " << mat.cols << " x " << mat.rows << std::endl;
 
 		// operations on the image
 		auto [hsv, hsv_channels] = hsv_img(mat);
