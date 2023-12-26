@@ -1,17 +1,18 @@
 /**
- * opencv test 1: image loading, blurring, ...
+ * opencv test 2: mask generation
  * @author Tobias Weber
- * @date 25-December-2023
+ * @date 26-December-2023
  * @license see 'LICENSE.GPL' file
  *
  * References:
  *	- https://docs.opencv.org/4.x/index.html
  *	- https://github.com/opencv/opencv
  *
- * g++ -std=c++20 -I/usr/include/opencv4 -o ocv1 ocv1.cpp -lopencv_core -lopencv_imgcodecs -lopencv_imgproc -lopencv_highgui
+ * g++ -std=c++20 -I/usr/include/opencv4 -o ocv2 ocv2.cpp -lopencv_core -lopencv_imgcodecs -lopencv_imgproc -lopencv_highgui
  */
 
 #include <array>
+#include <tuple>
 #include <iostream>
 
 #include <opencv2/core.hpp>
@@ -20,28 +21,43 @@
 
 
 
-cv::Mat blur(const cv::Mat& mat, int size)
+cv::Mat create_mask(const cv::Mat& mat)
 {
-	cv::Mat blurred;
-	cv::GaussianBlur(mat, blurred, cv::Size(size, size), 0);
+	cv::Mat thres;
+	cv::inRange(mat,
+		std::array<std::uint8_t, 3>{0x20 /*h*/, 0x50 /*s*/, 0x10 /*v*/},
+		std::array<std::uint8_t, 3>{0xaf /*h*/, 0xaf /*s*/, 0xcf /*v*/},
+		thres);
 
-	return blurred;
+	return thres;
 }
 
 
 
-cv::Mat grey(const cv::Mat& mat)
+cv::Mat clean_mask(const cv::Mat& mat, int size)
+{
+	cv::Mat cleaned;
+
+	cv::Mat kern = cv::Mat::eye(cv::Size(size, size), CV_8U /*mat.type()*/);
+	cv::morphologyEx(mat, cleaned, cv::MORPH_CLOSE, kern);
+	cv::morphologyEx(cleaned, cleaned, cv::MORPH_OPEN, kern);
+
+	return cleaned;
+}
+
+
+
+cv::Mat grey_img(const cv::Mat& mat)
 {
 	cv::Mat grey;
 	cv::cvtColor(mat, grey, cv::COLOR_BGR2GRAY);
 
-	//std::cout << "Grey type: " << grey.type() << std::endl;
 	return grey;
 }
 
 
 
-std::array<cv::Mat, 3> hsv(const cv::Mat& mat)
+std::tuple<cv::Mat, std::array<cv::Mat, 3>> hsv_img(const cv::Mat& mat)
 {
 	cv::Mat hsv_all;
 	cv::cvtColor(mat, hsv_all, cv::COLOR_BGR2HSV);
@@ -49,7 +65,7 @@ std::array<cv::Mat, 3> hsv(const cv::Mat& mat)
 	std::array<cv::Mat, 3> hsv;
 	cv::split(hsv_all, hsv);
 
-	return hsv;
+	return std::make_tuple(hsv_all, std::move(hsv));
 }
 
 
@@ -72,23 +88,18 @@ int main(int argc, char** argv)
 		std::cout << "\tChannels: " << mat.channels() << std::endl;
 		std::cout << "\tDimensions: " << mat.dims << std::endl;
 		std::cout << "\tSizes: " << mat.rows << " x " << mat.cols << std::endl;
-		/*std::cout << "\tSizes: ";
-		for(int dim=0; dim<mat.size.dims(); ++dim)
-			std::cout << mat.size[dim] << " ";
-		std::cout << std::endl;*/
 
-		// some test operations on the image
-		cv::Mat blurred = blur(mat, 5);
-		cv::Mat g(mat.rows, mat.cols, CV_8U); g = grey(mat);
-		auto [h, s, v] = hsv(mat);
+		// operations on the image
+		auto [hsv, hsv_channels] = hsv_img(mat);
+		const auto& [h, s, v] = hsv_channels;
+		cv::Mat mask = create_mask(hsv);
+		cv::Mat cleaned_mask = clean_mask(mask, 5);
 
 		// show images
 		cv::imshow("image", mat);
-		cv::imshow("blurred", blurred);
-		cv::imshow("grey", g);
-		cv::imshow("h", h);
-		cv::imshow("s", s);
-		cv::imshow("v", v);
+		//cv::imshow("h", h); cv::imshow("s", s); cv::imshow("v", v);
+		cv::imshow("mask", mask);
+		cv::imshow("cleaned mask", cleaned_mask);
 
 		// close windows
 		cv::waitKey(0);
