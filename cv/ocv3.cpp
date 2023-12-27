@@ -90,7 +90,12 @@ int main(int argc, char** argv)
 
 		cv::Mat cont_ext(mat.rows, mat.cols, CV_8UC3);
 		for(int idx=0; idx<contours_ext.size(); ++idx)
+		{
 			cv::drawContours(cont_ext, contours_ext, idx, cv::Scalar{0xff, 0x00, 0x00});
+
+			cv::Rect bbox = cv::boundingRect(contours_ext[idx]);
+			cv::rectangle(cont_ext, bbox, cv::Scalar{0x00, 0x00, 0xff});
+		}
 
 		// find contour hierarchy
 		std::vector<std::vector<cv::Point>> contours_all;

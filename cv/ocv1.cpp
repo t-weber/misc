@@ -8,7 +8,7 @@
  *	- https://docs.opencv.org/4.x/index.html
  *	- https://github.com/opencv/opencv
  *
- * g++ -std=c++20 -I/usr/include/opencv4 -o ocv1 ocv1.cpp -lopencv_core -lopencv_imgcodecs -lopencv_imgproc -lopencv_highgui
+ * g++ -std=c++20 -I/usr/include/opencv4 -o ocv1 ocv1.cpp -lopencv_core -lopencv_imgcodecs -lopencv_imgproc -lopencv_photo -lopencv_highgui
  */
 
 #include <array>
@@ -16,6 +16,7 @@
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/photo.hpp>
 #include <opencv2/highgui.hpp>
 
 
@@ -82,6 +83,12 @@ int main(int argc, char** argv)
 		cv::Mat g(mat.rows, mat.cols, CV_8U); g = grey(mat);
 		auto [h, s, v] = hsv(mat);
 
+		// photo algorithm tests
+		cv::Mat enhanced;
+		cv::detailEnhance(mat, enhanced);
+		cv::Mat stylised;
+		cv::stylization(mat, stylised);
+
 		// show images
 		cv::imshow("image", mat);
 		cv::imshow("blurred", blurred);
@@ -89,6 +96,8 @@ int main(int argc, char** argv)
 		cv::imshow("h", h);
 		cv::imshow("s", s);
 		cv::imshow("v", v);
+		cv::imshow("enhanced", enhanced);
+		cv::imshow("stylised", stylised);
 
 		// close windows
 		cv::waitKey(0);
