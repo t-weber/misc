@@ -38,9 +38,7 @@ entity ram is
 
 		-- input and output word
 		in_word : in t_logicvecarray(0 to num_ports-1)(num_wordbits-1 downto 0);
-		out_word : out t_logicvecarray(0 to num_ports-1)(num_wordbits-1 downto 0);
-
-		out_ready : out t_logicarray(0 to num_ports-1)
+		out_word : out t_logicvecarray(0 to num_ports-1)(num_wordbits-1 downto 0)
 	);
 end entity;
 
@@ -91,12 +89,11 @@ begin
 				variable curaddr : integer range 0 to num_words-1;
 			begin
 				if rising_edge(in_clk) then
-					out_ready(portidx) <= '0';
+					-- get the address
 					curaddr := to_int(in_addr(portidx));
 
 					-- read a word from memory
 					out_word(portidx) <= words(curaddr);
-					out_ready(portidx) <= '1';
 				end if;
 			end process;
 		end generate;	-- rom
