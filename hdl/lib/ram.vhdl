@@ -68,7 +68,7 @@ begin
 				variable curaddr : integer range 0 to num_words-1;
 			begin
 				if rising_edge(in_clk) then
-					out_ready(portidx) <= '0';
+					-- get the address
 					curaddr := to_int(in_addr(portidx));
 
 					if in_write(portidx) = '1' then
@@ -78,7 +78,6 @@ begin
 
 					-- read a word from memory
 					out_word(portidx) <= words(curaddr);
-					out_ready(portidx) <= '1';
 				end if;
 			end process;
 		end generate; -- ram
