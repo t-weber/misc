@@ -2,7 +2,7 @@
  * track segment test
  * @author Tobias Weber
  * @date 24 November 2024
- * @license see 'LICENSE' file
+ * @license see 'LICENSE.GPL' file
  *
  * g++ -std=c++20 -march=native -O2 -Wall -Wextra -Weffc++ -o track track.cpp
  */
