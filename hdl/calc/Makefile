@@ -7,7 +7,7 @@
 HDL = ghdl
 
 .PHONY: all
-all: clkdiv.o conv.o sevenseg.o dbgout.o ram.o cpu.o calc.o
+all: conv.o clkdiv.o sevenseg.o dbgout.o ram.o cpu.o calc.o
 
 %.o: %.vhdl
 	@echo "Building $@ from $<..."
