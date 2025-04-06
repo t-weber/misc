@@ -38,12 +38,14 @@ begin
 	out_clk <= in_clk when shift_bits=1 else slow_clk;
 
 	ctrprc : process(in_clk, in_rst) begin
-		if in_rst='1' then
-			ctr <= (others => '0');
-			slow_clk <= '0';
-		elsif rising_edge(in_clk) then
-			ctr <= next_ctr;
-			slow_clk <= next_slow_clk;
+		if rising_edge(in_clk) then
+			if in_rst = '1' then
+				ctr <= (others => '0');
+				slow_clk <= '0';
+			else
+				ctr <= next_ctr;
+				slow_clk <= next_slow_clk;
+			end if;
 		end if;
 	end process;
 
@@ -77,10 +79,12 @@ architecture clkdiv_impl of clkdiv is
 begin
 
 	ctrprc : process(in_clk, in_rst) begin
-		if in_rst='1' then
-			ctr <= (others => '0');
-		elsif rising_edge(in_clk) then
-			ctr <= next_ctr;
+		if rising_edge(in_clk) then
+			if in_rst='1' then
+				ctr <= (others => '0');
+			else
+				ctr <= next_ctr;
+			end if;
 		end if;
 	end process;
 

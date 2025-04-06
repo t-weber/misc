@@ -27,7 +27,6 @@ entity dbgout is
 
 		-- ram interface
 		out_ram_write : out std_logic;
-		in_ram_ready : in std_logic;
 		out_ram_addr : out std_logic_vector(num_addrbits-1 downto 0);
 		in_ram : in std_logic_vector(num_wordbits-1 downto 0);
 		
@@ -61,16 +60,14 @@ begin
 		if rising_edge(in_clk) then
 			out_ram_write <= '0';
 
-			if in_show_instr='0' then
+			if in_show_instr = '0' then
 				out_ram_addr <= in_sp;
 			else
 				out_ram_addr <= in_ip;
 			end if;
 			
-			if in_ram_ready='1' then
-				out_disp0 <= in_ram(3 downto 0);
-				out_disp1 <= in_ram(7 downto 4);
-			end if;
+			out_disp0 <= in_ram(3 downto 0);
+			out_disp1 <= in_ram(7 downto 4);
 		end if;
 	end process;
 

@@ -38,9 +38,7 @@ entity ram is
 
 		-- input and output word
 		in_word : in t_logicvecarray(0 to num_ports-1)(num_wordbits-1 downto 0);
-		out_word : out t_logicvecarray(0 to num_ports-1)(num_wordbits-1 downto 0);
-
-		out_ready : out t_logicarray(0 to num_ports-1)
+		out_word : out t_logicvecarray(0 to num_ports-1)(num_wordbits-1 downto 0)
 	);
 end entity;
 
@@ -54,66 +52,78 @@ architecture ram_impl of ram is
 
 	-- the memory is an array of words
 	signal words : t_words := (
-		x"10", x"40", -- push function 2 address, 0x40
-		x"22",	-- call function 2
-		x"10", x"20", -- push function 1 address, 0x20
-		x"22",	-- call function 1
-		x"10", x"ff",	-- push 0xff (value will be overwritten)
+		x"10", x"20",  -- push function 1 address, 0x20
+		x"22",         -- call function 1
+		x"10", x"40",  -- push function 2 address, 0x40
+		x"22",         -- call function 2
+		x"10", x"ff",  -- push 0xff (value will be overwritten)
 
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 
-		-- function 1, calculation test
-		x"10", x"04",	-- push 4
-		x"10", x"06",	-- push 6
-		x"10", x"03",	-- push 3
-		x"02",	-- sub
-		x"01",	-- add
-		x"10", x"07", -- push address 0x07 for value to overwrite
-		x"11",	-- pop result
-		x"20",	-- branch (return)
-
-		x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-
-		-- function 2, loop test
-		x"10", x"60", -- push address 0x60
-		x"12",	-- push value at address
-		x"10", x"01", -- push 1
-		x"01",	-- add
-		x"10", x"60", -- push address 0x60
-		x"11",	-- pop result
-		x"10", x"60", -- push address 0x60
-		x"12",	-- push value at address
-		x"10", x"0a", -- push 10
-		x"31",	-- less than
-		x"32",	-- not
-		x"10", x"56",	-- push address 0x56
-		x"21",	-- conditional branch
-		x"10", x"40", -- push function 2 start address, 0x40
-		x"20",	-- else: loop 
-		x"20",	-- return branch
+		-- 0x20: function 1, calculation test
+		x"10", x"04",  -- push 4
+		x"10", x"08",  -- push 8
+		x"10", x"03",  -- push 3
+		x"02",         -- sub
+		x"01",         -- add
+		x"10", x"03",  -- push 3
+		x"04",         -- mul
+		x"10", x"07",  -- push address 0x07 for value to overwrite
+		x"11",         -- pop result
+		x"20",         -- branch (return)
 
 		x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+
+		-- 0x40: function 2, loop test
+		x"10", x"60",  -- push address 0x60
+		x"12",         -- push value at address
+		x"10", x"01",  -- push 1
+		x"01",         -- add
+		x"10", x"60",  -- push address 0x60
+		x"11",         -- pop result
+		x"10", x"60",  -- push address 0x60
+		x"12",         -- push value at address
+		x"10", x"0a",  -- push 10
+		x"35",         -- less than
+		x"3a",         -- not
+		x"10", x"56",  -- push address 0x56
+		x"21",         -- conditional branch
+		x"10", x"40",  -- push function 2 start address, 0x40
+		x"20",         -- else: loop 
+		x"20",         -- 0x56: return branch
+
+		x"00",
+		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+
+		-- 0x60
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+
+		-- 0x80
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+
+		-- 0xa0
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+
+		-- 0xc0
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+
+		-- 0xe0
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
@@ -122,20 +132,20 @@ architecture ram_impl of ram is
 
 begin
 	-- generate ports 0 to num_ports-1
-	gen_ports : for portidx in 0 to num_ports-1 generate begin
+	--gen_ports : for portidx in 0 to num_ports-1 generate
 
 	-- in case the for-generate loop is not available, the
 	-- process has to be copied for the individual ports
-	--gen_port0 : if num_ports >= 0 generate
-	--	constant portidx : natural := 0;
-	--begin
+	gen_port0 : if num_ports >= 0 generate
+		constant portidx : natural := 0;
+
+	begin
 		-- ram
-		gen_ram : if is_rom='0' generate
+		gen_ram : if is_rom = '0' generate
 			process(in_clk)
 				variable curaddr : integer range 0 to num_words-1;
 			begin
 				if rising_edge(in_clk) then
-					out_ready(portidx) <= '0';
 					curaddr := to_int(in_addr(portidx));
 
 					if in_write(portidx) = '1' then
@@ -145,23 +155,60 @@ begin
 
 					-- read a word from memory
 					out_word(portidx) <= words(curaddr);
-					out_ready(portidx) <= '1';
 				end if;
 			end process;
 		end generate; -- ram
 
 		-- rom
-		gen_rom : if is_rom='1' generate
+		gen_rom : if is_rom = '1' generate
 			process(in_clk)
 				variable curaddr : integer range 0 to num_words-1;
 			begin
 				if rising_edge(in_clk) then
-					out_ready(portidx) <= '0';
 					curaddr := to_int(in_addr(portidx));
 
 					-- read a word from memory
 					out_word(portidx) <= words(curaddr);
-					out_ready(portidx) <= '1';
+				end if;
+			end process;
+		end generate;	-- rom
+	end generate;	-- ports
+
+
+
+	gen_port1 : if num_ports >= 0 generate
+		constant portidx : natural := 1;
+
+	begin
+		-- ram
+		gen_ram : if is_rom = '0' generate
+			process(in_clk)
+				variable curaddr : integer range 0 to num_words-1;
+			begin
+				if rising_edge(in_clk) then
+					curaddr := to_int(in_addr(portidx));
+
+					--if in_write(portidx) = '1' then
+					--	-- write a word to memory
+					--	words(curaddr) <= in_word(portidx);
+					--end if;
+
+					-- read a word from memory
+					out_word(portidx) <= words(curaddr);
+				end if;
+			end process;
+		end generate; -- ram
+
+		-- rom
+		gen_rom : if is_rom = '1' generate
+			process(in_clk)
+				variable curaddr : integer range 0 to num_words-1;
+			begin
+				if rising_edge(in_clk) then
+					curaddr := to_int(in_addr(portidx));
+
+					-- read a word from memory
+					out_word(portidx) <= words(curaddr);
 				end if;
 			end process;
 		end generate;	-- rom
