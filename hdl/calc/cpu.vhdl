@@ -49,6 +49,8 @@
  * 0x42: bitwise not
  * 0x45: bit shift left
  * 0x46: bit shift right
+ * 0x47: bit roll left
+ * 0x48: bit roll right
  */
 
 library ieee;
@@ -103,6 +105,21 @@ architecture cpu_impl of cpu is
 	-- cycle for multi-cycle instructions
 	signal cur_cycle, next_cycle : integer range 0 to 15 := 0;
 
+	-- one-operand expression results
+	signal umin, lognot, binnot : std_logic_vector(num_wordbits-1 downto 0);
+	signal oneop_result : std_logic_vector(num_wordbits-1 downto 0);
+
+	-- two-operand expression results
+	signal sum, diff, quot, remainder : std_logic_vector(num_wordbits-1 downto 0);
+	signal prod : std_logic_vector(2*num_wordbits-1 downto 0);
+	signal logequ, lognequ : std_logic_vector(num_wordbits-1 downto 0);
+	signal logless, loggreater : std_logic_vector(num_wordbits-1 downto 0);
+	signal loglessequ, loggreaterequ : std_logic_vector(num_wordbits-1 downto 0);
+	signal binor, binand : std_logic_vector(num_wordbits-1 downto 0);
+	signal bitshift_l, bitshift_r : std_logic_vector(num_wordbits-1 downto 0) := (others => '0');
+	signal bitroll_l, bitroll_r : std_logic_vector(num_wordbits-1 downto 0) := (others => '0');
+	signal twoop_result : std_logic_vector(num_wordbits-1 downto 0);
+
 begin
 	-- status output for debugging
 	out_ip <= reg_ip;
@@ -111,6 +128,55 @@ begin
 	out_instr <= reg_instr;
 	out_op1 <= reg_op1;
 	out_op2 <= reg_op2;
+
+
+	-- one-operand expression results
+	umin <= std_logic_vector(0 - unsigned(reg_op1));
+	lognot <= x"01" when reg_op1 = x"00" else (others => '0');
+	binnot <= not reg_op1;
+
+	oneop_result <=
+		umin when reg_instr = x"03" else
+		lognot when reg_instr = x"3a" else
+		binnot when reg_instr = x"42" else
+		(others => '0');
+
+	-- two-operand expression results
+	sum <= std_logic_vector(unsigned(reg_op2) + unsigned(reg_op1));
+	diff <= std_logic_vector(unsigned(reg_op2) - unsigned(reg_op1));
+	prod <= std_logic_vector(unsigned(reg_op2) * unsigned(reg_op1));
+	quot <= (others => '1') when unsigned(reg_op1) = 0 else
+		std_logic_vector(unsigned(reg_op2) / unsigned(reg_op1));
+	remainder <= (others => '1') when unsigned(reg_op1) = 0 else
+		std_logic_vector(unsigned(reg_op2) mod unsigned(reg_op1));
+	binor <= reg_op2 or reg_op1;
+	binand <= reg_op2 and reg_op1;
+	logequ <= x"01" when reg_op2 = reg_op1 else (others => '0');
+	lognequ <= x"01" when reg_op2 /= reg_op1 else (others => '0');
+	logless <= x"01" when unsigned(reg_op2) < unsigned(reg_op1) else (others => '0');
+	loggreater <= x"01" when unsigned(reg_op2) > unsigned(reg_op1) else (others => '0');
+	loglessequ <= x"01" when unsigned(reg_op2) <= unsigned(reg_op1) else (others => '0');
+	loggreaterequ <= x"01" when unsigned(reg_op2) >= unsigned(reg_op1) else (others => '0');
+
+	twoop_result <=
+		sum when reg_instr = x"01" else
+		diff when reg_instr = x"02" else
+		prod(num_wordbits-1 downto 0) when reg_instr = x"04" else
+		quot when reg_instr = x"05" else
+		remainder when reg_instr = x"06" else
+		logequ when reg_instr = x"30" else
+		lognequ when reg_instr = x"31" else
+		logless when reg_instr = x"35" else
+		loggreater when reg_instr = x"36" else
+		loglessequ when reg_instr = x"37" else
+		loggreaterequ when reg_instr = x"38" else
+		binor when reg_instr = x"40" else
+		binand when reg_instr = x"41" else
+		bitshift_l when reg_instr = x"45" else
+		bitshift_r when reg_instr = x"46" else
+		bitroll_l when reg_instr = x"47" else
+		bitroll_r when reg_instr = x"48" else
+		(others => '0');
 
 
 	process(in_clk, in_rst)
@@ -142,21 +208,10 @@ begin
 
 
 	opproc : process(cur_mode, reg_ip, reg_sp, reg_instr,
-		reg_op1, reg_op2, cur_cycle, in_ram)
+		reg_op1, reg_op2, oneop_result, twoop_result,
+		cur_cycle, in_ram)
 
-		-- one-operand expression results
-		variable umin, lognot, binnot : std_logic_vector(num_wordbits-1 downto 0);
-		variable oneop_result : std_logic_vector(num_wordbits-1 downto 0);
-
-		-- two-operand expression results
-		variable sum, diff, quot, remainder : std_logic_vector(num_wordbits-1 downto 0);
-		variable prod : std_logic_vector(2*num_wordbits-1 downto 0);
-		variable logequ, lognequ : std_logic_vector(num_wordbits-1 downto 0);
-		variable logless, loggreater : std_logic_vector(num_wordbits-1 downto 0);
-		variable loglessequ, loggreaterequ : std_logic_vector(num_wordbits-1 downto 0);
-		variable binor, binand : std_logic_vector(num_wordbits-1 downto 0);
-		variable bitshift_l, bitshift_r : std_logic_vector(num_wordbits-1 downto 0) := (others => '0');
-		variable twoop_result : std_logic_vector(num_wordbits-1 downto 0);
+		variable to_shift : integer range 0 to num_wordbits - 1 := 0;
 
 	begin
 		-- default: keep current values
@@ -174,59 +229,29 @@ begin
 		out_ram <= (others => '0');
 		out_ram_addr <= (others => '0');
 
-		-- one-operand expression results
-		umin := std_logic_vector(0 - unsigned(reg_op1));
-		lognot := x"01" when reg_op1 = x"00" else (others => '0');
-		binnot := not reg_op1;
 
-		oneop_result :=
-			umin when reg_instr = x"03" else
-			lognot when reg_instr = x"3a" else
-			binnot when reg_instr = x"42" else
-			(others => '0');
+		-- bit shift operations
+		to_shift := to_int(reg_op1(2 downto 0));
 
-		-- two-operand expression results
-		sum := std_logic_vector(unsigned(reg_op2) + unsigned(reg_op1));
-		diff := std_logic_vector(unsigned(reg_op2) - unsigned(reg_op1));
-		prod := std_logic_vector(unsigned(reg_op2) * unsigned(reg_op1));
-		quot := (others => '1') when unsigned(reg_op1) = 0 else
-			std_logic_vector(unsigned(reg_op2) / unsigned(reg_op1));
-		remainder := (others => '1') when unsigned(reg_op1) = 0 else
-			std_logic_vector(unsigned(reg_op2) mod unsigned(reg_op1));
-		binor := reg_op2 or reg_op1;
-		binand := reg_op2 and reg_op1;
-		bitshift_l := (others => '0');
-		bitshift_r := (others => '0');
-		bitshift_l(num_wordbits - 1 downto to_int(reg_op1(3 downto 0)))
-			:= reg_op2(num_wordbits - to_int(reg_op1(3 downto 0)) - 1 downto 0);
-		--bitshift_l(to_int(reg_op1(3 downto 0)) - 1 downto 0) := (others => '0'); --when to_int(reg_op1(3 downto 0)) > 0;
-		bitshift_r(num_wordbits - to_int(reg_op1(3 downto 0)) - 1 downto 0)
-			:= reg_op2(num_wordbits - 1 downto to_int(reg_op1(3 downto 0)));
-		--bitshift_r(num_wordbits - 1 downto to_int(reg_op1(3 downto 0))) := (others => '0'); --when to_int(reg_op1(3 downto 0)) < 8;
-		logequ := x"01" when reg_op2 = reg_op1 else (others => '0');
-		lognequ := x"01" when reg_op2 /= reg_op1 else (others => '0');
-		logless := x"01" when unsigned(reg_op2) < unsigned(reg_op1) else (others => '0');
-		loggreater := x"01" when unsigned(reg_op2) > unsigned(reg_op1) else (others => '0');
-		loglessequ := x"01" when unsigned(reg_op2) <= unsigned(reg_op1) else (others => '0');
-		loggreaterequ := x"01" when unsigned(reg_op2) >= unsigned(reg_op1) else (others => '0');
+		bitshift_l <= (others => '0');
+		bitshift_r <= (others => '0');
+		bitroll_l <= (others => '0');
+		bitroll_r <= (others => '0');
 
-		twoop_result :=
-			sum when reg_instr = x"01" else
-			diff when reg_instr = x"02" else
-			prod(num_wordbits-1 downto 0) when reg_instr = x"04" else
-			quot when reg_instr = x"05" else
-			remainder when reg_instr = x"06" else
-			logequ when reg_instr = x"30" else
-			lognequ when reg_instr = x"31" else
-			logless when reg_instr = x"35" else
-			loggreater when reg_instr = x"36" else
-			loglessequ when reg_instr = x"37" else
-			loggreaterequ when reg_instr = x"38" else
-			binor when reg_instr = x"40" else
-			binand when reg_instr = x"41" else
-			bitshift_l when reg_instr = x"45" else
-			bitshift_r when reg_instr = x"46" else
-			(others => '0');
+		bitshift_l(num_wordbits - 1 downto to_shift)
+			<= reg_op2(num_wordbits - to_shift - 1 downto 0);
+		bitroll_l(num_wordbits - 1 downto to_shift)
+			<= reg_op2(num_wordbits - to_shift - 1 downto 0);
+		bitshift_r(num_wordbits - to_shift - 1 downto 0)
+			<= reg_op2(num_wordbits - 1 downto to_shift);
+		bitroll_r(num_wordbits - to_shift - 1 downto 0)
+			<= reg_op2(num_wordbits - 1 downto to_shift);
+		if to_shift > 0 then
+			bitroll_l(to_shift - 1 downto 0)
+				<= reg_op2(num_wordbits - 1 downto num_wordbits - to_shift);
+			bitroll_r(num_wordbits - 1 downto num_wordbits - to_shift)
+				<= reg_op2(to_shift - 1 downto 0);
+		end if;
 
 
 		case cur_mode is
@@ -314,7 +339,7 @@ begin
 					--
 					when x"01" | x"02" | x"04" | x"05" | x"06" |
 						x"30" | x"31" | x"35" | x"36" | x"37" | x"38" |
-						x"40" | x"41" | x"45" | x"46" =>
+						x"40" | x"41" | x"45" | x"46" | x"47" | x"48" =>
 						case cur_cycle is
 							-- pop operand 1
 							when 0 =>

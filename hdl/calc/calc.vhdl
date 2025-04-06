@@ -16,11 +16,11 @@ entity calc is
 		-- word size
 		constant ram_num_wordbits : natural := 8;
 		-- number of stored words
-		constant ram_num_words : natural := 2**ram_num_addrbits
+		constant ram_num_words : natural := 2**8 --2**ram_num_addrbits
 	);
 
 	port(
-		clk : in std_logic;
+		clock_50_b7a : in std_logic;
 
 		key : in std_logic_vector(3 downto 0);
 		sw : in std_logic_vector(7 downto 0);
@@ -37,9 +37,9 @@ architecture calc_impl of calc is
 	type t_disp is array (0 to 4) of std_logic_vector(3 downto 0);
 	signal disp : t_disp;
 
-	signal ram_write0, ram_write1 : std_logic;
+	signal ram_write0 : std_logic;
 	signal ram_addr0, ram_addr1 : std_logic_vector(ram_num_addrbits-1 downto 0);
-	signal ram_write_word0, ram_write_word1  : std_logic_vector(ram_num_wordbits-1 downto 0);
+	signal ram_write_word0 : std_logic_vector(ram_num_wordbits-1 downto 0);
 	signal ram_read_word0, ram_read_word1 : std_logic_vector(ram_num_wordbits-1 downto 0);
 
 	signal reg_ip, reg_sp, reg_cycle : std_logic_vector(ram_num_wordbits-1 downto 0);
@@ -57,9 +57,9 @@ begin
 		port map(
 			in_clk => clkdiv,
 
-			in_write(0) => ram_write0, in_write(1) => ram_write1,
+			in_write(0) => ram_write0, in_write(1) => '0',
 			in_addr(0) => ram_addr0, in_addr(1) => ram_addr1,
-			in_word(0) => ram_write_word0, in_word(1) => ram_write_word1, 
+			in_word(0) => ram_write_word0, in_word(1) => (others => '0'),
 			out_word(0) => ram_read_word0, out_word(1) => ram_read_word1
 		);
 	--==============================================================================
@@ -91,7 +91,8 @@ begin
 			num_ctrbits => 32
 		)
 		port map(
-			in_clk => clk, in_rst => not key(0), out_clk => clkdiv
+			in_clk => clock_50_b7a, in_rst => '0', --not key(0),
+			out_clk => clkdiv
 		);
 	--==============================================================================
 
@@ -99,8 +100,8 @@ begin
 	--==============================================================================
 	-- output
 	--==============================================================================
-	seg0 : entity work.sevenseg generic map(inverse_numbering => '1', zero_is_on => '1') port map(in_digit => disp(0), out_leds => hex0);	
-	seg1 : entity work.sevenseg generic map(inverse_numbering => '1', zero_is_on => '1') port map(in_digit => disp(1), out_leds => hex1);	
+	seg0 : entity work.sevenseg generic map(inverse_numbering => '1', zero_is_on => '1') port map(in_digit => disp(0), out_leds => hex0);
+	seg1 : entity work.sevenseg generic map(inverse_numbering => '1', zero_is_on => '1') port map(in_digit => disp(1), out_leds => hex1);
 	seg2 : entity work.sevenseg generic map(inverse_numbering => '1', zero_is_on => '1') port map(in_digit => disp(2), out_leds => hex2);
 	seg3 : entity work.sevenseg generic map(inverse_numbering => '1', zero_is_on => '1') port map(in_digit => disp(3), out_leds => hex3);
 
@@ -110,8 +111,7 @@ begin
 		)
 		port map(
 			in_clk => clkdiv,
-			out_ram_write => ram_write1, out_ram_addr => ram_addr1,
-			in_ram => ram_read_word1,
+			out_ram_addr => ram_addr1, in_ram => ram_read_word1,
 			in_ip => reg_ip, in_sp => reg_sp, in_cycle => reg_cycle,
 			in_show_sp => sw(0), in_show_instr => sw(1),
 			out_disp0 => disp(0), out_disp1 => disp(1),
@@ -120,6 +120,7 @@ begin
 		);
 
 	ledg(0) <= clkdiv;
+	ledg(7 downto 1) <= (others => '0');
 
 	--==============================================================================
 

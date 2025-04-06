@@ -26,7 +26,7 @@ entity ram is
 		-- word size
 		constant num_wordbits : natural := 8;
 		-- number of stored words
-		constant num_words : natural := 2**num_addrbits
+		constant num_words : natural := 2**8 --2**num_addrbits
 	);
 
 	port(

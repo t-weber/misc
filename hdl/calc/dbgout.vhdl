@@ -26,7 +26,6 @@ entity dbgout is
 		in_show_sp, in_show_instr : in std_logic;
 
 		-- ram interface
-		out_ram_write : out std_logic;
 		out_ram_addr : out std_logic_vector(num_addrbits-1 downto 0);
 		in_ram : in std_logic_vector(num_wordbits-1 downto 0);
 		
@@ -58,8 +57,6 @@ begin
 	-- display value on top of stack or current instruction
 	process(in_clk) begin
 		if rising_edge(in_clk) then
-			out_ram_write <= '0';
-
 			if in_show_instr = '0' then
 				out_ram_addr <= in_sp;
 			else
