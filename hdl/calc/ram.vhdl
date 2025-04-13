@@ -56,9 +56,13 @@ architecture ram_impl of ram is
 		x"22",         -- call function 1
 		x"10", x"40",  -- push function 2 address, 0x40
 		x"22",         -- call function 2
-		x"10", x"ff",  -- push 0xff (value will be overwritten)
+		x"10", x"80",  -- push function 3 address, 0x80
+		x"22",         -- call function 3
+		x"10", x"ff",  -- push 0xff (value will be overwritten by function 1 result)
+		x"10", x"ff",  -- push 0xff (value will be overwritten by function 3 result)
+		x"00",         -- halt
 
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+		x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 
@@ -70,7 +74,7 @@ architecture ram_impl of ram is
 		x"01",         -- add
 		x"10", x"03",  -- push 3
 		x"04",         -- mul
-		x"10", x"07",  -- push address 0x07 for value to overwrite
+		x"10", x"0a",  -- push address 0x0a for value to overwrite
 		x"11",         -- pop result
 		x"20",         -- branch (return)
 
@@ -94,7 +98,7 @@ architecture ram_impl of ram is
 		x"21",         -- conditional branch
 		x"10", x"40",  -- push function 2 start address, 0x40
 		x"20",         -- else: loop 
-		x"20",         -- 0x56: return branch
+		x"20",         -- 0x56: branch (return)
 
 		x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
@@ -105,9 +109,16 @@ architecture ram_impl of ram is
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 
-		-- 0x80
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
-		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
+		-- 0x80: function 3, shift test
+		x"10", x"03",  -- push 3
+		x"10", x"02",  -- push 2
+		x"45",         -- shift 3 left by 2 -> 0b1100 = 0xc
+		x"10", x"01",  -- push 1
+		x"46",         -- shift 0xc left by 1 -> 0b110 = 6
+		x"10", x"0c",  -- push address 0x0c for value to overwrite
+		x"11",         -- pop result
+		x"20",         -- branch (return)
+		x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 		x"00", x"00", x"00", x"00", x"00", x"00", x"00", x"00",
 

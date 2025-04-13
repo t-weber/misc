@@ -20,7 +20,7 @@ clean:
 
 
 run:
-	ghdl -r --std=08 cpu_tb cpu_tb_arch --vcd=cpu_tb.vcd --stop-time=6200ns
+	ghdl -r --std=08 cpu_tb cpu_tb_arch --vcd=cpu_tb.vcd --stop-time=6520ns
 
 
 %.o: %.vhdl

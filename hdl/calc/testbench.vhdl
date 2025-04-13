@@ -44,9 +44,8 @@ begin
 	clk <= not clk after CLKDELAY;
 	rst <= '0';
 
-	 -- address where result of function 1 is written to
-	ram_addr1 <= x"07";   -- function 1 result address
-	--ram_addr1 <= x"60"; -- function 2 counter address
+	 -- show data at the stack pointer
+	ram_addr1 <= reg_sp;
 
 
 	--==============================================================================
@@ -104,7 +103,7 @@ begin
 				", ram_wr = " & to_hstring(ram_write_word0) &
 				", ram_we = " & std_logic'image(ram_write0) &
 				-- function 1 result: should be (8-3+4)*3 = 27 = 0x1b
-				", ram[7] = " & to_hstring(ram_read_word1) &
+				", ram[sp] = " & to_hstring(ram_read_word1) &
 				lf;
 		end if;
 	end process;
