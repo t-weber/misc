@@ -108,6 +108,7 @@ int main()
 		std::make_shared<V2>()
 	};
 
+	// visit all bases b with all visitors b
 	for(const auto& b : bs)
 		for(const auto& v : vs)
 			b->accept(v.get());

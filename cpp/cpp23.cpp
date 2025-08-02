@@ -27,9 +27,8 @@ enum class E : int
 };
 
 
-class A
+struct A
 {
-public:
 	// multiple arguments for operator[]
 	int operator[](int i1, int i2, int i3)
 	{
@@ -38,9 +37,8 @@ public:
 };
 
 
-class B
+struct B
 {
-public:
 	std::shared_ptr<B> create()
 	{
 		//using T = B;
@@ -49,6 +47,109 @@ public:
 		std::println("{}", ty::type_id<T>().pretty_name());
 		return std::make_shared<T>();
 	}
+};
+
+
+struct C
+{
+	int a{}, b{};
+
+	C(int a, int b) : a{a}, b{b}
+	{}
+};
+
+
+/**
+ * formatter for struct C
+ * for example formatters, see: https://github.com/llvm/llvm-project/blob/main/libcxx/include/__format/formatter_tuple.h
+ */
+template<class t_C, class t_char>
+requires requires(const t_C& c)
+{
+	// constraint for structs with two members, 'a' and 'b'
+	c.a;
+	c.b;
+}
+// partially specialise std::formatter
+struct std::formatter<t_C, t_char>
+{
+public:
+	/**
+	 * print struct t_C
+	 */
+	template<class t_context, class t_iter = typename t_context::iterator>
+	t_iter format(const t_C& c, t_context& context) const
+	{
+		constexpr const int format_func = 1;
+
+		// version 1: print to string and copy it to out()
+		if constexpr(format_func == 0)
+		{
+			using t_str = std::basic_string<t_char>;
+
+			// get string representation of struct t_C
+			t_str str;
+			if(m_print_a && m_print_b)
+				str = std::format("[ {}, {} ]", c.a, c.b);
+			else if(m_print_a)
+				str = std::format("[ {} ]", c.a);
+			else if(m_print_b)
+				str = std::format("[ {} ]", c.b);
+			else
+				str = std::format("[ ]");
+
+			// write out the string
+			t_iter iter = context.out();
+			for(t_char c : str)
+				*iter++ = c;
+
+			return iter;
+		}
+
+		// version 2: directly write to out()
+		else if constexpr(format_func == 1)
+		{
+			if(m_print_a && m_print_b)
+				std::format_to(context.out(), "[ {}, {} ]", c.a, c.b);
+			else if(m_print_a)
+				std::format_to(context.out(), "[ {} ]", c.a);
+			else if(m_print_b)
+				std::format_to(context.out(), "[ {} ]", c.b);
+			else
+				std::format_to(context.out(), "[ ]");
+		}
+
+		return context.out();
+	}
+
+
+	/**
+	 * parse format specifier after the ":" in, e.g., "{:ab}"
+	 */
+	template<class t_context, class t_iter = typename t_context::iterator>
+	constexpr t_iter parse(t_context& context)
+	{
+		t_iter iter = context.begin();
+
+		if(iter != context.end() && *iter == t_char('a'))
+		{
+			m_print_a = true;
+			std::advance(iter, 1);
+		}
+
+		if(iter != context.end() && *iter == t_char('b'))
+		{
+			m_print_b = true;
+			std::advance(iter, 1);
+		}
+
+		// ignore closing '}'
+		context.advance_to(context.end());
+		return iter;
+	}
+
+private:
+	bool m_print_a{ false }, m_print_b{ false };
 };
 
 
@@ -75,6 +176,12 @@ int main()
 	std::println("{2:{0}.{1}f}{3:{0}.{1}f}", len, prec, d1, d2);
 
 	//std::cout << std::format("{2:{0}.{1}f}{3:{0}.{1}f}", len, prec, d1, d2) << std::endl;
+
+	C c{123, 987};
+	std::println("c = {}.", c);
+	std::println("c = {:ab}.", c);
+	std::println("c = {:a}.", c);
+	std::println("c = {:b}.", c);
 	// --------------------------------------------------------------------
 
 
