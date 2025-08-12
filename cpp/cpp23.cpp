@@ -4,20 +4,36 @@
  * @date may-2022
  * @license: see 'LICENSE.EUPL' file
  *
- * g++ -std=c++23 -o cpp23 cpp23.cpp
+ * g++ -g -Wall -Wextra -Weffc++ -std=c++23 -fmodules -o cpp23 cpp23.cpp -lstdc++exp
  */
 
-//#include <iostream>
-#include <print>
-#include <format>
-#include <memory>
-#include <expected>
-#include <string>
-#include <cmath>
-//#include <stacktrace>
+#define USE_MODULES 1
+
+
+#if USE_MODULES == 0
+	//#include <iostream>
+	#include <print>
+	#include <format>
+	#include <memory>
+	#include <expected>
+	#include <string>
+	#include <cmath>
+
+	#if __has_include(<stacktrace>)
+		#include <stacktrace>
+		#define USE_STACKTRACE
+	#endif
+#endif
+
 
 #include <boost/type_index.hpp>
 namespace ty = boost::typeindex;
+
+
+#if USE_MODULES != 0
+	import std;
+	#define USE_STACKTRACE
+#endif
 
 
 enum class E : int
@@ -163,6 +179,93 @@ std::expected<t_real, std::string> tst_sqrt(t_real f)
 }
 
 
+// if consteval test (for rvalues)
+template<class T>
+constexpr T tst_consteval(T&& t)
+{
+	if consteval  // is the context consteval?
+	{
+		// compile-time code
+		return std::forward<T>(t) + std::forward<T>(t);
+	}
+	else
+	{
+		// run-time code
+		return 3 * std::forward<T>(t);
+	}
+}
+
+
+// if consteval test (for lvalues)
+template<class T>
+constexpr T tst_consteval(const T& t)
+{
+	if consteval  // is the context consteval?
+	{
+		// compile-time code
+		return t + t + t + t;
+	}
+	else
+	{
+		// run-time code
+		return 5 * t;
+	}
+}
+
+
+// compile-time constant
+constinit int g_i = tst_consteval<int>(100);
+
+
+#ifdef USE_STACKTRACE
+void tst_stacktrace()
+{
+	std::stacktrace trace = std::stacktrace::current();
+
+	for(std::size_t i = 0; i < trace.size(); ++i)
+	{
+		const std::stacktrace_entry& entry = trace[i];
+		if(!entry)
+			continue;
+
+		std::println("file \"{}\", line {}: {}",
+			entry.source_file(), entry.source_line(), entry.description());
+	}
+}
+#endif
+
+
+// container with multi-dim operator[]
+template<class t_val, std::size_t... SIZES>
+struct Cont
+{
+	t_val vals[(SIZES * ...)]{};
+
+	template<class ...t_idx>
+	t_val& operator[](t_idx ..._indices)
+	{
+		constexpr std::size_t DIM = sizeof...(SIZES);
+		constexpr std::array<std::size_t, DIM> sizes{{ SIZES... }};
+		const std::array<std::size_t, DIM> indices
+			{{ static_cast<std::size_t>(_indices)... }};
+		//std::println("sizes: {}, indices: {}.", sizes, indices);
+
+		std::size_t lin_idx{};
+		for(std::size_t i = 0; i < DIM - 1; ++i)
+		{
+			std::size_t size = 1;
+			for(std::size_t j = i + 1; j < DIM; ++j)
+				size *= sizes[j];
+			lin_idx += indices[i] * size;
+		}
+		lin_idx += indices[DIM - 1];
+		//std::println("linear index: {}.", lin_idx);
+
+		return vals[lin_idx];
+	}
+};
+
+
 int main()
 {
 	// --------------------------------------------------------------------
@@ -255,6 +358,48 @@ int main()
 		std::println("Error: {}.", str);
 		return 0.;
 	});
+	// --------------------------------------------------------------------
+
+
+	std::println();
+
+
+	// --------------------------------------------------------------------
+	std::println("if consteval");
+	//if !consteval { std::println("not consteval"); }
+
+	constexpr int i = 100;
+	constexpr int j = tst_consteval(i);
+	int x = 100;
+	std::println("tst_consteval([constinit rval] 100) = {}.", g_i);
+	std::println("tst_consteval([const     rval] 100) = {}.", tst_consteval(100));
+	std::println("tst_consteval([constexpr lval] 100) = {}.", j);
+	std::println("tst_consteval([non-const lval] 100) = {}.", tst_consteval<int>(x));
+	// --------------------------------------------------------------------
+
+
+	std::println();
+
+
+	#ifdef USE_STACKTRACE
+	// --------------------------------------------------------------------
+	std::println("stacktrace");
+
+	tst_stacktrace();
+	// --------------------------------------------------------------------
+
+
+	std::println();
+	#endif
+
+
+	// --------------------------------------------------------------------
+	std::println("operator[](...)");
+
+	Cont<double, 2, 2> cont;
+	cont[0, 0] = 1.; cont[0, 1] = 2.;
+	cont[1, 0] = 3.; cont[1, 1] = 4.;
+	std::println("{}", cont.vals);
 	// --------------------------------------------------------------------
 
 
