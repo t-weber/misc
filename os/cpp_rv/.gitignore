@@ -1,0 +1,7 @@
+externals/*
+genrom
+*.prog
+*.bin
+rv_tb
+rom.sv
+linker.ld

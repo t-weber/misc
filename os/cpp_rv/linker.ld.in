@@ -1,0 +1,69 @@
+/**
+ * binary layout
+ * @author Tobias Weber
+ * @date 24-aug-2025
+ * @license see 'LICENSE.GPL' file
+ *
+ * References:
+ *   - https://sourceware.org/binutils/docs/ld/Simple-Example.html
+ *   - https://sourceware.org/binutils/docs/ld/Scripts.html
+ *   - https://wiki.osdev.org/RISC-V_Bare_Bones
+ *   - https://github.com/YosysHQ/picorv32/tree/main/picosoc
+ *   - https://github.com/grughuhler/picorv32_tang_nano_unified/tree/main
+ */
+
+
+/* address where execution starts */
+#if USE_64BIT != 0
+	_mem_base = 0x80000000; /* for 64 bit */
+#else
+	_mem_base = 0x00000000; /* for 32 bit */
+#endif
+
+
+MEMORY
+{
+	mem_rom (rx)   : org = _mem_base,                         len = /*0x1000000*/ 0x1000
+	mem_ram (rw!x) : org = ORIGIN(mem_rom) + LENGTH(mem_rom), len = /*0x1000000*/ 0x1000
+}
+
+
+SECTIONS
+{
+	. = 0x0;
+
+	.code /*ALIGN(8)*/ : { *(.text) *(.text*) } > mem_rom
+
+	.consts /*ALIGN(8)*/ : {
+		*(.rodata) *(.rodata*)
+
+		/* variables used for entrypoint.s */
+		/* initial stack and global pointers at the end of the ram area */
+		_sp_addr = ORIGIN(mem_ram) + LENGTH(mem_ram) - 0x10; /* at the end of ram */
+		_gp_addr = ORIGIN(mem_ram) + LENGTH(mem_ram)/2;      /* somewhere in the middle of ram */
+
+		/* variables used for startup.cpp */
+		_globals_uninit_addr = ADDR(.globals_uninit);
+		_globals_uninit_end = ADDR(.globals_uninit) + SIZEOF(.globals_uninit);
+	} > mem_rom
+
+	.globals /*ALIGN(8)*/ : {
+		*(.sdata) *(.sdata*) /* small initialised globals */
+		*(.data) *(.data*)   /* initialised globals */
+	} > mem_ram
+
+	.globals_uninit /*ALIGN(8)*/ : {
+		*(.sbss) *(.sbss*) /* small uninitialised globals */
+		*(.bss) *(.bss*)   /* uninitialised globals */
+	} > mem_ram
+
+	/* note: non-listed sections will automatically be output to memory anyway */
+
+	/DISCARD/ : {
+		*(.eh_frame) /* no exception handling */
+		*(.comment) *(.riscv.attributes)
+	}
+}
+
+
+ENTRY(_entrypoint)
