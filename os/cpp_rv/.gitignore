@@ -3,5 +3,5 @@ genrom
 *.prog
 *.bin
 rv_tb
-rom.svi
+rom.sv
 linker.ld
