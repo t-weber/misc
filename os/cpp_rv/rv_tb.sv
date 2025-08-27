@@ -253,6 +253,9 @@ module rv_tb;
 			$display("Maximum number of clock cycles: %d. Set using +iter=<num> argument.", maxiter);
 		end
 
+		$dumpfile("rv_tb.vcd");
+		$dumpvars(0, rv_tb);
+
 		// read address for 2nd memory port
 		addr_2 <= (16'hff00 >> 2'h2);  // watch the 0xff00 address for the memory test in main.cpp
 
@@ -265,6 +268,8 @@ module rv_tb;
 			//else
 			//	cpu_irq <= 4'b0000;
 		end
+
+		$dumpflush();
 	end
 	// ---------------------------------------------------------------------------
 
