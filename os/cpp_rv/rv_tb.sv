@@ -13,8 +13,11 @@
 `timescale 1ns / 1ps
 `default_nettype /*wire*/ none
 
+`define RAM_TWO_PORTS
+//`define WRITE_DUMP
 
-module rv_tb;
+
+module rv_tb();
 	// ---------------------------------------------------------------------------
 	// overall state
 	// ---------------------------------------------------------------------------
@@ -50,9 +53,6 @@ module rv_tb;
 	// ---------------------------------------------------------------------------
 
 
-	localparam ADDR_BITS = 14;
-	localparam DATA_BITS = 32;
-
 	wire reset = (state == RESET_ALL);
 	logic clock = 1'b0;
 
@@ -60,6 +60,9 @@ module rv_tb;
 	// ---------------------------------------------------------------------------
 	// instantiate ram
 	// ---------------------------------------------------------------------------
+	localparam ADDR_BITS = 14; //12;
+	localparam DATA_BITS = 32;
+
 	// ram port 1
 	wire write_enable_1;
 	logic [ADDR_BITS - 1 : 0] addr_1;
@@ -68,6 +71,9 @@ module rv_tb;
 	// ram port 2
 	logic [ADDR_BITS - 1 : 0] addr_2;
 	logic [DATA_BITS - 1 : 0] out_data_2;
+`ifndef RAM_TWO_PORTS
+	logic [DATA_BITS - 1 : 0] next_out_data_2;
+`endif
 
 	ram_2port #(.ADDR_BITS(ADDR_BITS), .WORD_BITS(DATA_BITS), .ALL_WRITE(1'b0))
 		ram_mod(
@@ -76,12 +82,15 @@ module rv_tb;
 			// port 1 (reading and writing)
 			.in_clk_1(clock),
 			.in_read_ena_1(1'b1), .in_write_ena_1(write_enable_1),
-			.in_addr_1(addr_1), .in_data_1(in_data_1), .out_data_1(out_data_1),
+			.in_addr_1(addr_1), .in_data_1(in_data_1), .out_data_1(out_data_1)
 
+`ifdef RAM_TWO_PORTS
+			,
 			// port 2 (reading)
 			.in_clk_2(clock),
 			.in_read_ena_2(1'b1), .in_write_ena_2(1'b0),
 			.in_addr_2(addr_2), .in_data_2(), .out_data_2(out_data_2)
+`endif
 		);
 	// ---------------------------------------------------------------------------
 
@@ -106,7 +115,7 @@ module rv_tb;
 	logic [DATA_BITS - 1 : 0] memcpy_data;
 	logic memcpy_write_enable;
 
-	memcpy #(.ADDR_BITS(8), .WORD_BITS(DATA_BITS))
+	memcpy #(.ADDR_BITS(8), .NUM_WORDS(2**8), .WORD_BITS(DATA_BITS))
 		memcpy_mod(
 			.in_clk(clock),
 			.in_rst(reset),
@@ -132,7 +141,8 @@ module rv_tb;
 
 	logic [DATA_BITS - 1 : 0] cpu_irq = 4'b0000;
 	wire [DATA_BITS - 1 : 0] cpu_irq_ended;
-	
+	wire cpu_trap;
+
 	logic cpu_mem_valid;
 	logic cpu_mem_ready = 1'b0;
 	wire [31 : 0] cpu_addr;
@@ -157,6 +167,7 @@ module rv_tb;
 		// interrupts
 		.irq(cpu_irq),             // in
 		.eoi(cpu_irq_ended),       // out
+		.trap(cpu_trap),           // out,
 
 		// memory interface
 		.mem_ready(cpu_mem_ready), // in
@@ -164,7 +175,12 @@ module rv_tb;
 		.mem_addr(cpu_addr),       // out
 		.mem_wstrb(cpu_bytesel),   // out
 		.mem_wdata(cpu_data),      // out
-		.mem_rdata(out_data_1)     // in
+		.mem_rdata(out_data_1),    // in
+
+		.pcpi_rd(32'b0),
+		.pcpi_wr(1'b0),
+		.pcpi_wait(1'b0),
+		.pcpi_ready(1'b0)
 	);
 
 
@@ -201,6 +217,9 @@ module rv_tb;
 	always_ff@(posedge clock) begin
 		state_memaccess <= next_state_memaccess;
 		write_data <= next_write_data;
+`ifndef RAM_TWO_PORTS
+		out_data_2 <= next_out_data_2;
+`endif
 	end
 
 	always_comb begin
@@ -208,6 +227,9 @@ module rv_tb;
 		next_write_data = write_data;
 		cpu_mem_ready = 1'b0;
 		cpu_write_enable = 1'b0;
+`ifndef RAM_TWO_PORTS
+		next_out_data_2 = out_data_2;
+`endif
 
 		case(state_memaccess)
 			CPU_WAIT_MEM: begin
@@ -228,8 +250,14 @@ module rv_tb;
 			CPU_PREPARE_WRITE: begin
 				next_write_data = write_data_sel;
 				next_state_memaccess = CPU_WRITE;
+`ifndef RAM_TWO_PORTS
+				// if the cpu is writing to the address being watched,
+				// copy the data
+				if(addr_1 == addr_2)
+					next_out_data_2 = write_data_sel;
+`endif
 			end
-	
+
 			CPU_WRITE: begin
 				cpu_write_enable = 1'b1;
 				next_state_memaccess = CPU_MEM_READY;
@@ -253,11 +281,13 @@ module rv_tb;
 			$display("Maximum number of clock cycles: %d. Set using +iter=<num> argument.", maxiter);
 		end
 
+`ifdef WRITE_DUMP
 		$dumpfile("rv_tb.vcd");
 		$dumpvars(0, rv_tb);
+`endif
 
 		// read address for 2nd memory port
-		addr_2 <= (16'hff00 >> 2'h2);  // watch the 0xff00 address for the memory test in main.cpp
+		addr_2 <= ({ADDR_BITS{16'h3f00}} >> 2'h2);  // watch the 0xff00 address for the memory test in main.cpp
 
 		for(iter = 0; iter < maxiter; ++iter) begin
 			clock <= ~clock;
@@ -269,7 +299,9 @@ module rv_tb;
 			//	cpu_irq <= 4'b0000;
 		end
 
+`ifdef WRITE_DUMP
 		$dumpflush();
+`endif
 	end
 	// ---------------------------------------------------------------------------
 

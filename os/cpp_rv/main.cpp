@@ -12,7 +12,7 @@
 #define DO_MEMTEST   1
 #define DO_MAINPROG  1
 
-#define RESULT_ADDR  0xff00 // address that is watched in the sv testbench
+#define RESULT_ADDR  0x3f00 // address that is watched in the sv testbench
 #define SERIAL_PRINT 1      // will block the testbench, because the 0x10000005 status reg is not set
 
 
@@ -34,7 +34,7 @@ extern "C" int main() noexcept
 	extern const volatile void* _mem_base;
 	unsigned long mem_base = reinterpret_cast<unsigned long>(&_mem_base);
 
-	// inspect in qemu mon, for 64 bit: x /8c 0x8000ff00
+	// inspect in qemu mon, for 64 bit: x /8c 0x80003f00
 	volatile char* buf = reinterpret_cast<volatile char*>(mem_base + RESULT_ADDR);
 	buf[0] = 'A'; buf[1] = 'B'; buf[2] = 'C'; buf[3] = '\n'; buf[4] = 0;
 
