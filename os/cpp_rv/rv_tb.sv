@@ -156,7 +156,7 @@ module rv_tb();
 	picorv32 #(.COMPRESSED_ISA(1'b0), .REGS_INIT_ZERO(1'b1),
 		.ENABLE_MUL(1'b1), .ENABLE_DIV(1'b1), .BARREL_SHIFTER(1'b1),
 		.PROGADDR_RESET(32'h0),                            // initial program counter
-		.ENABLE_IRQ(1'b1), .PROGADDR_IRQ(32'h0020),        // see symbol table for _isr_entrypoint
+		.ENABLE_IRQ(1'b1), .PROGADDR_IRQ(32'h0040),        // see symbol table for _isr_entrypoint
 		.ENABLE_IRQ_QREGS(1'b0), .ENABLE_IRQ_TIMER(1'b0),  // non-standard
 		.STACKADDR({ (ADDR_BITS /*- 2*/){ 1'b1 } } - 4'hf) // initial stack pointer
 	)
@@ -293,7 +293,8 @@ module rv_tb();
 			clock <= ~clock;
 			#1;
 
-			//if(iter >= 1580 && iter < 1590)
+			// generate a test interrupt
+			//if(iter >= 1650 && iter < 1660)
 			//	cpu_irq <= 4'b1000;
 			//else
 			//	cpu_irq <= 4'b0000;

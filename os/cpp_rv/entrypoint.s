@@ -10,7 +10,7 @@
 #
 
 
-.globl _entrypoint, _startup, main, isr_main
+.globl _entrypoint, _isr_entrypoint, _startup, main, isr_main
 
 
 .text
@@ -19,6 +19,9 @@
 		#li sp, 0x8000fff0
 		la gp, _gp_addr
 		la sp, _sp_addr
+
+		# enable interrupts via instr_maskirq
+		#.word(0x600600b)
 
 		call _startup
 		call main
@@ -30,8 +33,26 @@
 		ebreak
 		j .
 
+
 	.balign 32
 	_isr_entrypoint:
-		# TODO
-		#call isr_main
-		mret
+		# create stack frame and store registers
+		.set WORD_SIZE, 4
+		addi sp, sp, -30*WORD_SIZE
+		.set reg_idx, 0
+		.irp reg, ra,gp,tp,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31
+			sw \reg, (reg_idx*WORD_SIZE)(sp)
+			.set reg_idx, reg_idx + 1
+		.endr
+
+		# TODO: pass irq number
+		call isr_main
+
+		# restore registers and remove stack frame
+		.set reg_idx, 0
+		.irp reg, ra,gp,tp,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31
+			lw \reg, (reg_idx*WORD_SIZE)(sp)
+			.set reg_idx, reg_idx + 1
+		.endr
+		addi sp, sp, +30*WORD_SIZE
+		ret
