@@ -62,11 +62,12 @@ extern "C" int main() noexcept
 }
 
 
+#if USE_INTERRUPTS != 0
 /**
  * main function for interrupt service routines
- * TODO
  */
-extern "C" void isr_main() noexcept
+extern "C" void isr_main(unsigned int irqs) noexcept
 {
-	
 }
+
+#endif

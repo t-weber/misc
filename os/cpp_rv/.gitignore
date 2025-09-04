@@ -5,3 +5,4 @@ genrom
 rv_tb
 rom.sv
 linker.ld
+entrypoint.s

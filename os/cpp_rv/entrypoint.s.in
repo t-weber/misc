@@ -1,0 +1,68 @@
+/**
+ * calls the main c++ program
+ * @author Tobias Weber
+ * @date 24-aug-2025
+ * @license see 'LICENSE.GPL' file
+ *
+ * References:
+ *   - https://github.com/YosysHQ/picorv32/tree/main/picosoc
+ *   - https://github.com/grughuhler/picorv32_tang_nano_unified/tree/main
+ */
+
+
+.globl _entrypoint, _startup, main
+
+
+.text
+	_entrypoint:
+		// set global and stack pointer
+		la gp, _gp_addr
+		la sp, _sp_addr
+		li tp, 0
+
+#if USE_INTERRUPTS != 0
+		// enable interrupts via instr_maskirq
+		.word(0x0600600b)
+#endif
+
+		call _startup
+		call main
+
+		ebreak
+		j .
+
+
+#if USE_INTERRUPTS != 0
+.globl _isr_entrypoint, isr_main
+
+	.balign 32
+	_isr_entrypoint:
+		// create stack frame and store registers
+		.set WORD_SIZE, 4
+		addi sp, sp, -30*WORD_SIZE
+		.set reg_idx, 0
+		.irp reg, ra,sp,gp,/*tp,*/x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31
+			sw \reg, (reg_idx*WORD_SIZE)(sp)
+			.set reg_idx, reg_idx + 1
+		.endr
+
+		// pass irq number held in x4
+		mv a0, x4
+		call isr_main
+
+		// restore registers and remove stack frame
+		.set reg_idx, 0
+		.irp reg, ra,sp,gp,/*tp,*/x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,x31
+			lw \reg, (reg_idx*WORD_SIZE)(sp)
+			.set reg_idx, reg_idx + 1
+		.endr
+		addi sp, sp, +30*WORD_SIZE
+
+		// restore global pointer
+		//la gp, _gp_addr
+		li tp, 0
+
+		// return via instr_retirq, return address is in gp
+		.word(0x0400000b)
+		//ret
+#endif

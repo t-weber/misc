@@ -14,6 +14,8 @@ CXX=riscv64-elf-g++
 OBJCPY=riscv64-elf-objcopy
 OBJDMP=riscv64-elf-objdump
 
+USE_INTERRUPTS=1
+
 #
 # base integer (i) and mul/div (m)
 # see: https://gcc.gnu.org/onlinedocs/gcc/RISC-V-Options.html
@@ -43,7 +45,15 @@ rm -fv "${PROGFILE}"
 rm -fv "${BINFILE}"
 rm -fv "${LFILE}"
 rm -fv rom.sv
+rm -fv entrypoint.s
 rm -fv rv_tb
+
+
+
+# preprocess entrypoint file
+echo -e "\nentrypoint.s.in -> entrypoint.s..."
+${CPP} -P -DUSE_64BIT=${USE_64BIT} -DUSE_INTERRUPTS=${USE_INTERRUPTS} \
+	entrypoint.s.in -o entrypoint.s
 
 
 # preprocess linker file
@@ -58,6 +68,7 @@ if ! ${CXX} ${CFLAGS} -time \
 	-mno-save-restore -mno-riscv-attribute -mno-fdiv -mdiv \
 	-nostartfiles -nolibc -nodefaultlibs -nostdlib++ -nostdlib \
 	-fno-builtin -ffreestanding -static \
+	-DUSE_INTERRUPTS=${USE_INTERRUPTS} \
 	-T ${LFILE} -o ${PROGFILE} entrypoint.s ${CFILES}; then
 	exit -1
 fi
