@@ -103,6 +103,7 @@ logic [ADDR_BITS - 1 : 0] addr_2;
 logic [DATA_BITS - 1 : 0] out_data_2, next_out_data_2;
 
 
+// add define: RAM_DISABLE_PORT2
 ram_2port #(.ADDR_BITS(ADDR_BITS), .WORD_BITS(DATA_BITS), .ALL_WRITE(1'b0))
 	ram_mod(
 		.in_rst(reset),

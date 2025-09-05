@@ -13,8 +13,11 @@
 `timescale 1ns / 1ps
 `default_nettype /*wire*/ none
 
-`define RAM_TWO_PORTS
+//`define RAM_DISABLE_PORT2
 //`define WRITE_DUMP
+`ifndef USE_INTERRUPTS
+	`define USE_INTERRUPTS 1'b0
+`endif
 
 
 module rv_tb();
@@ -71,7 +74,7 @@ module rv_tb();
 	// ram port 2
 	logic [ADDR_BITS - 1 : 0] addr_2;
 	logic [DATA_BITS - 1 : 0] out_data_2;
-`ifndef RAM_TWO_PORTS
+`ifdef RAM_DISABLE_PORT2
 	logic [DATA_BITS - 1 : 0] next_out_data_2;
 `endif
 
@@ -84,7 +87,7 @@ module rv_tb();
 			.in_read_ena_1(1'b1), .in_write_ena_1(write_enable_1),
 			.in_addr_1(addr_1), .in_data_1(in_data_1), .out_data_1(out_data_1)
 
-`ifdef RAM_TWO_PORTS
+`ifndef RAM_DISABLE_PORT2
 			,
 			// port 2 (reading)
 			.in_clk_2(clock),
@@ -155,10 +158,10 @@ module rv_tb();
 	// instantiate cpu
 	picorv32 #(.COMPRESSED_ISA(1'b0), .REGS_INIT_ZERO(1'b1),
 		.ENABLE_MUL(1'b1), .ENABLE_DIV(1'b1), .BARREL_SHIFTER(1'b1),
-		.PROGADDR_RESET(32'h0),                            // initial program counter
-		.ENABLE_IRQ(1'b1), .PROGADDR_IRQ(32'h0040),        // see symbol table for _isr_entrypoint
-		.ENABLE_IRQ_QREGS(1'b0), .ENABLE_IRQ_TIMER(1'b0),  // non-standard
-		.STACKADDR({ (ADDR_BITS /*- 2*/){ 1'b1 } } - 4'hf) // initial stack pointer
+		.PROGADDR_RESET(32'h0),                                // initial program counter
+		.ENABLE_IRQ(USE_INTERRUPTS), .PROGADDR_IRQ(32'h0040),  // see symbol table for _isr_entrypoint
+		.ENABLE_IRQ_QREGS(1'b0), .ENABLE_IRQ_TIMER(1'b0),      // non-standard
+		.STACKADDR({ (ADDR_BITS /*- 2*/){ 1'b1 } } - 4'hf)     // initial stack pointer
 	)
 	cpu_mod(
 		.resetn(~reset),
@@ -217,7 +220,7 @@ module rv_tb();
 	always_ff@(posedge clock) begin
 		state_memaccess <= next_state_memaccess;
 		write_data <= next_write_data;
-`ifndef RAM_TWO_PORTS
+`ifdef RAM_DISABLE_PORT2
 		out_data_2 <= next_out_data_2;
 `endif
 	end
@@ -227,7 +230,7 @@ module rv_tb();
 		next_write_data = write_data;
 		cpu_mem_ready = 1'b0;
 		cpu_write_enable = 1'b0;
-`ifndef RAM_TWO_PORTS
+`ifdef RAM_DISABLE_PORT2
 		next_out_data_2 = out_data_2;
 `endif
 
@@ -250,7 +253,7 @@ module rv_tb();
 			CPU_PREPARE_WRITE: begin
 				next_write_data = write_data_sel;
 				next_state_memaccess = CPU_WRITE;
-`ifndef RAM_TWO_PORTS
+`ifdef RAM_DISABLE_PORT2
 				// if the cpu is writing to the address being watched,
 				// copy the data
 				if(addr_1 == addr_2)
@@ -274,6 +277,10 @@ module rv_tb();
 	integer maxiter;
 
 	initial begin
+`ifdef RAM_DISABLE_PORT2
+		$display("Using one-port RAM.");
+`endif
+
 		if($value$plusargs("iter=%d", maxiter)) begin
 			$display("Maximum number of clock cycles: %d", maxiter);
 		end else begin
@@ -293,11 +300,13 @@ module rv_tb();
 			clock <= ~clock;
 			#1;
 
-			// generate a test interrupt
-			//if(iter >= 1650 && iter < 1660)
-			//	cpu_irq <= 4'b1000;
-			//else
-			//	cpu_irq <= 4'b0000;
+`ifdef USE_INTERRUPTS
+			// generate a test interrupt (when enabled)
+			if(iter >= 1650 && iter < 1660)
+				cpu_irq <= 4'b1000;
+			else
+				cpu_irq <= 4'b0000;
+`endif
 		end
 
 `ifdef WRITE_DUMP

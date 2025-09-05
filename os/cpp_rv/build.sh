@@ -14,7 +14,14 @@ CXX=riscv64-elf-g++
 OBJCPY=riscv64-elf-objcopy
 OBJDMP=riscv64-elf-objdump
 
-USE_INTERRUPTS=1
+USE_INTERRUPTS=0
+TESTBENCH_DEFS="-DDEBUG"
+#TESTBENCH_DEFS+=" -DRAM_DISABLE_PORT2"
+CFLAGS="-std=c++20 -O2 -Wall -Wextra -Weffc++"
+
+if [ "$USE_INTERRUPTS" != 0 ]; then
+	TESTBENCH_DEFS+=" -DUSE_INTERRUPTS=1"
+fi
 
 #
 # base integer (i) and mul/div (m)
@@ -31,8 +38,6 @@ else
 	ABI=ilp32
 	USE_64BIT=0
 fi
-
-CFLAGS="-std=c++20 -O2 -Wall -Wextra -Weffc++"
 
 # files
 CFILES="startup.cpp main.cpp"
@@ -101,7 +106,8 @@ fi
 # build sv testbench
 echo -e "\nBuilding testbench..."
 if [ -d externals ]; then
-	if ! iverilog -g2012 -DDEBUG -o rv_tb \
+	if ! iverilog -g2012 ${TESTBENCH_DEFS} \
+		\-o rv_tb \
 		externals/ram_2port.sv externals/memcpy.sv \
 		externals/memsel.sv externals/picorv32.v \
 		rom.sv rv_tb.sv; then
