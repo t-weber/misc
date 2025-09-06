@@ -58,6 +58,26 @@ extern "C" int main() noexcept
 	}
 #endif
 
+
+#if DO_MEMTEST != 0
+	unsigned int val = 1;
+	bool shift_left = true;
+	while(true)
+	{
+		*reinterpret_cast<volatile unsigned int*>(mem_base + RESULT_ADDR) = val;
+
+		if(shift_left)
+			val <<= 1;
+		else
+			val >>= 1;
+
+		if(shift_left && (val & (1 << 7)))
+			shift_left = false;
+		if(!shift_left && (val & 1))
+			shift_left = true;
+	}
+#endif
+
 	return 0;
 }
 
@@ -68,6 +88,13 @@ extern "C" int main() noexcept
  */
 extern "C" void isr_main(unsigned int irqs) noexcept
 {
+	// flip a bit if the button was pressed
+	if(irqs & (1 << 3))
+	{
+		extern const volatile void* _mem_base;
+		unsigned long mem_base = reinterpret_cast<unsigned long>(&_mem_base);
+		volatile unsigned long* buf = reinterpret_cast<volatile unsigned long*>(mem_base + RESULT_ADDR + 4);
+		buf[0] = ~buf[0];
+	}
 }
-
 #endif

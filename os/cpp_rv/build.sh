@@ -20,7 +20,7 @@ TESTBENCH_DEFS="-DDEBUG"
 CFLAGS="-std=c++20 -O2 -Wall -Wextra -Weffc++"
 
 if [ "$USE_INTERRUPTS" != 0 ]; then
-	TESTBENCH_DEFS+=" -DUSE_INTERRUPTS=1"
+	TESTBENCH_DEFS+=" -DUSE_INTERRUPTS"
 fi
 
 #

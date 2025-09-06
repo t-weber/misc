@@ -15,9 +15,7 @@
 
 //`define RAM_DISABLE_PORT2
 //`define WRITE_DUMP
-`ifndef USE_INTERRUPTS
-	`define USE_INTERRUPTS 1'b0
-`endif
+//`define USE_INTERRUPTS
 
 
 module rv_tb();
@@ -101,10 +99,11 @@ module rv_tb();
 	// ---------------------------------------------------------------------------
 	// instantiate rom
 	// ---------------------------------------------------------------------------
+	localparam ROM_ADDR_BITS = 8; //rom.ADDR_BITS;  // use value from generated rom.sv
+
 	logic [DATA_BITS - 1 : 0] out_rom_data;
-	rom #()
-		rom_mod(
-			.in_addr(addr_1[7 : 0]),
+	rom rom_mod(
+			.in_addr(addr_1[ROM_ADDR_BITS - 1 : 0]),
 			.out_data(out_rom_data)
 		);
 	// ---------------------------------------------------------------------------
@@ -114,11 +113,14 @@ module rv_tb();
 	// copy rom to ram
 	// ---------------------------------------------------------------------------
 	wire memcpy_finished;
-	logic [7 : 0] memcpy_addr;
+	logic [ROM_ADDR_BITS - 1 : 0] memcpy_addr;
 	logic [DATA_BITS - 1 : 0] memcpy_data;
 	logic memcpy_write_enable;
 
-	memcpy #(.ADDR_BITS(8), .NUM_WORDS(2**8), .WORD_BITS(DATA_BITS))
+	memcpy #(
+			.ADDR_BITS(ROM_ADDR_BITS),
+			.NUM_WORDS(2**ROM_ADDR_BITS),
+			.WORD_BITS(DATA_BITS))
 		memcpy_mod(
 			.in_clk(clock),
 			.in_rst(reset),
@@ -158,10 +160,14 @@ module rv_tb();
 	// instantiate cpu
 	picorv32 #(.COMPRESSED_ISA(1'b0), .REGS_INIT_ZERO(1'b1),
 		.ENABLE_MUL(1'b1), .ENABLE_DIV(1'b1), .BARREL_SHIFTER(1'b1),
-		.PROGADDR_RESET(32'h0),                                // initial program counter
-		.ENABLE_IRQ(USE_INTERRUPTS), .PROGADDR_IRQ(32'h0040),  // see symbol table for _isr_entrypoint
-		.ENABLE_IRQ_QREGS(1'b0), .ENABLE_IRQ_TIMER(1'b0),      // non-standard
-		.STACKADDR({ (ADDR_BITS /*- 2*/){ 1'b1 } } - 4'hf)     // initial stack pointer
+		.PROGADDR_RESET(32'h0),                             // initial program counter
+`ifdef USE_INTERRUPTS
+		.ENABLE_IRQ(1'b1), .PROGADDR_IRQ(32'h0040),         // see symbol table for _isr_entrypoint
+		.ENABLE_IRQ_QREGS(1'b0), .ENABLE_IRQ_TIMER(1'b0),   // non-standard
+`else
+		.ENABLE_IRQ(1'b0),
+`endif
+		.STACKADDR({ (ADDR_BITS /*- 2*/){ 1'b1 } } - 4'hf)  // initial stack pointer
 	)
 	cpu_mod(
 		.resetn(~reset),
@@ -279,6 +285,9 @@ module rv_tb();
 	initial begin
 `ifdef RAM_DISABLE_PORT2
 		$display("Using one-port RAM.");
+`endif
+`ifndef USE_INTERRUPTS
+		$display("Disabling interrupts.");
 `endif
 
 		if($value$plusargs("iter=%d", maxiter)) begin

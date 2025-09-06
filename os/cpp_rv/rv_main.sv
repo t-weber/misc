@@ -21,30 +21,32 @@ module main
 	// leds
 	output [5 : 0] led,
 	output [7 : 0] ledg
-
 );
-
-
-// ----------------------------------------------------------------------------
-// keys
-// ----------------------------------------------------------------------------
-logic rst;
-
-debounce_switch debounce_key0(.in_clk(clk27), .in_rst(1'b0),
-	.in_signal(~key[0]), .out_debounced(rst));
-// ----------------------------------------------------------------------------
 
 
 // ----------------------------------------------------------------------------
 // slow clock
 // ----------------------------------------------------------------------------
 localparam MAIN_CLK = 27_000_000;
-localparam SLOW_CLK =        100;
+localparam SLOW_CLK =      0_500;
 
 logic clock;
 
 clkgen #(.MAIN_CLK_HZ(MAIN_CLK), .CLK_HZ(SLOW_CLK))
 clk_slow (.in_clk(clk27), .in_rst(1'b0), .out_clk(clock));
+// ----------------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------
+// keys
+// ----------------------------------------------------------------------------
+logic rst, btn;
+
+debounce_switch debounce_key0(.in_clk(clk27), .in_rst(1'b0),
+	.in_signal(~key[0]), .out_debounced(rst));
+
+debounce_button debounce_key1(.in_clk(clock), .in_rst(1'b0),
+	.in_signal(~key[1]), .out_debounced(btn));
 // ----------------------------------------------------------------------------
 
 
@@ -98,26 +100,12 @@ wire write_enable_1;
 logic [ADDR_BITS - 1 : 0] addr_1;
 logic [DATA_BITS - 1 : 0] in_data_1, out_data_1;
 
-// ram port 2
-logic [ADDR_BITS - 1 : 0] addr_2;
-logic [DATA_BITS - 1 : 0] out_data_2, next_out_data_2;
-
-
-// add define: RAM_DISABLE_PORT2
+// multiport not supported by hardware: use define: RAM_DISABLE_PORT2
 ram_2port #(.ADDR_BITS(ADDR_BITS), .WORD_BITS(DATA_BITS), .ALL_WRITE(1'b0))
 	ram_mod(
-		.in_rst(reset),
-
-		// port 1 (reading and writing)
-		.in_clk_1(clock),
+		.in_rst(reset), .in_clk_1(clock),
 		.in_read_ena_1(1'b1), .in_write_ena_1(write_enable_1),
 		.in_addr_1(addr_1), .in_data_1(in_data_1), .out_data_1(out_data_1)
-
-		// multiport not supported by hardware
-		// port 2 (reading)
-		//.in_clk_2(clock),
-		//.in_read_ena_2(1'b1), .in_write_ena_2(1'b0)
-		//.in_addr_2(addr_2), .in_data_2(32'b0), .out_data_2(out_data_2)
 	);
 // ---------------------------------------------------------------------------
 
@@ -125,10 +113,11 @@ ram_2port #(.ADDR_BITS(ADDR_BITS), .WORD_BITS(DATA_BITS), .ALL_WRITE(1'b0))
 // ---------------------------------------------------------------------------
 // instantiate rom
 // ---------------------------------------------------------------------------
+localparam ROM_ADDR_BITS = rom.ADDR_BITS;  // use value from generated rom.sv
+
 logic [DATA_BITS - 1 : 0] out_rom_data;
-rom #()
-	rom_mod(
-		.in_addr(addr_1[5 : 0]),
+rom rom_mod(
+		.in_addr(addr_1[ROM_ADDR_BITS - 1 : 0]),
 		.out_data(out_rom_data)
 	);
 // ---------------------------------------------------------------------------
@@ -138,11 +127,11 @@ rom #()
 // copy rom to ram
 // ---------------------------------------------------------------------------
 wire memcpy_finished;
-logic [5 : 0] memcpy_addr;
+logic [ROM_ADDR_BITS - 1 : 0] memcpy_addr;
 logic [DATA_BITS - 1 : 0] memcpy_data;
 logic memcpy_write_enable;
 
-memcpy #(.ADDR_BITS(6), .NUM_WORDS(2**6), .WORD_BITS(DATA_BITS))
+memcpy #(.ADDR_BITS(ROM_ADDR_BITS), .NUM_WORDS(2**ROM_ADDR_BITS), .WORD_BITS(DATA_BITS))
 	memcpy_mod(
 		.in_clk(clock),
 		.in_rst(reset),
@@ -166,7 +155,7 @@ memcpy #(.ADDR_BITS(6), .NUM_WORDS(2**6), .WORD_BITS(DATA_BITS))
 // ---------------------------------------------------------------------------
 wire clock_cpu;
 
-logic [DATA_BITS - 1 : 0] cpu_irq = 4'b0000;
+wire [DATA_BITS - 1 : 0] cpu_irq;
 wire [DATA_BITS - 1 : 0] cpu_irq_ended;
 wire cpu_trap;
 
@@ -183,7 +172,7 @@ logic [DATA_BITS - 1 : 0] write_data, next_write_data;
 picorv32 #(.COMPRESSED_ISA(1'b0), .REGS_INIT_ZERO(1'b0),
 	.ENABLE_MUL(1'b1), .ENABLE_DIV(1'b1), .BARREL_SHIFTER(1'b1),
 	.PROGADDR_RESET(32'h0),                            // initial program counter
-	.ENABLE_IRQ(1'b0), .PROGADDR_IRQ(32'h0020),        // see symbol table for _isr_entrypoint
+	.ENABLE_IRQ(1'b1), .PROGADDR_IRQ(32'h0040),        // see symbol table for _isr_entrypoint
 	.ENABLE_IRQ_QREGS(1'b0), .ENABLE_IRQ_TIMER(1'b0),  // non-standard
 	.STACKADDR({ (ADDR_BITS /*- 2*/){ 1'b1 } } - 4'hf) // initial stack pointer
 )
@@ -216,6 +205,9 @@ assign clock_cpu = ((state == RUN_CPU || state == RESET_ALL) ? clock : 1'b0);
 assign addr_1 = (state == RUN_CPU ? cpu_addr[ADDR_BITS + 2 - 1 : 2] : memcpy_addr);
 assign in_data_1 = (state == RUN_CPU ? write_data : memcpy_data);
 assign write_enable_1 = (state == RUN_CPU ? cpu_write_enable : memcpy_write_enable);
+
+// interrupts
+assign cpu_irq = { 28'b0, btn, 3'b0 };
 // ---------------------------------------------------------------------------
 
 
@@ -223,6 +215,11 @@ assign write_enable_1 = (state == RUN_CPU ? cpu_write_enable : memcpy_write_enab
 // manage memory read and write access by cpu
 // ---------------------------------------------------------------------------
 logic [DATA_BITS - 1 : 0] write_data_sel;
+
+// address to watch
+logic [ADDR_BITS - 1 : 0] addr_watch, addr_watch_2;
+logic [DATA_BITS - 1 : 0] data_watch, next_data_watch;
+logic [DATA_BITS - 1 : 0] data_watch_2, next_data_watch_2;
 
 memsel #(.WORD_BITS(DATA_BITS), .BYTE_BITS(8))
 	memsel_mod(
@@ -244,7 +241,8 @@ t_state_memaccess state_memaccess = CPU_WAIT_MEM, next_state_memaccess = CPU_WAI
 always_ff@(posedge clock) begin
 	state_memaccess <= next_state_memaccess;
 	write_data <= next_write_data;
-	out_data_2 <= next_out_data_2;
+	data_watch <= next_data_watch;
+	data_watch_2 <= next_data_watch_2;
 end
 
 always_comb begin
@@ -252,7 +250,8 @@ always_comb begin
 	next_write_data = write_data;
 	cpu_mem_ready = 1'b0;
 	cpu_write_enable = 1'b0;
-	next_out_data_2 = out_data_2;
+	next_data_watch = data_watch;
+	next_data_watch_2 = data_watch_2;
 
 	case(state_memaccess)
 		CPU_WAIT_MEM: begin
@@ -273,8 +272,10 @@ always_comb begin
 		CPU_PREPARE_WRITE: begin
 			next_write_data = write_data_sel;
 			next_state_memaccess = CPU_WRITE;
-			if(addr_1 == addr_2)
-				next_out_data_2 = write_data_sel;
+			if(addr_1 == addr_watch)
+				next_data_watch = write_data_sel;
+			else if(addr_1 == addr_watch_2)
+				next_data_watch_2 = write_data_sel;
 		end
 
 		CPU_WRITE: begin
@@ -298,13 +299,15 @@ assign led[4] = ~clock;
 assign led[5] = ~clock_cpu;*/
 assign led[2] = ~(state_memaccess == CPU_WAIT_MEM);
 assign led[3] = ~(state_memaccess == CPU_MEM_READY);
-assign led[4] = ~(state_memaccess == CPU_PREPARE_WRITE);
-assign led[5] = ~(state_memaccess == CPU_WRITE);
+assign led[4] = ~(state_memaccess == CPU_PREPARE_WRITE || state_memaccess == CPU_WRITE);
+//assign led[5] = ~(state_memaccess == CPU_WRITE);
+assign led[5] = ~data_watch_2[0];
 
 
-// watch the 0x3f00 address for the memory test in main.cpp
-assign addr_2 = (16'h3f00 >> 2'h2);
-assign ledg[7:0] = out_data_2[7 : 0];
+// watch the 0x3f00 and 0x3f01 addresses for the memory test in main.cpp
+assign addr_watch = (16'h3f00 >> 2'h2);
+assign addr_watch_2 = (16'h3f04 >> 2'h2);
+assign ledg[7:0] = data_watch[7 : 0];
 //assign ledg[7:0] = addr_1[7 : 0];
 //assign ledg[7:0] = cpu_addr[7 : 0];
 // ---------------------------------------------------------------------------
