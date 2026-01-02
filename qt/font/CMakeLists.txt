@@ -21,5 +21,5 @@ include_directories("${PROJECT_SOURCE_DIR}"
   "${Boost_INCLUDE_DIRS}"
   "${Qt6Core_INCLUDE_DIRS}" "${Qt6Gui_INCLUDE_DIRS}" "${Qt6Widgets_INCLUDE_DIRS}")
 
-add_executable(qttst qttst.cpp qttst.h)
+add_executable(qttst qttst.cpp)
 target_link_libraries(qttst ${Boost_LIBRARIES} Qt6::Core Qt6::Gui Qt6::Widgets)
