@@ -761,7 +761,7 @@ static t_value factor()
 		}
 	}
 
-	fprintf(stderr, "Invalid lookahead in %s: \"%d\".\n", __func__, g_lookahead);
+	fprintf(stderr, "Invalid lookahead in %s: %d.\n", __func__, g_lookahead);
 	return 0.;
 }
 
