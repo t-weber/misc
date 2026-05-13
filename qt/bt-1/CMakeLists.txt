@@ -29,5 +29,9 @@ add_executable(bt bt.cpp bt.h)
 target_link_libraries(bt
   ${Boost_LIBRARIES}
   Qt6::Core Qt6::Gui Qt6::Widgets
-  Qt6::Bluetooth Qt6::QDarwinBluetoothPermissionPlugin
+  Qt6::Bluetooth
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  target_link_libraries(bt Qt6::QDarwinBluetoothPermissionPlugin)
+endif()

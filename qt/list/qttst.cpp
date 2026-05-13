@@ -205,12 +205,16 @@ std::vector<int> TstDlg::GetSelectedRows(bool sort_reversed) const
 
 void TstDlg::ListItemChanged(QListWidgetItem* cur, [[maybe_unused]] QListWidgetItem* prev)
 {
+	if(!cur)
+		return;
 	std::cout << "item selected: " << cur->text().toStdString() << std::endl;
 }
 
 
 void TstDlg::ListItemEntered(QListWidgetItem* item)
 {
+	if(!item)
+		return;
 	std::cout << "item entered: " << item->text().toStdString() << std::endl;
 }
 

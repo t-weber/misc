@@ -187,7 +187,7 @@ void BtDlg::DelListItem()
 
 	for(int row : GetSelectedRows(true))
 	{
-		if(QListWidgetItem* item = m_list->takeItem(row); item)
+		if(QListWidgetItem* item = m_list->item(row); item)
 			delete item;
 	}
 }
