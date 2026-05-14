@@ -144,16 +144,20 @@ void BtDlg::Scan()
 		[this, low_E](const QBluetoothDeviceInfo& devinf)
 	{
 		// see if the device is already in the tree
-		QString itemtext = QString("%1").arg(devinf.name());
-		if(m_tree->findItems(itemtext, Qt::MatchExactly).size())
+		QString devname_short = QString("%1").arg(devinf.name());
+		QString devname = QString("%1\nDevice UUID: %2\nAddress: %3")
+			.arg(devinf.name())
+			.arg(devinf.deviceUuid().toString())
+			.arg(devinf.address().toString());
+		if(m_tree->findItems(devname, Qt::MatchExactly).size())
 		{
-			m_status->setText("Bt device \"" + itemtext + "\" already discovered.");
+			m_status->setText("Bt device \"" + devname_short + "\" already discovered.");
 			return;
 		}
 
 		// add new device
 		m_tree->setSortingEnabled(false);
-		QTreeWidgetItem *dev = new QTreeWidgetItem(QStringList(itemtext));
+		QTreeWidgetItem *dev = new QTreeWidgetItem(QStringList(devname));
 		m_tree->addTopLevelItem(dev);
 		m_tree->scrollToItem(dev);
 		m_tree->setCurrentItem(dev);
@@ -161,11 +165,12 @@ void BtDlg::Scan()
 
 		for(const QBluetoothUuid uuid : devinf.serviceUuids())
 		{
-			QTreeWidgetItem *svc = new QTreeWidgetItem(QStringList(uuid.toString()));
+			QTreeWidgetItem *svc = new QTreeWidgetItem(QStringList(
+				"Service UUID: " + uuid.toString()));
 			dev->addChild(svc);
 		}
 
-		m_status->setText("Bt device \"" + itemtext + "\" discovered.");
+		m_status->setText("Bt device \"" + devname_short + "\" discovered.");
 
 		// service discovery
 		if(low_E)
