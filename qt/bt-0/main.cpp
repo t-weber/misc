@@ -39,7 +39,7 @@ int main(int argc, char** argv)
 		// ------------------------------------------------------------------------
 		// misc initialisation
 		// ------------------------------------------------------------------------
-		QLoggingCategory::setFilterRules("*=false\n*.debug=false\n");
+		QLoggingCategory::setFilterRules("*=false\n*.debug=false\n*.bluetooth* = true\n");
 		qInstallMessageHandler([](QtMsgType ty, const QMessageLogContext& ctx, const QString& log) -> void
 		{
 			auto get_msg_type = [](const QtMsgType& _ty) -> std::string
@@ -57,7 +57,8 @@ int main(int argc, char** argv)
 
 			auto get_str = [](const char* pc) -> std::string
 			{
-				if(!pc) return "<unknown>";
+				if(!pc)
+					return "<unknown>";
 				return std::string{"\""} + std::string{pc} + std::string{"\""};
 			};
 

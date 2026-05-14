@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QGridLayout>
 #include <QPermissions>
+#include <QLoggingCategory>
 
 #include <locale>
 #include <iostream>
@@ -23,6 +24,7 @@
 // ----------------------------------------------------------------------------
 BtDlg::BtDlg(QWidget* parent) : QDialog{parent}
 {
+	setWindowTitle("Bt Test");
 	m_listWidget = std::make_shared<QWidget>(this);
 
 	m_list = std::make_shared<QListWidget>(m_listWidget.get());
@@ -37,7 +39,7 @@ BtDlg::BtDlg(QWidget* parent) : QDialog{parent}
 	m_btnStop->setText("Stop");
 
 	m_checkLowPower = std::make_shared<QCheckBox>(m_listWidget.get());
-	m_checkLowPower->setText("Low Power Devices");
+	m_checkLowPower->setText("Low Energy Devices");
 	m_checkLowPower->setChecked(true);
 
 	m_checkPermissions = std::make_shared<QCheckBox>(m_listWidget.get());
@@ -243,6 +245,40 @@ static inline void set_locales()
 
 int main(int argc, char** argv)
 {
+	QLoggingCategory::setFilterRules("*=false\n*.debug=false\n*.bluetooth* = true\n");
+	qInstallMessageHandler([](QtMsgType ty, const QMessageLogContext& ctx, const QString& log) -> void
+	{
+		auto get_msg_type = [](const QtMsgType& _ty) -> std::string
+		{
+			switch(_ty)
+			{
+				case QtDebugMsg: return "debug";
+				case QtWarningMsg: return "warning";
+				case QtCriticalMsg: return "critical";
+				case QtFatalMsg: return "fatal";
+				case QtInfoMsg: return "info";
+				default: return "<unknown>";
+			}
+		};
+
+		auto get_str = [](const char* pc) -> std::string
+		{
+			if(!pc)
+				return "<unknown>";
+			return std::string{"\""} + std::string{pc} + std::string{"\""};
+		};
+
+		std::cerr << "qt " << get_msg_type(ty);
+		if(ctx.function)
+		{
+			std::cerr << " in "
+				<< "file " << get_str(ctx.file) << ", "
+				<< "function " << get_str(ctx.function) << ", "
+				<< "line " << ctx.line;
+		}
+		std::cerr << ": " << log.toStdString() << std::endl;
+	});
+
 	auto app = std::make_unique<QApplication>(argc, argv);
 	set_locales();
 
