@@ -217,8 +217,8 @@ void BtDlg::Scan()
 				}
 
 				// add new service name to the tree item
-				QTreeWidgetItem *svc = new QTreeWidgetItem(QStringList(obj->serviceName()));
-				//QTreeWidgetItem *svc = new QTreeWidgetItem(QStringList(uuid.toString()));
+				QTreeWidgetItem *svc = new QTreeWidgetItem(
+					QStringList(obj->serviceName() + "\nService UUID: " + uuid.toString()));
 				dev->addChild(svc);
 			});
 
@@ -264,7 +264,8 @@ void BtDlg::Scan()
 				}
 
 				// add new service name to the tree item
-				QTreeWidgetItem *svc = new QTreeWidgetItem(QStringList(svcinf.serviceName()));
+				QTreeWidgetItem *svc = new QTreeWidgetItem(
+					QStringList(svcinf.serviceName() + "\nService UUID: " + svcinf.serviceUuid().toString()));
 				dev->addChild(svc);
 			});
 
