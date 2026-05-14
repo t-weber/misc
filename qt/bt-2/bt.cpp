@@ -2,7 +2,7 @@
  * bt test
  * @author Tobias Weber
  * @date 13-May-2026
- * @license see 'LiCENSE.GPL' file
+ * @license see 'LICENSE.GPL' file
  *
  * References:
  *  * example:     https://doc.qt.io/qt-6/qtbluetooth-lowenergyscanner-example.html

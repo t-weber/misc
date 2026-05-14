@@ -2,7 +2,7 @@
  * bt test
  * @author Tobias Weber
  * @date May-2026
- * @license see 'LiCENSE.GPL' file
+ * @license see 'LICENSE.GPL' file
  *
  * References:
  *  * https://doc.qt.io/qt-6/qbluetoothdevicediscoveryagent.html

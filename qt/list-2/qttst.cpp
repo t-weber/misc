@@ -2,7 +2,7 @@
  * qt list widget example
  * @author Tobias Weber
  * @date Dec-2021
- * @license see 'LiCENSE.GPL' file
+ * @license see 'LICENSE.GPL' file
  */
 
 #include "qttst.h"

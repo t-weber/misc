@@ -17,7 +17,6 @@
 #include <QBluetoothDeviceDiscoveryAgent>
 
 #include <vector>
-#include <sstream>
 #include <memory>
 
 

@@ -19,8 +19,6 @@
 #include <QBluetoothServiceDiscoveryAgent>
 #include <QLowEnergyController>
 
-#include <vector>
-#include <sstream>
 #include <memory>
 
 
