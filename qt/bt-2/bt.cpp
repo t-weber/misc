@@ -165,8 +165,22 @@ void BtDlg::Scan()
 
 		for(const QBluetoothUuid uuid : devinf.serviceUuids())
 		{
-			QTreeWidgetItem *svc = new QTreeWidgetItem(QStringList(
-				"Service UUID: " + uuid.toString()));
+			QString svcname = "Service UUID: " + uuid.toString();
+
+			// see if the service is already in the tree
+			/*for(QTreeWidgetItem* item : m_tree->findItems(svcname, Qt::MatchExactly))
+			{
+				if(item->parent() == dev)
+					continue;
+			}*/
+			for(int childidx = 0; childidx < dev->childCount(); ++childidx)
+			{
+				QTreeWidgetItem* item = dev->child(childidx);
+				if(item->text(0) == svcname)
+					return;
+			}
+
+			QTreeWidgetItem *svc = new QTreeWidgetItem(dev, QStringList(svcname));
 			dev->addChild(svc);
 		}
 
@@ -208,17 +222,23 @@ void BtDlg::Scan()
 				[this, dev, ctrl](const QBluetoothUuid& uuid)
 			{
 				QLowEnergyService* obj = ctrl->createServiceObject(uuid, m_btagent.get());
+				QString svcname = obj->serviceName() + "\nService UUID: " + uuid.toString();
 
 				// see if the service is already in the tree
-				for(QTreeWidgetItem* item : m_tree->findItems(obj->serviceName(), Qt::MatchExactly))
+				/*for(QTreeWidgetItem* item : m_tree->findItems(svcname, Qt::MatchExactly))
 				{
 					if(item->parent() == dev)
+						return;
+				}*/
+				for(int childidx = 0; childidx < dev->childCount(); ++childidx)
+				{
+					QTreeWidgetItem* item = dev->child(childidx);
+					if(item->text(0) == svcname)
 						return;
 				}
 
 				// add new service name to the tree item
-				QTreeWidgetItem *svc = new QTreeWidgetItem(
-					QStringList(obj->serviceName() + "\nService UUID: " + uuid.toString()));
+				QTreeWidgetItem *svc = new QTreeWidgetItem(QStringList(svcname));
 				dev->addChild(svc);
 			});
 
@@ -254,18 +274,25 @@ void BtDlg::Scan()
 				new QBluetoothServiceDiscoveryAgent(devinf.address(), m_btagent.get());
 
 			connect(ctrl, &QBluetoothServiceDiscoveryAgent::serviceDiscovered,
-				[this, dev](const QBluetoothServiceInfo& svcinf)
+				[/*this,*/ dev](const QBluetoothServiceInfo& svcinf)
 			{
+				QString svcname = svcinf.serviceName() + "\nService UUID: " + svcinf.serviceUuid().toString();
+
 				// see if the service is already in the tree
-				for(QTreeWidgetItem* item : m_tree->findItems(svcinf.serviceName(), Qt::MatchExactly))
+				/*for(QTreeWidgetItem* item : m_tree->findItems(svcname, Qt::MatchExactly))
 				{
 					if(item->parent() == dev)
+						return;
+				}*/
+				for(int childidx = 0; childidx < dev->childCount(); ++childidx)
+				{
+					QTreeWidgetItem* item = dev->child(childidx);
+					if(item->text(0) == svcname)
 						return;
 				}
 
 				// add new service name to the tree item
-				QTreeWidgetItem *svc = new QTreeWidgetItem(
-					QStringList(svcinf.serviceName() + "\nService UUID: " + svcinf.serviceUuid().toString()));
+				QTreeWidgetItem *svc = new QTreeWidgetItem(QStringList(svcname));
 				dev->addChild(svc);
 			});
 
