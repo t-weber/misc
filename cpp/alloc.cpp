@@ -9,6 +9,7 @@
 
 
 #include <vector>
+#include <memory>
 #include <iostream>
 
 
@@ -78,8 +79,9 @@ struct alloc_noinit
 				<< std::hex << reinterpret_cast<void*>(mem) << "." << std::endl;
 
 			// call constructor
-			void *pmem = reinterpret_cast<void*>(mem);
-			new(pmem) t_other_elem{ std::forward<t_args>(args)... };
+			//void *pmem = reinterpret_cast<void*>(mem);
+			//new(pmem) t_other_elem{ std::forward<t_args>(args)... };
+			std::construct_at<t_other_elem, t_args...>(mem, std::forward<t_args>(args)...);
 		}
 	}
 
