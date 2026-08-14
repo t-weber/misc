@@ -29,8 +29,33 @@ struct gen_iterator
 	using pointer = std::conditional<is_const, const value_type*, value_type*>::type;
 	using reference = std::conditional<is_const, const value_type&, value_type&>::type;
 
-	explicit gen_iterator(t_vec *vec, size_type idx) : m_vec{vec}, m_idx{idx}
+	explicit gen_iterator(t_vec *vec = nullptr, size_type idx = 0) : m_vec{vec}, m_idx{idx}
 	{ }
+
+	gen_iterator(const gen_iterator<t_vec_, is_const>& other)
+	{
+		operator=(other);
+	}
+
+	gen_iterator(gen_iterator<t_vec_, is_const>&& other) noexcept
+		: m_vec{ std::exchange(other.m_vec, nullptr) }, m_idx{ other.m_idx }
+	{ }
+
+	gen_iterator<t_vec_, is_const>& operator=(const gen_iterator<t_vec_, is_const>& other)
+	{
+		m_vec = other.m_vec;
+		m_idx = other.m_idx;
+
+		return *this;
+	}
+
+	gen_iterator<t_vec_, is_const>& operator=(gen_iterator<t_vec_, is_const>&& other)
+	{
+		m_vec = std::exchange(other.m_vec, nullptr);
+		m_idx = other.m_idx;
+
+		return *this;
+	}
 
 	bool operator==(gen_iterator<t_vec_, is_const> iter) const
 	{
